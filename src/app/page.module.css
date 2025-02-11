@@ -1,0 +1,118 @@
+.main {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 5rem;
+  min-height: 100vh;
+  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+}
+
+.nav {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  width: 100%;
+  padding: 2rem 0;
+}
+
+.titleHeader {
+  display: flex;
+  align-items: center;
+}
+
+.headerColor1 {
+  background-color: #f87171;
+  width: 2rem;
+  height: 1.5rem;
+  margin-right: 0.3rem;
+}
+
+.headerColor2 {
+  background-color: #facc15;
+  width: 1rem;
+  height: 1.5rem;
+  margin-right: 0.3rem;
+}
+
+.headerColor3 {
+  background-color: #3080a3;
+  width: 0.5rem;
+  height: 1.5rem;
+  margin-right: 1.5rem;
+}
+
+.walletItem {
+  display: flex;
+  align-items: center;
+}
+
+.imageContainer {
+  background-color: #ffffff;
+  border-radius: 50%;
+  margin-right: 0.5rem;
+  display: flex;
+  padding: 0.2rem;
+}
+
+.w100 {
+  width: 100%;
+}
+
+.r1 {
+  margin-right: 1rem;
+}
+
+.buttonFunction {
+  margin-right: 0.7rem;
+  margin-bottom: 0.5rem;
+}
+
+.koinosForm {
+  width: 100%;
+  display: flex;
+  flex-direction: row;
+  margin-bottom: 1.5rem;
+}
+
+.koinosFormLine {
+  background-color: rgb(148, 148, 148);
+  width: 0.2rem;
+  margin-right: 1rem;
+}
+
+.arg {
+  margin-bottom: 1.5rem;
+}
+
+.argFormat {
+  font-size: 0.7rem;
+}
+
+.argName {
+  margin-bottom: 0.5rem;
+}
+
+.arrayButtons {
+  margin-top: 1rem;
+}
+
+.signAs {
+  font-size: 0.7rem;
+  margin-bottom: 0.5rem;
+}
+
+.code {
+  white-space: pre;
+  background-color: #3b3b3b;
+  color: #ffffff;
+  font-family: monospace;
+  padding: 1.5em;
+  border-radius: 0.5rem;
+  margin: 1em 0em;
+}
+
+.footer {
+  min-height: 5rem;
+  width: 100%;
+}

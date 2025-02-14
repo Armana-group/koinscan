@@ -30,16 +30,10 @@ export default function Home() {
 
       if (readOnly) {
         if (textArgs === "{}") textArgs = "";
-        setCode(
-          `const { result } = await contract.functions.${selectedMethod}(${textArgs});`,
-        );
         const res = await readContract(selectedMethod, args);
         setResults(`result:\n\n${JSON.stringify(res, null, 2)}`);
       } else {
         if (!signer) throw new Error("Connect wallet");
-        setCode(`const { transaction, receipt } = await contract.functions.${selectedMethod}(${textArgs},{
-  rcLimit: 10_00000000, // 10 mana
-});`);
 
         const onTxSubmit = (receipt?: TransactionReceipt) => {
           notification.success({

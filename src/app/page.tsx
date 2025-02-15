@@ -1,14 +1,18 @@
 "use client";
 
 import { ConfigProvider } from "antd";
+import { useRef } from "react";
+import { Search } from "lucide-react";
+import { useRouter } from "next/navigation";
 import theme from "./theme";
 import { Input } from "@/components/ui/input";
-import { Search } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Navigation } from "@/components/navigation";
 import { AuroraText } from "@/components/magicui/aurora-text";
 
 export default function Home() {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const router = useRouter();
   return (
     <ConfigProvider theme={theme}>
       <div className="min-h-screen bg-background transition-colors duration-300">
@@ -38,6 +42,12 @@ export default function Home() {
                   type="text"
                   placeholder="Search by address, transaction hash, block, or token"
                   className="pl-12 h-14 text-lg bg-background border-2 border-border/50 rounded-2xl shadow-[0_0_0_1px_rgba(0,0,0,0.02)] hover:border-border focus:border-foreground/30 focus:ring-2 focus:ring-foreground/10 transition-all"
+                  ref={inputRef}
+                  onKeyDown={(event: React.KeyboardEvent<HTMLInputElement>) => {
+                    if (event.key === "Enter" && inputRef.current?.value.trim()) {
+                      router.push(`/contracts/${inputRef.current.value}`);
+                    }
+                  }}
                 />
               </div>
 

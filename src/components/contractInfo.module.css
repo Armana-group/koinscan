@@ -1,0 +1,30 @@
+.contractInfo {
+  display: flex;
+  flex-direction: row;
+  width: 100%;
+  margin-bottom: 2rem;
+}
+
+@media (max-width: 768px) {
+  .contractInfo {
+    flex-direction: column;
+  }
+}
+
+.h2Wrap {
+  overflow-wrap: break-word;
+}
+
+.image {
+  width: 6rem;
+  margin-right: 1rem;
+}
+
+.image img {
+  width: inherit;
+  border-radius: 20%;
+  box-shadow: 0 0 2em #fff;
+}
+
+.description {
+}

@@ -1,11 +1,18 @@
 .main {
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
+  /* justify-content: space-between; */
   align-items: center;
   padding: 0 5rem;
   min-height: 100vh;
   font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+}
+
+@media (max-width: 768px) {
+  .main {
+    padding: 0 1.5rem; /* Reduce padding for smaller screens */
+    min-height: auto; /* Adjust height to avoid overflow */
+  }
 }
 
 .nav {

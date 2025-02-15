@@ -30,7 +30,7 @@ export const HeaderComponent = (props: {
         <div className={styles.headerColor1}></div>
         <div className={styles.headerColor2}></div>
         <div className={styles.headerColor3}></div>
-        <h1>Koinos Contract</h1>
+        {/* <h1>Koinos Contract</h1> */}
       </div>
       <Dropdown
         menu={{
@@ -63,7 +63,7 @@ export const HeaderComponent = (props: {
               ),
               key: "walletConnect",
             },
-            {
+            /* {
               label: (
                 <div className={styles.walletItem}>
                   <Image
@@ -76,7 +76,7 @@ export const HeaderComponent = (props: {
                 </div>
               ),
               key: "mkw",
-            },
+            }, */
             {
               label: "Disconnect",
               key: "disconnect",

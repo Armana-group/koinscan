@@ -1,141 +1,82 @@
 "use client";
 
-import { Button, notification, ConfigProvider } from "antd";
-import { useCallback, useState } from "react";
-import { SignerInterface, TransactionReceipt } from "koilib";
+import { ConfigProvider } from "antd";
+import { useRef } from "react";
+import { Search } from "lucide-react";
+import { useRouter } from "next/navigation";
 import theme from "./theme";
-import styles from "./page.module.css";
-import { KoinosForm, prettyName } from "../components/KoinosForm";
-import { ProjectDescription } from "@/components/ProjectDescription";
-import { HeaderComponent } from "@/components/HeaderComponent";
-import { FooterComponent } from "@/components/FooterComponent";
-import { contract, readContract, writeContract } from "@/koinos/contract";
-import { BLOCK_EXPLORER } from "@/koinos/constants";
+import { Input } from "@/components/ui/input";
+import { ThemeToggle } from "@/components/theme-toggle";
+import { Navigation } from "@/components/navigation";
+import { AuroraText } from "@/components/magicui/aurora-text";
 
 export default function Home() {
-  const [selectedMethod, setSelectedMethod] = useState<string>("");
-  const [submitText, setSubmitText] = useState<string>("");
-  const [args, setArgs] = useState<unknown>({});
-  const [signer, setSigner] = useState<SignerInterface | undefined>(undefined);
-  const [code, setCode] = useState<string>("");
-  const [loading, setLoading] = useState<boolean>(false);
-  const [results, setResults] = useState<string>("");
-
-  const submit = useCallback(async () => {
-    try {
-      setLoading(true);
-      setResults("");
-      let textArgs = JSON.stringify(args, null, 2);
-      const { read_only: readOnly } = contract.abi!.methods[selectedMethod];
-
-      if (readOnly) {
-        if (textArgs === "{}") textArgs = "";
-        const res = await readContract(selectedMethod, args);
-        setResults(`result:\n\n${JSON.stringify(res, null, 2)}`);
-      } else {
-        if (!signer) throw new Error("Connect wallet");
-
-        const onTxSubmit = (receipt?: TransactionReceipt) => {
-          notification.success({
-            message: "Transaction submitted",
-            description:
-              "the transaction is in the mempool waiting to be mined",
-            placement: "bottomLeft",
-            duration: 15,
-          });
-          setResults(`receipt:\n\n${JSON.stringify(receipt, null, 2)}`);
-        };
-        const { transaction } = await writeContract(
-          selectedMethod,
-          args,
-          signer,
-          onTxSubmit,
-        );
-
-        notification.success({
-          message: "Transaction mined",
-          description: (
-            <span>
-              see confirmation in{" "}
-              <a
-                target="_blank"
-                href={`${BLOCK_EXPLORER}/tx/${transaction!.id!}`}
-              >
-                {" "}
-                koinosblocks{" "}
-              </a>{" "}
-            </span>
-          ),
-          placement: "bottomLeft",
-          duration: 15,
-        });
-      }
-      setLoading(false);
-    } catch (error) {
-      notification.error({
-        message: (error as Error).message,
-        placement: "bottomLeft",
-        duration: 15,
-      });
-      setLoading(false);
-    }
-  }, [args, signer, contract, selectedMethod]);
-
-  const contractMethods = Object.keys(contract.abi!.methods).map((name) => {
-    return {
-      name,
-      prettyName: prettyName(name),
-      readOnly: contract.abi!.methods[name].read_only,
-    };
-  });
-
+  const inputRef = useRef<HTMLInputElement>(null);
+  const router = useRouter();
   return (
     <ConfigProvider theme={theme}>
-      <main className={styles.main}>
-        <HeaderComponent onChange={(s) => setSigner(s)}></HeaderComponent>
-        <ProjectDescription></ProjectDescription>
-        <div className={styles.w100}>
-          <h3>Select Function</h3>
-          {contractMethods.map((contractMethod) => (
-            <Button
-              key={contractMethod.name}
-              onClick={() => {
-                setSelectedMethod(contractMethod.name);
-                setResults("");
-                setCode("");
-                if (contractMethod.readOnly) {
-                  setSubmitText("Read");
-                } else {
-                  setSubmitText("Send");
-                }
-              }}
-              className={styles.buttonFunction}
-            >
-              {contractMethod.prettyName}
-            </Button>
-          ))}
-        </div>
-        {selectedMethod ? (
-          <div className={styles.w100}>
-            <h3>{prettyName(selectedMethod)}</h3>
-            <p>{contract.abi!.methods[selectedMethod].description}</p>
-            <KoinosForm
-              contract={contract}
-              typeName={contract.abi!.methods[selectedMethod].argument}
-              onChange={(newArgs) => setArgs(newArgs)}
-            ></KoinosForm>
-            {signer && !contract.abi!.methods[selectedMethod].read_only ? (
-              <div className={styles.signAs}>Sign as {signer.getAddress()}</div>
-            ) : null}
-            <Button type="primary" onClick={submit} loading={loading}>
-              {submitText}
-            </Button>
-            {code ? <div className={styles.code}>{code}</div> : null}
-            {results ? <div className={styles.code}>{results}</div> : null}
+      <div className="min-h-screen bg-background transition-colors duration-300">
+        <div className="container mx-auto px-4">
+          {/* Navigation */}
+          <div className="pt-8">
+            <Navigation />
           </div>
-        ) : null}
-        <FooterComponent></FooterComponent>
-      </main>
+
+          {/* Main Content */}
+          <main className="flex min-h-[calc(100vh-12rem)] flex-col items-center justify-center -mt-16">
+            <div className="max-w-3xl w-full space-y-12 text-center">
+              <div className="space-y-4">
+                <h1 className="text-5xl font-bold tracking-tight text-foreground">
+                  <AuroraText>Explore the Koinos blockchain</AuroraText>
+                </h1>
+                <p className="text-xl text-muted-foreground">
+                  Search for transactions, blocks, accounts, and smart contracts
+                </p>
+              </div>
+
+              <div className="relative group">
+                <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
+                  <Search className="h-5 w-5 text-muted-foreground" />
+                </div>
+                <Input
+                  type="text"
+                  placeholder="Search by address, transaction hash, block, or token"
+                  className="pl-12 h-14 text-lg bg-background border-2 border-border/50 rounded-2xl shadow-[0_0_0_1px_rgba(0,0,0,0.02)] hover:border-border focus:border-foreground/30 focus:ring-2 focus:ring-foreground/10 transition-all"
+                  ref={inputRef}
+                  onKeyDown={(event: React.KeyboardEvent<HTMLInputElement>) => {
+                    if (event.key === "Enter" && inputRef.current?.value.trim()) {
+                      router.push(`/contracts/${inputRef.current.value}`);
+                    }
+                  }}
+                />
+              </div>
+
+              <div className="space-y-4">
+                <div className="flex flex-wrap gap-2 justify-center">
+                  {[
+                    "Latest blocks",
+                    "Recent transactions",
+                    "Top tokens",
+                    "Active contracts",
+                  ].map((item) => (
+                    <button
+                      key={item}
+                      className="px-4 py-2 rounded-full bg-background border border-border text-sm text-foreground hover:bg-muted/50 transition-colors"
+                    >
+                      {item}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </main>
+
+          {/* Theme Toggle */}
+          <div className="fixed bottom-8 left-8">
+            <ThemeToggle />
+          </div>
+        </div>
+      </div>
     </ConfigProvider>
   );
 }

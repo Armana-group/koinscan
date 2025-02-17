@@ -15,7 +15,7 @@ export const ContractInfo = (props: {
         <h2 className={styles.h2Wrap}>
           {props.nickname ? `@${props.nickname}` : "Koinos address"}
         </h2>
-        <p>{props.address}</p>
+        <p>{props.address ? props.address : "loading..."}</p>
         <p>{props.description}</p>
       </div>
     </div>

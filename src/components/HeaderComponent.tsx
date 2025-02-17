@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Button, Dropdown, notification } from "antd";
 import Image from "next/image";
 import { SignerInterface } from "koilib";
@@ -24,9 +25,10 @@ export const HeaderComponent = (props: {
   const [walletName, setWalletName] = useState<WalletName | undefined>(
     undefined,
   );
+  const router = useRouter()
   return (
     <nav className={styles.nav}>
-      <div className={styles.titleHeader}>
+      <div className={styles.titleHeader} onClick={() => { router.push("/"); }}>
         <div className={styles.headerColor1}></div>
         <div className={styles.headerColor2}></div>
         <div className={styles.headerColor3}></div>

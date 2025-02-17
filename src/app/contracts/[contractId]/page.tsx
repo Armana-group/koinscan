@@ -3,9 +3,9 @@
 import { Button, notification, ConfigProvider } from "antd";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Contract, Provider, Serializer, SignerInterface, utils } from "koilib";
-import theme from "../theme";
-import styles from "../page.module.css";
-import { KoinosForm, prettyName } from "../../components/KoinosForm";
+import theme from "../../theme";
+import styles from "../../page.module.css";
+import { KoinosForm, prettyName } from "../../../components/KoinosForm";
 import { HeaderComponent } from "@/components/HeaderComponent";
 import { FooterComponent } from "@/components/FooterComponent";
 import {

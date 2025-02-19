@@ -1,9 +1,7 @@
 "use client";
 
-import { Button, notification, ConfigProvider } from "antd";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Contract, Provider, Serializer, SignerInterface, utils } from "koilib";
-import theme from "../../theme";
 import styles from "../../page.module.css";
 import { KoinosForm, prettyName } from "../../../components/KoinosForm";
 import { HeaderComponent } from "@/components/HeaderComponent";
@@ -14,12 +12,15 @@ import {
   RPC_NODE,
 } from "@/koinos/constants";
 import { ContractInfo } from "@/components/ContractInfo";
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
 
 export default function ContractPage({
   params,
 }: {
   params: { contractId: string };
 }) {
+  const { toast } = useToast();
   const [selectedMethod, setSelectedMethod] = useState<string>("");
   const [submitText, setSubmitText] = useState<string>("");
   const [args, setArgs] = useState<unknown>({});
@@ -147,93 +148,92 @@ export default function ContractPage({
           rcLimit: 10_00000000,
         });
 
-        notification.success({
-          message: "Transaction submitted",
-          description: "the transaction is in the mempool waiting to be mined",
-          placement: "bottomLeft",
-          duration: 15,
+        toast({
+          title: "Transaction submitted",
+          description: "The transaction is in the mempool waiting to be mined",
         });
         setResults(`receipt:\n\n${JSON.stringify(receipt, null, 2)}`);
 
         await transaction!.wait();
 
-        notification.success({
-          message: "Transaction mined",
+        toast({
+          title: "Transaction mined",
           description: (
             <span>
-              see confirmation in{" "}
+              See confirmation in{" "}
               <a
                 target="_blank"
                 href={`${BLOCK_EXPLORER}/tx/${transaction!.id!}`}
+                className="underline"
               >
-                {" "}
-                koinosblocks{" "}
-              </a>{" "}
+                koinosblocks
+              </a>
             </span>
           ),
-          placement: "bottomLeft",
-          duration: 15,
         });
       }
       setLoading(false);
     } catch (error) {
-      notification.error({
-        message: (error as Error).message,
-        placement: "bottomLeft",
-        duration: 15,
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: (error as Error).message,
       });
       setLoading(false);
     }
-  }, [args, signer, contract, selectedMethod]);
+  }, [args, signer, contract, selectedMethod, toast]);
 
   return (
-    <ConfigProvider theme={theme}>
-      <main className={styles.main}>
-        <HeaderComponent onChange={(s) => setSigner(s)}></HeaderComponent>
-        <ContractInfo {...info}></ContractInfo>
+    <main className={styles.main}>
+      <HeaderComponent onChange={(s) => setSigner(s)}></HeaderComponent>
+      <ContractInfo {...info}></ContractInfo>
+      <div className={styles.w100}>
+        {contractMethods
+          ? contractMethods.map((contractMethod) => (
+              <Button
+                key={contractMethod.name}
+                variant="outline"
+                onClick={() => {
+                  setSelectedMethod(contractMethod.name);
+                  setResults("");
+                  setCode("");
+                  if (contractMethod.readOnly) {
+                    setSubmitText("Read");
+                  } else {
+                    setSubmitText("Send");
+                  }
+                }}
+                className={styles.buttonFunction}
+              >
+                {contractMethod.prettyName}
+              </Button>
+            ))
+          : "loading..."}
+      </div>
+      {contract && selectedMethod ? (
         <div className={styles.w100}>
-          {contractMethods
-            ? contractMethods.map((contractMethod) => (
-                <Button
-                  key={contractMethod.name}
-                  onClick={() => {
-                    setSelectedMethod(contractMethod.name);
-                    setResults("");
-                    setCode("");
-                    if (contractMethod.readOnly) {
-                      setSubmitText("Read");
-                    } else {
-                      setSubmitText("Send");
-                    }
-                  }}
-                  className={styles.buttonFunction}
-                >
-                  {contractMethod.prettyName}
-                </Button>
-              ))
-            : "loading..."}
+          <h3>{prettyName(selectedMethod)}</h3>
+          <p>{contract.abi!.methods[selectedMethod].description}</p>
+          <KoinosForm
+            contract={contract}
+            typeName={contract.abi!.methods[selectedMethod].argument}
+            onChange={(newArgs) => setArgs(newArgs)}
+          ></KoinosForm>
+          {signer && !contract.abi!.methods[selectedMethod].read_only ? (
+            <div className={styles.signAs}>Sign as {signer.getAddress()}</div>
+          ) : null}
+          <Button 
+            onClick={submit} 
+            disabled={loading}
+            className="mt-4"
+          >
+            {submitText}
+          </Button>
+          {code ? <div className={styles.code}>{code}</div> : null}
+          {results ? <div className={styles.code}>{results}</div> : null}
         </div>
-        {contract && selectedMethod ? (
-          <div className={styles.w100}>
-            <h3>{prettyName(selectedMethod)}</h3>
-            <p>{contract.abi!.methods[selectedMethod].description}</p>
-            <KoinosForm
-              contract={contract}
-              typeName={contract.abi!.methods[selectedMethod].argument}
-              onChange={(newArgs) => setArgs(newArgs)}
-            ></KoinosForm>
-            {signer && !contract.abi!.methods[selectedMethod].read_only ? (
-              <div className={styles.signAs}>Sign as {signer.getAddress()}</div>
-            ) : null}
-            <Button type="primary" onClick={submit} loading={loading}>
-              {submitText}
-            </Button>
-            {code ? <div className={styles.code}>{code}</div> : null}
-            {results ? <div className={styles.code}>{results}</div> : null}
-          </div>
-        ) : null}
-        <FooterComponent></FooterComponent>
-      </main>
-    </ConfigProvider>
+      ) : null}
+      <FooterComponent></FooterComponent>
+    </main>
   );
 }

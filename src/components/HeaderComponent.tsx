@@ -19,7 +19,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
-import { notification } from "antd";
+import { useToast } from "@/hooks/use-toast";
 
 function shortAddress(address: string): string {
   return `${address.slice(0, 4)}...${address.slice(address.length - 4)}`;
@@ -31,6 +31,7 @@ export const HeaderComponent = (props: {
   const [addr, setAddr] = useState<string>("");
   const [walletName, setWalletName] = useState<WalletName | undefined>(undefined);
   const router = useRouter();
+  const { toast } = useToast();
 
   const handleWalletAction = async (action: WalletName | "disconnect") => {
     try {
@@ -52,8 +53,10 @@ export const HeaderComponent = (props: {
       setWalletName(wName);
       if (props.onChange) props.onChange(signer);
     } catch (error) {
-      notification.error({
-        message: (error as Error).message,
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: (error as Error).message,
       });
       console.error(error);
     }

@@ -1,3 +1,5 @@
+"use client";
+
 import { SignerInterface } from "koilib";
 import * as kondor from "kondor-js";
 import MyKoinosWallet from "@roamin/my-koinos-wallet-sdk";

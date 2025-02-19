@@ -1,7 +1,10 @@
 import { useMemo, useState } from "react";
 import { Enum } from "protobufjs";
-import { Button, Input, Radio, RadioChangeEvent } from "antd";
 import { Contract, Serializer } from "koilib";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
 import styles from "../app/page.module.css";
 
 const nativeTypes = [
@@ -93,6 +96,9 @@ export function prettyName(name: string): string {
     })
     .join(" ");
 }
+
+// Replace RadioChangeEvent type with standard HTML event
+type RadioChangeEvent = React.ChangeEvent<HTMLInputElement>;
 
 export const KoinosForm = (props: KoinosFormProps) => {
   const [value, setValue] = useState<Record<string, unknown>>({});
@@ -263,22 +269,17 @@ export const KoinosForm = (props: KoinosFormProps) => {
                         ></KoinosForm>
                       ) : null}
                       {arg.nested && arg.isEnum ? (
-                        <Radio.Group
-                          onChange={(event) =>
-                            updateValue({
-                              name: arg.name,
-                              updateArray: true,
-                              index: i,
-                              event,
-                            })
-                          }
+                        <RadioGroup
+                          defaultValue={arg.value as string}
+                          onValueChange={(value) => updateValue({ name: arg.name, val: value })}
                         >
-                          {arg.enums!.map((en) => (
-                            <Radio key={en.value} value={en.value}>
-                              {en.name}
-                            </Radio>
+                          {arg.enums?.map((enumValue) => (
+                            <div key={enumValue.name} className="flex items-center space-x-2">
+                              <RadioGroupItem value={enumValue.name} id={`${arg.name}-${enumValue.name}`} />
+                              <Label htmlFor={`${arg.name}-${enumValue.name}`}>{enumValue.name}</Label>
+                            </div>
                           ))}
-                        </Radio.Group>
+                        </RadioGroup>
                       ) : null}
                       {!arg.nested ? (
                         <Input
@@ -341,28 +342,33 @@ export const KoinosForm = (props: KoinosFormProps) => {
                 ></KoinosForm>
               ) : null}
               {!arg.repeated && arg.nested && arg.isEnum ? (
-                <Radio.Group
-                  onChange={(event) => updateValue({ name: arg.name, event })}
+                <RadioGroup
+                  defaultValue={arg.value as string}
+                  onValueChange={(value) => updateValue({ name: arg.name, val: value })}
                 >
-                  {arg.enums!.map((en) => (
-                    <Radio key={en.value} value={en.value}>
-                      {en.name}
-                    </Radio>
+                  {arg.enums?.map((enumValue) => (
+                    <div key={enumValue.name} className="flex items-center space-x-2">
+                      <RadioGroupItem value={enumValue.name} id={`${arg.name}-${enumValue.name}`} />
+                      <Label htmlFor={`${arg.name}-${enumValue.name}`}>{enumValue.name}</Label>
+                    </div>
                   ))}
-                </Radio.Group>
+                </RadioGroup>
               ) : null}
               {!arg.repeated && !arg.nested && arg.type === "bool" ? (
-                <Radio.Group
-                  onChange={(event) => updateValue({ name: arg.name, event })}
+                <RadioGroup
+                  defaultValue={arg.value as string}
+                  onValueChange={(value) => updateValue({ name: arg.name, val: value })}
                 >
-                  <Radio value={false}>false</Radio>
-                  <Radio value={true}>true</Radio>
-                </Radio.Group>
+                  <RadioGroupItem value="false" id={`${arg.name}-false`} />
+                  <RadioGroupItem value="true" id={`${arg.name}-true`} />
+                </RadioGroup>
               ) : null}
               {!arg.repeated && !arg.nested && arg.type !== "bool" ? (
                 <Input
                   type="text"
-                  onChange={(event) => updateValue({ name: arg.name, event })}
+                  value={arg.value as string}
+                  onChange={(e) => updateValue({ name: arg.name, event: e })}
+                  className="w-full"
                 ></Input>
               ) : null}
             </div>

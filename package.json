@@ -10,6 +10,8 @@
   },
   "dependencies": {
     "@armana/walletconnect-koinos-sdk-js": "^0.1.4",
+    "@radix-ui/react-dropdown-menu": "^2.1.6",
+    "@radix-ui/react-slot": "^1.1.2",
     "@roamin/my-koinos-wallet-sdk": "^0.0.9",
     "antd": "^5.15.4",
     "clsx": "^2.1.1",

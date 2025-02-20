@@ -21,7 +21,7 @@ if (typeof window !== 'undefined') {
     WALLET_CONNECT_MODAL_SIGN_OPTIONS,
   );
   mkw = new MyKoinosWallet(
-    "https://my-koinos-wallet.vercel.app/embed/wallet-connector",
+    "https://my.koinos.io/embed/wallet-connector"
   );
 }
 

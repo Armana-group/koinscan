@@ -45,14 +45,14 @@ importers:
         specifier: ^12.4.2
         version: 12.4.5(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       koilib:
-        specifier: ^9.1.0
-        version: 9.1.0
+        specifier: ^5.5.6
+        version: 5.6.1
       kondor-js:
         specifier: ^1.2.0
         version: 1.2.0
       lucide-react:
-        specifier: ^0.475.0
-        version: 0.475.0(react@18.3.1)
+        specifier: ^0.363.0
+        version: 0.363.0(react@18.3.1)
       motion:
         specifier: ^12.4.2
         version: 12.4.5(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
@@ -66,10 +66,10 @@ importers:
         specifier: ^7.2.4
         version: 7.4.0
       react:
-        specifier: ^18
+        specifier: ^18.2.0
         version: 18.3.1
       react-dom:
-        specifier: ^18
+        specifier: ^18.2.0
         version: 18.3.1(react@18.3.1)
       tailwind-merge:
         specifier: ^3.0.1
@@ -2186,9 +2186,6 @@ packages:
   koilib@5.6.1:
     resolution: {integrity: sha512-Ulon6gOYIVf11XzQ18BwY/p6VHdQ3JyIgqgZ/RsATg/VuUUvWoZ8w4nPNBBMohPhXh5lmu/O1E/wQ8BGxfpEvg==}
 
-  koilib@9.1.0:
-    resolution: {integrity: sha512-70H511Y63UXA0gleSNRfPnwn0Aba3hWJ3j6DzMM5GKfDMvsR4bfv6VzQE6MWDQPWVfJm37ueFh04YxBBTnrGYg==}
-
   kondor-js@1.2.0:
     resolution: {integrity: sha512-TC3TIHztOpXtM5yIB9CzlVrdNoFQ15mCI/qM8mCkGeMwtayI22EcqtEmRdnVhHI91JBmu7PIxDo9S/Ge8IQgIA==}
 
@@ -2255,10 +2252,10 @@ packages:
   lru-cache@5.1.1:
     resolution: {integrity: sha512-KpNARQA3Iwv+jTA0utUVVbrh+Jlrr1Fv0e56GGzAFOXN7dk/FviaDW8LHmK52DlcH4WP2n6gI8vN1aesBFgo9w==}
 
-  lucide-react@0.475.0:
-    resolution: {integrity: sha512-NJzvVu1HwFVeZ+Gwq2q00KygM1aBhy/ZrhY9FsAgJtpB+E4R7uxRk9M2iKvHa6/vNxZydIB59htha4c2vvwvVg==}
+  lucide-react@0.363.0:
+    resolution: {integrity: sha512-AlsfPCsXQyQx7wwsIgzcKOL9LwC498LIMAo+c0Es5PkHJa33xwmYAkkSoKoJWWWSYQEStqu58/jT4tL2gi32uQ==}
     peerDependencies:
-      react: ^16.5.1 || ^17.0.0 || ^18.0.0 || ^19.0.0
+      react: ^16.5.1 || ^17.0.0 || ^18.0.0
 
   math-intrinsics@1.1.0:
     resolution: {integrity: sha512-/IXtbwEk5HTPyEwyKX6hGkYXxM9nbj64B+ilVJnC/R6B0pH5G4V3b0pVbL7DBj4tkhBAppbQUlf6F6Xl9LHu1g==}
@@ -6035,17 +6032,6 @@ snapshots:
     transitivePeerDependencies:
       - encoding
 
-  koilib@9.1.0:
-    dependencies:
-      '@noble/hashes': 1.7.1
-      '@noble/secp256k1': 1.7.1
-      '@roamin/koinos-pb-to-proto': 0.0.3
-      cross-fetch: 3.2.0
-      multibase: 4.0.6
-      protobufjs: 7.4.0
-    transitivePeerDependencies:
-      - encoding
-
   kondor-js@1.2.0:
     dependencies:
       multibase: 4.0.6
@@ -6111,7 +6097,7 @@ snapshots:
     dependencies:
       yallist: 3.1.1
 
-  lucide-react@0.475.0(react@18.3.1):
+  lucide-react@0.363.0(react@18.3.1):
     dependencies:
       react: 18.3.1
 

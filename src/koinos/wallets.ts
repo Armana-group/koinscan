@@ -12,15 +12,24 @@ import { NETWORK_NAME, WALLET_CONNECT_MODAL_SIGN_OPTIONS } from "./constants";
 
 export type WalletName = "kondor" | "mkw" | "walletConnect";
 
-// setup wallets
-const walletConnectKoinos = new WebWalletConnectKoinos(
-  WALLET_CONNECT_MODAL_SIGN_OPTIONS,
-);
-const mkw = new MyKoinosWallet(
-  "https://my-koinos-wallet.vercel.app/embed/wallet-connector",
-);
+// Initialize wallets only in browser environment
+let walletConnectKoinos: WebWalletConnectKoinos | null = null;
+let mkw: MyKoinosWallet | null = null;
+
+if (typeof window !== 'undefined') {
+  walletConnectKoinos = new WebWalletConnectKoinos(
+    WALLET_CONNECT_MODAL_SIGN_OPTIONS,
+  );
+  mkw = new MyKoinosWallet(
+    "https://my-koinos-wallet.vercel.app/embed/wallet-connector",
+  );
+}
 
 export async function connectWallet(walletName: WalletName) {
+  if (typeof window === 'undefined') {
+    throw new Error('Cannot connect wallet in server environment');
+  }
+
   switch (walletName) {
     case "kondor": {
       const accounts = await kondor.getAccounts();
@@ -30,6 +39,9 @@ export async function connectWallet(walletName: WalletName) {
       return accounts[0].address;
     }
     case "walletConnect": {
+      if (!walletConnectKoinos) {
+        throw new Error('WalletConnect not initialized');
+      }
       const [address] = await walletConnectKoinos.connect(
         [
           (NETWORK_NAME as string) === "mainnet"
@@ -45,6 +57,9 @@ export async function connectWallet(walletName: WalletName) {
       return address;
     }
     case "mkw": {
+      if (!mkw) {
+        throw new Error('MyKoinosWallet not initialized');
+      }
       await mkw.connect();
       await mkw.requestPermissions({
         accounts: ["getAccounts"],
@@ -61,12 +76,18 @@ export async function connectWallet(walletName: WalletName) {
 }
 
 export async function disconnectWallet(walletName: WalletName) {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
   switch (walletName) {
     case "kondor": {
       return;
     }
     case "walletConnect": {
-      await walletConnectKoinos.disconnect();
+      if (walletConnectKoinos) {
+        await walletConnectKoinos.disconnect();
+      }
       return;
     }
     case "mkw": {
@@ -82,14 +103,24 @@ export function getWalletSigner(
   walletName: WalletName,
   address: string,
 ): SignerInterface {
+  if (typeof window === 'undefined') {
+    throw new Error('Cannot get wallet signer in server environment');
+  }
+
   switch (walletName) {
     case "kondor": {
       return kondor.getSigner(address);
     }
     case "walletConnect": {
+      if (!walletConnectKoinos) {
+        throw new Error('WalletConnect not initialized');
+      }
       return walletConnectKoinos.getSigner(address);
     }
     case "mkw": {
+      if (!mkw) {
+        throw new Error('MyKoinosWallet not initialized');
+      }
       return mkw.getSigner(address);
     }
     default: {

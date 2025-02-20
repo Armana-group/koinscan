@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect, useCallback } from "react";
 import { Enum } from "protobufjs";
 import { Contract, Serializer } from "koilib";
 import { Button } from "@/components/ui/button";
@@ -58,29 +58,39 @@ function buildInitialInputValues(
 ): unknown {
   if (repeated) {
     if (nested) {
-      const protobufType = serializer.root.lookupTypeOrEnum(type);
-      if (!protobufType.fields) return "";
-      const nestedArgs = Object.keys(protobufType.fields).map((f) => {
-        const { type } = protobufType.fields[f];
-        const nested = !nativeTypes.includes(type);
-        return buildInitialInputValues(serializer, type, nested, false);
-      });
-      // build 1 element
-      return [nestedArgs];
+      try {
+        const protobufType = serializer.root.lookupTypeOrEnum(type);
+        if (!protobufType.fields) return "";
+        const nestedArgs = Object.keys(protobufType.fields).map((f) => {
+          const { type } = protobufType.fields[f];
+          const nested = !nativeTypes.includes(type);
+          return buildInitialInputValues(serializer, type, nested, false);
+        });
+        // build 1 element
+        return [nestedArgs];
+      } catch (error) {
+        console.error('Error building initial values:', error);
+        return [""];
+      }
     }
     return [""];
   }
 
   if (nested) {
-    const protobufType = serializer.root.lookupTypeOrEnum(type);
-    if (!protobufType.fields) return "";
-    const nestedArgs = Object.keys(protobufType.fields).map((f) => {
-      const { type, rule } = protobufType.fields[f] as Field;
-      const nested = !nativeTypes.includes(type);
-      const repeated = rule === "repeated";
-      return buildInitialInputValues(serializer, type, nested, repeated);
-    });
-    return nestedArgs;
+    try {
+      const protobufType = serializer.root.lookupTypeOrEnum(type);
+      if (!protobufType.fields) return "";
+      const nestedArgs = Object.keys(protobufType.fields).map((f) => {
+        const { type, rule } = protobufType.fields[f] as Field;
+        const nested = !nativeTypes.includes(type);
+        const repeated = rule === "repeated";
+        return buildInitialInputValues(serializer, type, nested, repeated);
+      });
+      return nestedArgs;
+    } catch (error) {
+      console.error('Error building initial values:', error);
+      return "";
+    }
   }
 
   if (type === "bool") return false;
@@ -102,39 +112,53 @@ type RadioChangeEvent = React.ChangeEvent<HTMLInputElement>;
 
 export const KoinosForm = (props: KoinosFormProps) => {
   const [value, setValue] = useState<Record<string, unknown>>({});
-  // counter is used to trigger changes in args
-  const [counter, setCounter] = useState<number>(0);
   const serializer = useMemo(() => {
-    if (props.contract) return props.contract.serializer!;
-    return props.serializer!;
-  }, []);
+    if (props.contract) {
+      if (!props.contract.serializer) {
+        console.warn('Contract serializer is not initialized');
+        return undefined;
+      }
+      return props.contract.serializer;
+    }
+    return props.serializer;
+  }, [props.contract, props.serializer]);
 
-  useMemo(() => {
-    setValue({});
-    // TODO: fix error in console because of the next line
-    //
-    // Warning: Cannot update a component (`Home`) while rendering
-    // a different component (`KoinosForm`). To locate the bad
-    // setState() call inside `KoinosForm`
-    if (props.onChange) props.onChange({});
-  }, [setValue, props.typeName]);
+  // Initialize value state only when typeName changes
+  useEffect(() => {
+    const initialValue = {};
+    setValue(initialValue);
+    // Only call onChange with the initial value once when typeName changes
+    if (props.onChange) {
+      props.onChange(initialValue);
+    }
+  }, [props.typeName]); // Remove props.onChange from dependencies
 
   const args = useMemo(() => {
     if (!props.contract && (!props.protobufType || !props.serializer)) {
-      throw new Error("invalid properties for KoinosForm");
+      console.warn('Invalid properties for KoinosForm');
+      return [];
     }
 
-    let fields: INamespace2["fields"];
-    if (props.contract) {
-      if (props.typeName) {
-        fields = (serializer.root.lookupType(props.typeName) as INamespace2)
-          .fields;
-      } else {
-        fields = {};
-      }
-    } else {
-      fields = props.protobufType!.fields;
+    if (!serializer) {
+      console.warn('Serializer is not initialized');
+      return [];
     }
+
+    let fields: INamespace2["fields"] = {};
+    try {
+      if (props.contract && props.typeName) {
+        const type = serializer.root.lookupType(props.typeName);
+        if (type) {
+          fields = (type as INamespace2).fields;
+        }
+      } else if (props.protobufType) {
+        fields = props.protobufType.fields;
+      }
+    } catch (error) {
+      console.error('Error looking up type:', error);
+      return [];
+    }
+
     return Object.keys(fields).map((name) => {
       const { type, rule, options } = fields[name];
       const nested = !nativeTypes.includes(type);
@@ -152,24 +176,38 @@ export const KoinosForm = (props: KoinosFormProps) => {
             value: number;
           }[]
         | undefined;
-      if (nested) {
-        protobufType = serializer.root.lookupTypeOrEnum(type) as INamespace2;
-        if (!protobufType.fields) {
-          isEnum = true;
-          enums = Object.keys((protobufType as unknown as Enum).values).map(
-            (v) => {
-              return {
-                name: v,
-                value: (protobufType as unknown as Enum).values[v],
-              };
-            },
-          );
+
+      if (nested && serializer) {
+        try {
+          protobufType = serializer.root.lookupTypeOrEnum(type) as INamespace2;
+          if (!protobufType.fields) {
+            isEnum = true;
+            enums = Object.keys((protobufType as unknown as Enum).values).map(
+              (v) => {
+                return {
+                  name: v,
+                  value: (protobufType as unknown as Enum).values[v],
+                };
+              },
+            );
+          }
+        } catch (error) {
+          console.error('Error looking up nested type:', error);
         }
       }
 
       let val: unknown;
-      if (value[name] === undefined) {
-        val = buildInitialInputValues(serializer, type, nested, repeated);
+      if (value[name] === undefined && serializer) {
+        try {
+          if (!serializer) {
+            val = repeated ? [""] : "";
+          } else {
+            val = buildInitialInputValues(serializer, type, nested, repeated);
+          }
+        } catch (error) {
+          console.error('Error building initial values:', error);
+          val = repeated ? [""] : "";
+        }
       } else {
         val = value[name];
       }
@@ -188,9 +226,9 @@ export const KoinosForm = (props: KoinosFormProps) => {
         error: "",
       };
     });
-  }, [counter, props]);
+  }, [serializer, props.contract, props.typeName, props.protobufType, props.norepeated, value]);
 
-  const updateValue = ({
+  const updateValue = useCallback(({
     name,
     updateArray,
     index,
@@ -230,8 +268,10 @@ export const KoinosForm = (props: KoinosFormProps) => {
     }
 
     setValue(newValue);
-    if (props.onChange) props.onChange(newValue);
-  };
+    if (props.onChange) {
+      props.onChange(newValue);
+    }
+  }, [value, props.onChange]);
 
   if (typeof props.protobufType === "string")
     throw Error("protobuftype must be an object");
@@ -313,7 +353,6 @@ export const KoinosForm = (props: KoinosFormProps) => {
                             ) as unknown[]
                           )[0],
                         });
-                        setCounter(counter + 1);
                       }}
                     >
                       Add
@@ -325,7 +364,6 @@ export const KoinosForm = (props: KoinosFormProps) => {
                           updateArray: true,
                           pop: true,
                         });
-                        setCounter(counter + 1);
                       }}
                     >
                       Remove

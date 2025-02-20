@@ -160,11 +160,13 @@ export default function ContractPageClient({
               c.serializer = new Serializer(c.abi.koilib_types);
             } else if (c.abi.types) {
               console.log('Using types for serializer');
+              console.log(c.abi);
               // Don't try to parse the types, use them directly
               c.serializer = new Serializer(c.abi.types);
             }
           } catch (serializerError) {
             console.error('Error setting up serializer:', serializerError);
+            console.error(serializerError);
             // Continue without serializer if initialization fails
             console.warn('Continuing without serializer due to initialization error');
           }

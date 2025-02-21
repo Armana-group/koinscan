@@ -1,9 +1,9 @@
 "use client";
 
-import { Button, notification, ConfigProvider } from "antd";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Contract, Provider, Serializer, SignerInterface, utils } from "koilib";
-import theme from "../../theme";
+import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 import styles from "../../page.module.css";
 import { KoinosForm, prettyName } from "../../../components/KoinosForm";
 import { HeaderComponent } from "@/components/HeaderComponent";
@@ -147,18 +147,15 @@ export default function ContractPage({
           rcLimit: 10_00000000,
         });
 
-        notification.success({
-          message: "Transaction submitted",
+        toast.success("Transaction submitted", {
           description: "the transaction is in the mempool waiting to be mined",
-          placement: "bottomLeft",
-          duration: 15,
+          duration: 15000,
         });
         setResults(`receipt:\n\n${JSON.stringify(receipt, null, 2)}`);
 
         await transaction!.wait();
 
-        notification.success({
-          message: "Transaction mined",
+        toast.success("Transaction mined", {
           description: (
             <span>
               see confirmation in{" "}
@@ -171,69 +168,64 @@ export default function ContractPage({
               </a>{" "}
             </span>
           ),
-          placement: "bottomLeft",
-          duration: 15,
+          duration: 15000,
         });
       }
       setLoading(false);
     } catch (error) {
-      notification.error({
-        message: (error as Error).message,
-        placement: "bottomLeft",
-        duration: 15,
+      toast.error((error as Error).message, {
+        duration: 15000,
       });
       setLoading(false);
     }
   }, [args, signer, contract, selectedMethod]);
 
   return (
-    <ConfigProvider theme={theme}>
-      <main className={styles.main}>
-        <HeaderComponent onChange={(s) => setSigner(s)}></HeaderComponent>
-        <ContractInfo {...info}></ContractInfo>
+    <main className={styles.main}>
+      <HeaderComponent onChange={(s) => setSigner(s)}></HeaderComponent>
+      <ContractInfo {...info}></ContractInfo>
+      <div className={styles.w100}>
+        {contractMethods
+          ? contractMethods.map((contractMethod) => (
+              <Button
+                key={contractMethod.name}
+                onClick={() => {
+                  setSelectedMethod(contractMethod.name);
+                  setResults("");
+                  setCode("");
+                  if (contractMethod.readOnly) {
+                    setSubmitText("Read");
+                  } else {
+                    setSubmitText("Send");
+                  }
+                }}
+                className={styles.buttonFunction}
+              >
+                {contractMethod.prettyName}
+              </Button>
+            ))
+          : "loading..."}
+      </div>
+      {contract && selectedMethod ? (
         <div className={styles.w100}>
-          {contractMethods
-            ? contractMethods.map((contractMethod) => (
-                <Button
-                  key={contractMethod.name}
-                  onClick={() => {
-                    setSelectedMethod(contractMethod.name);
-                    setResults("");
-                    setCode("");
-                    if (contractMethod.readOnly) {
-                      setSubmitText("Read");
-                    } else {
-                      setSubmitText("Send");
-                    }
-                  }}
-                  className={styles.buttonFunction}
-                >
-                  {contractMethod.prettyName}
-                </Button>
-              ))
-            : "loading..."}
+          <h3>{prettyName(selectedMethod)}</h3>
+          <p>{contract.abi!.methods[selectedMethod].description}</p>
+          <KoinosForm
+            contract={contract}
+            typeName={contract.abi!.methods[selectedMethod].argument}
+            onChange={(newArgs) => setArgs(newArgs)}
+          ></KoinosForm>
+          {signer && !contract.abi!.methods[selectedMethod].read_only ? (
+            <div className={styles.signAs}>Sign as {signer.getAddress()}</div>
+          ) : null}
+          <Button variant="default" onClick={submit} disabled={loading}>
+            {submitText}
+          </Button>
+          {code ? <div className={styles.code}>{code}</div> : null}
+          {results ? <div className={styles.code}>{results}</div> : null}
         </div>
-        {contract && selectedMethod ? (
-          <div className={styles.w100}>
-            <h3>{prettyName(selectedMethod)}</h3>
-            <p>{contract.abi!.methods[selectedMethod].description}</p>
-            <KoinosForm
-              contract={contract}
-              typeName={contract.abi!.methods[selectedMethod].argument}
-              onChange={(newArgs) => setArgs(newArgs)}
-            ></KoinosForm>
-            {signer && !contract.abi!.methods[selectedMethod].read_only ? (
-              <div className={styles.signAs}>Sign as {signer.getAddress()}</div>
-            ) : null}
-            <Button type="primary" onClick={submit} loading={loading}>
-              {submitText}
-            </Button>
-            {code ? <div className={styles.code}>{code}</div> : null}
-            {results ? <div className={styles.code}>{results}</div> : null}
-          </div>
-        ) : null}
-        <FooterComponent></FooterComponent>
-      </main>
-    </ConfigProvider>
+      ) : null}
+      <FooterComponent></FooterComponent>
+    </main>
   );
 }

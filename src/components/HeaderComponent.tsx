@@ -19,7 +19,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
-import { notification } from "antd";
+import { toast } from "sonner";
 
 function shortAddress(address: string): string {
   return `${address.slice(0, 4)}...${address.slice(address.length - 4)}`;
@@ -52,9 +52,7 @@ export const HeaderComponent = (props: {
       setWalletName(wName);
       if (props.onChange) props.onChange(signer);
     } catch (error) {
-      notification.error({
-        message: (error as Error).message,
-      });
+      toast.error((error as Error).message);
       console.error(error);
     }
   };

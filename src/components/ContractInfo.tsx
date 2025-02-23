@@ -16,7 +16,7 @@ export const ContractInfo = (props: {
   };
 
   return (
-    <Card className="w-full bg-white/80 backdrop-blur-xl border-0 shadow-[0_2px_4px_rgba(0,0,0,0.04)] rounded-2xl overflow-hidden hover:shadow-[0_4px_8px_rgba(0,0,0,0.08)] transition-all">
+    <Card className="w-full bg-background/80 backdrop-blur-xl border-border shadow-sm rounded-2xl overflow-hidden hover:shadow-md transition-all">
       <CardContent className="p-8">
         <div className="flex flex-col md:flex-row gap-8">
           {/* Image Section */}
@@ -29,8 +29,8 @@ export const ContractInfo = (props: {
                 className="w-full h-full object-cover relative z-10"
               />
               <div className="absolute bottom-3 right-3 z-20">
-                <div className="p-1.5 rounded-full bg-[#1d1d1f]/5 backdrop-blur-xl">
-                  <Shield className="w-4 h-4 text-[#1d1d1f]" />
+                <div className="p-1.5 rounded-full bg-background/5 backdrop-blur-xl">
+                  <Shield className="w-4 h-4 text-foreground" />
                 </div>
               </div>
             </div>
@@ -41,26 +41,26 @@ export const ContractInfo = (props: {
             <div className="space-y-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex flex-wrap items-center gap-3">
-                  <code className="px-4 py-2 bg-[#f5f5f7] rounded-xl font-mono text-sm text-[#1d1d1f] border border-[#1d1d1f]/5">
+                  <code className="px-4 py-2 bg-muted rounded-xl font-mono text-sm text-foreground border border-border">
                     {props.address}
                   </code>
                   <div className="flex items-center gap-2">
                     <Button 
                       variant="ghost" 
                       size="icon" 
-                      className="h-9 w-9 rounded-xl hover:bg-[#f5f5f7] transition-colors"
+                      className="h-9 w-9 rounded-xl hover:bg-muted transition-colors"
                       onClick={copyAddress}
                     >
-                      <Copy className="w-4 h-4 text-[#1d1d1f]" />
+                      <Copy className="w-4 h-4 text-foreground" />
                     </Button>
                     <Button 
                       variant="ghost" 
                       size="icon"
-                      className="h-9 w-9 rounded-xl hover:bg-[#f5f5f7] transition-colors"
+                      className="h-9 w-9 rounded-xl hover:bg-muted transition-colors"
                       asChild
                     >
                       <a href={`https://koinosblocks.com/address/${props.address}`} target="_blank" rel="noopener noreferrer">
-                        <ExternalLink className="w-4 h-4 text-[#1d1d1f]" />
+                        <ExternalLink className="w-4 h-4 text-foreground" />
                       </a>
                     </Button>
                   </div>
@@ -69,8 +69,8 @@ export const ContractInfo = (props: {
                 {/* Wallet Status */}
                 <div className={`flex items-center gap-2 px-4 py-2 rounded-xl ${
                   props.signer 
-                    ? "bg-green-500/10 text-green-700" 
-                    : "bg-[#f5f5f7] text-[#6e6e73]"
+                    ? "bg-green-500/10 text-green-700 dark:text-green-400" 
+                    : "bg-muted text-muted-foreground"
                 }`}>
                   <Wallet className="w-4 h-4" />
                   <span className="text-sm font-medium">
@@ -80,7 +80,7 @@ export const ContractInfo = (props: {
               </div>
 
               {props.description && (
-                <p className="text-[#6e6e73] leading-relaxed max-w-3xl text-lg">
+                <p className="text-muted-foreground leading-relaxed max-w-3xl text-lg">
                   {props.description}
                 </p>
               )}

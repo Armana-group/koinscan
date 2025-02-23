@@ -106,7 +106,7 @@ const JsonNode = ({ data, level = 0, isLast = true, initialExpanded = true }: Js
 
 export const JsonDisplay = ({ data, initialExpanded = true }: JsonDisplayProps) => {
   return (
-    <div className="font-mono text-sm bg-[#1d1d1f] dark:bg-[#1d1d1f]/90 text-white/90 rounded-xl p-4 overflow-x-auto">
+    <div className="font-mono text-sm bg-muted/50 dark:bg-muted/90 text-foreground rounded-xl p-4 overflow-x-auto">
       <JsonNode data={data} initialExpanded={initialExpanded} />
     </div>
   );

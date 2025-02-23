@@ -53,6 +53,11 @@
     --color-4: 195 100% 63%;
 
     --color-5: 90 100% 63%;
+
+    /* Logo colors */
+    --logo-color-1: 0 71% 71%;
+    --logo-color-2: 48 96% 53%;
+    --logo-color-3: 200 54% 41%;
   }
 
   .dark {
@@ -93,6 +98,11 @@
     --color-3: 210 100% 63%;
     --color-4: 195 100% 63%;
     --color-5: 90 100% 63%;
+
+    /* Logo colors - darker variants */
+    --logo-color-1: 0 60% 50%;
+    --logo-color-2: 48 70% 45%;
+    --logo-color-3: 200 60% 35%;
   }
 }
 

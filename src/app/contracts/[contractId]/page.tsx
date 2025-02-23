@@ -286,16 +286,16 @@ export default function ContractPage({
   return (
     <>
       <Navbar />
-      <main className="min-h-screen bg-[#f5f5f7] p-4 md:p-8 pb-20 pt-24">
+      <main className="min-h-screen bg-background p-4 md:p-8">
         <div className="container max-w-[980px] mx-auto space-y-8">
           {/* Contract Info Section */}
           {!error && contract && (
             <div className="space-y-8">
               <div className="text-center space-y-4 py-8">
-                <h1 className="text-5xl font-semibold text-[#1d1d1f]">
+                <h1 className="text-5xl font-semibold text-foreground">
                   {info.nickname ? `@${info.nickname}` : "Smart Contract"}
                 </h1>
-                <p className="text-xl text-[#6e6e73] max-w-2xl mx-auto">
+                <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
                   {info.description || "Interact with this smart contract on the Koinos blockchain"}
                 </p>
               </div>
@@ -304,39 +304,39 @@ export default function ContractPage({
               
               {/* Stats Overview */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <Card className="bg-white/80 backdrop-blur-xl border-0 shadow-[0_2px_4px_rgba(0,0,0,0.04)] rounded-2xl overflow-hidden hover:shadow-[0_4px_8px_rgba(0,0,0,0.04)] transition-all">
+                <Card className="bg-background/80 backdrop-blur-xl border-border shadow-sm rounded-2xl overflow-hidden hover:shadow-md transition-all">
                   <CardContent className="p-6">
                     <div className="flex items-center gap-3">
                       <div className="p-3 rounded-2xl bg-blue-500/10">
                         <BookOpen className="w-5 h-5 text-blue-600" />
                       </div>
                       <div>
-                        <div className="text-2xl font-semibold text-[#1d1d1f]">
+                        <div className="text-2xl font-semibold text-foreground">
                           {contractMethods?.filter((m) => m.readOnly).length || 0}
                         </div>
-                        <div className="text-sm text-[#6e6e73]">Read Methods</div>
+                        <div className="text-sm text-muted-foreground">Read Methods</div>
                       </div>
                     </div>
                   </CardContent>
                 </Card>
                 
-                <Card className="bg-white/80 backdrop-blur-xl border-0 shadow-[0_2px_4px_rgba(0,0,0,0.04)] rounded-2xl overflow-hidden hover:shadow-[0_4px_8px_rgba(0,0,0,0.04)] transition-all">
+                <Card className="bg-background/80 backdrop-blur-xl border-border shadow-sm rounded-2xl overflow-hidden hover:shadow-md transition-all">
                   <CardContent className="p-6">
                     <div className="flex items-center gap-3">
                       <div className="p-3 rounded-2xl bg-purple-500/10">
                         <PenLine className="w-5 h-5 text-purple-600" />
                       </div>
                       <div>
-                        <div className="text-2xl font-semibold text-[#1d1d1f]">
+                        <div className="text-2xl font-semibold text-foreground">
                           {contractMethods?.filter((m) => !m.readOnly).length || 0}
                         </div>
-                        <div className="text-sm text-[#6e6e73]">Write Methods</div>
+                        <div className="text-sm text-muted-foreground">Write Methods</div>
                       </div>
                     </div>
                   </CardContent>
                 </Card>
 
-                <Card className="bg-white/80 backdrop-blur-xl border-0 shadow-[0_2px_4px_rgba(0,0,0,0.04)] rounded-2xl overflow-hidden hover:shadow-[0_4px_8px_rgba(0,0,0,0.04)] transition-all">
+                <Card className="bg-background/80 backdrop-blur-xl border-border shadow-sm rounded-2xl overflow-hidden hover:shadow-md transition-all">
                   <CardContent className="p-6">
                     <div className="flex items-center gap-3">
                       <div className="p-3 rounded-2xl bg-green-500/10">
@@ -345,10 +345,10 @@ export default function ContractPage({
                         </div>
                       </div>
                       <div>
-                        <div className="text-sm font-medium text-[#1d1d1f] truncate max-w-[180px]">
+                        <div className="text-sm font-medium text-foreground truncate max-w-[180px]">
                           {signer ? signer.getAddress() : "Not Connected"}
                         </div>
-                        <div className="text-sm text-[#6e6e73]">Wallet Status</div>
+                        <div className="text-sm text-muted-foreground">Wallet Status</div>
                       </div>
                     </div>
                   </CardContent>
@@ -360,7 +360,7 @@ export default function ContractPage({
           {/* Function Groups */}
           {error ? (
             <div className="flex items-center justify-center min-h-[400px]">
-              <Card className="max-w-md w-full p-8 bg-white/80 backdrop-blur-xl border-0 shadow-[0_2px_4px_rgba(0,0,0,0.04)] rounded-2xl">
+              <Card className="max-w-md w-full p-8 bg-background/80 backdrop-blur-xl border-border shadow-sm rounded-2xl">
                 <div className="flex flex-col items-center gap-6">
                   <div className="rounded-full bg-red-500/10 p-4">
                     <svg
@@ -408,7 +408,7 @@ export default function ContractPage({
             </div>
           ) : loading ? (
             <div className="flex items-center justify-center h-32">
-              <div className="text-lg text-[#6e6e73]">Loading contract...</div>
+              <div className="text-lg text-muted-foreground">Loading contract...</div>
             </div>
           ) : contract ? (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -418,18 +418,18 @@ export default function ContractPage({
                   <div className="p-3 rounded-2xl bg-blue-500/10">
                     <BookOpen className="w-6 h-6 text-blue-600" />
                   </div>
-                  <h2 className="text-2xl font-semibold text-[#1d1d1f]">Read Functions</h2>
+                  <h2 className="text-2xl font-semibold text-foreground">Read Functions</h2>
                 </div>
                 <div className="space-y-6">
                   {contractMethods
                     ?.filter((method) => method.readOnly)
                     .map((method) => (
-                      <Card key={method.name} className="group bg-white/80 backdrop-blur-xl border-0 shadow-[0_2px_4px_rgba(0,0,0,0.04)] rounded-2xl overflow-hidden hover:shadow-[0_4px_8px_rgba(0,0,0,0.08)] transition-all">
+                      <Card key={method.name} className="group bg-background/80 backdrop-blur-xl border-border shadow-sm rounded-2xl overflow-hidden hover:shadow-md transition-all">
                         <CardHeader className="p-6 pb-0">
                           <div className="flex items-start justify-between">
                             <div>
-                              <CardTitle className="text-xl font-semibold text-[#1d1d1f]">{method.prettyName}</CardTitle>
-                              <CardDescription className="mt-1 text-[#6e6e73]">
+                              <CardTitle className="text-xl font-semibold text-foreground">{method.prettyName}</CardTitle>
+                              <CardDescription className="mt-1 text-muted-foreground">
                                 {contract.abi?.methods[method.name].description || "No description available"}
                               </CardDescription>
                             </div>
@@ -439,7 +439,7 @@ export default function ContractPage({
                           </div>
                         </CardHeader>
                         <CardContent className="p-6">
-                          <div className="bg-[#f5f5f7] rounded-xl p-4">
+                          <div className="bg-muted rounded-xl p-4">
                             <KoinosForm
                               contract={contract}
                               protobufType={method.name}
@@ -469,10 +469,10 @@ export default function ContractPage({
                           </Button>
                           {methodStates[method.name]?.results && (
                             <div className="mt-6 animate-in fade-in slide-in-from-top-4">
-                              <div className="text-sm font-medium text-[#1d1d1f] mb-2">
+                              <div className="text-sm font-medium text-foreground mb-2">
                                 Result
                               </div>
-                              <div className="bg-[#f5f5f7] rounded-xl p-4 overflow-x-auto">
+                              <div className="bg-muted rounded-xl p-4 overflow-x-auto">
                                 <JsonDisplay data={JSON.parse(methodStates[method.name].results)} />
                               </div>
                             </div>
@@ -489,18 +489,18 @@ export default function ContractPage({
                   <div className="p-3 rounded-2xl bg-purple-500/10">
                     <PenLine className="w-6 h-6 text-purple-600" />
                   </div>
-                  <h2 className="text-2xl font-semibold text-[#1d1d1f]">Write Functions</h2>
+                  <h2 className="text-2xl font-semibold text-foreground">Write Functions</h2>
                 </div>
                 <div className="space-y-6">
                   {contractMethods
                     ?.filter((method) => !method.readOnly)
                     .map((method) => (
-                      <Card key={method.name} className="group bg-white/80 backdrop-blur-xl border-0 shadow-[0_2px_4px_rgba(0,0,0,0.04)] rounded-2xl overflow-hidden hover:shadow-[0_4px_8px_rgba(0,0,0,0.08)] transition-all">
+                      <Card key={method.name} className="group bg-background/80 backdrop-blur-xl border-border shadow-sm rounded-2xl overflow-hidden hover:shadow-md transition-all">
                         <CardHeader className="p-6 pb-0">
                           <div className="flex items-start justify-between">
                             <div>
-                              <CardTitle className="text-xl font-semibold text-[#1d1d1f]">{method.prettyName}</CardTitle>
-                              <CardDescription className="mt-1 text-[#6e6e73]">
+                              <CardTitle className="text-xl font-semibold text-foreground">{method.prettyName}</CardTitle>
+                              <CardDescription className="mt-1 text-muted-foreground">
                                 {contract.abi?.methods[method.name].description || "No description available"}
                               </CardDescription>
                             </div>
@@ -510,7 +510,7 @@ export default function ContractPage({
                           </div>
                         </CardHeader>
                         <CardContent className="p-6">
-                          <div className="bg-[#f5f5f7] rounded-xl p-4">
+                          <div className="bg-muted rounded-xl p-4">
                             <KoinosForm
                               contract={contract}
                               protobufType={method.name}
@@ -518,12 +518,12 @@ export default function ContractPage({
                             />
                           </div>
                           {signer ? (
-                            <div className="mt-3 text-sm text-[#6e6e73] flex items-center gap-2">
+                            <div className="mt-3 text-sm text-muted-foreground flex items-center gap-2">
                               <div className="w-2 h-2 rounded-full bg-green-500" />
                               <span>Signing as: {signer.getAddress()}</span>
                             </div>
                           ) : (
-                            <div className="mt-3 text-sm text-[#6e6e73] flex items-center gap-2">
+                            <div className="mt-3 text-sm text-muted-foreground flex items-center gap-2">
                               <div className="w-2 h-2 rounded-full bg-yellow-500" />
                               <span>Please connect your wallet to execute this function</span>
                             </div>
@@ -533,7 +533,7 @@ export default function ContractPage({
                             className={`mt-4 w-full rounded-full h-12 text-base font-medium ${
                               signer 
                                 ? "bg-purple-600 text-white hover:bg-purple-700"
-                                : "bg-[#f5f5f7] text-[#6e6e73] hover:bg-[#ebebeb]"
+                                : "bg-background text-muted-foreground hover:bg-border"
                             } transition-colors`}
                             onClick={(e) => {
                               e.preventDefault();
@@ -555,10 +555,10 @@ export default function ContractPage({
                           </Button>
                           {methodStates[method.name]?.results && (
                             <div className="mt-6 animate-in fade-in slide-in-from-top-4">
-                              <div className="text-sm font-medium text-[#1d1d1f] mb-2">
+                              <div className="text-sm font-medium text-foreground mb-2">
                                 Receipt
                               </div>
-                              <div className="bg-[#f5f5f7] rounded-xl p-4 overflow-x-auto">
+                              <div className="bg-muted rounded-xl p-4 overflow-x-auto">
                                 <JsonDisplay data={JSON.parse(methodStates[method.name].results)} />
                               </div>
                             </div>

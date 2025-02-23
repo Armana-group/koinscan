@@ -2,6 +2,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Copy, ExternalLink, Shield, Wallet } from "lucide-react";
 import { toast } from "sonner";
+import { useEffect, useState } from "react";
+import { Contract, Provider, utils } from "koilib";
+import { RPC_NODE } from "@/koinos/constants";
 
 export const ContractInfo = (props: {
   nickname: string;
@@ -10,9 +13,128 @@ export const ContractInfo = (props: {
   image: string;
   signer?: any;
 }) => {
+  const [balance, setBalance] = useState<string | null>(null);
+  const [decimals, setDecimals] = useState<number>(8); // Default to 8 decimals
+  const [symbol, setSymbol] = useState<string>("");
+
+  useEffect(() => {
+    const fetchTokenInfo = async () => {
+      if (props.signer) {
+        try {
+          console.log("Fetching token info for address:", props.address);
+          console.log("Signer address:", props.signer.getAddress());
+          
+          const provider = new Provider([RPC_NODE]);
+          const contract = new Contract({
+            id: props.address,
+            provider,
+            abi: utils.tokenAbi
+          });
+
+          // Fetch symbol
+          try {
+            const { result: symbolResult } = await contract.functions.symbol({});
+            if (symbolResult?.value) {
+              setSymbol(symbolResult.value);
+              console.log("Token symbol:", symbolResult.value);
+            }
+          } catch (error) {
+            console.warn("Failed to fetch symbol:", error);
+          }
+
+          // Fetch decimals
+          try {
+            const { result: decimalsResult } = await contract.functions.decimals({});
+            if (decimalsResult?.value !== undefined) {
+              setDecimals(decimalsResult.value);
+              console.log("Token decimals:", decimalsResult.value);
+            }
+          } catch (error) {
+            console.warn("Failed to fetch decimals:", error);
+          }
+
+          // Fetch balance
+          try {
+            const signerAddress = props.signer.getAddress();
+            console.log("Fetching balance for address:", signerAddress);
+            
+            const { result } = await contract.functions.balanceOf({
+              owner: signerAddress
+            });
+            
+            console.log("Balance result:", result);
+            
+            if (result?.value) {
+              setBalance(result.value);
+              console.log("Setting balance to:", result.value);
+            } else {
+              console.log("No balance value in result");
+              // Try alternative balance field name
+              if (result?.balance) {
+                setBalance(result.balance);
+                console.log("Setting balance from alternative field to:", result.balance);
+              }
+            }
+          } catch (error) {
+            console.error("Failed to fetch balance:", error);
+            
+            // Try alternative balance endpoint
+            try {
+              console.log("Trying alternative balance endpoint...");
+              const { result } = await contract.functions.balance({
+                owner: props.signer.getAddress()
+              });
+              
+              console.log("Alternative balance result:", result);
+              
+              if (result?.value) {
+                setBalance(result.value);
+                console.log("Setting balance from alternative endpoint to:", result.value);
+              } else if (result?.balance) {
+                setBalance(result.balance);
+                console.log("Setting balance from alternative endpoint field to:", result.balance);
+              }
+            } catch (altError) {
+              console.error("Failed to fetch balance from alternative endpoint:", altError);
+              toast.error("Failed to fetch balance");
+            }
+          }
+        } catch (error) {
+          console.error("Failed to initialize contract:", error);
+          toast.error("Failed to load token information");
+        }
+      } else {
+        console.log("No signer available");
+        setBalance(null);
+      }
+    };
+
+    fetchTokenInfo();
+  }, [props.signer, props.address]);
+
   const copyAddress = () => {
     navigator.clipboard.writeText(props.address);
     toast.success("Address copied to clipboard");
+  };
+
+  const formatBalance = (balance: string, decimals: number) => {
+    try {
+      const value = BigInt(balance);
+      const divisor = BigInt(10 ** decimals);
+      const integerPart = value / divisor;
+      const fractionalPart = value % divisor;
+      
+      let formattedFractional = fractionalPart.toString().padStart(decimals, '0');
+      // Remove trailing zeros
+      formattedFractional = formattedFractional.replace(/0+$/, '');
+      
+      return formattedFractional 
+        ? `${integerPart}.${formattedFractional} ${symbol}`
+        : `${integerPart} ${symbol}`;
+    } catch (error) {
+      console.error("Failed to format balance:", error);
+      return `${balance} ${symbol}`;
+    }
   };
 
   return (
@@ -69,7 +191,16 @@ export const ContractInfo = (props: {
                 }`}>
                   <Wallet className="w-4 h-4" />
                   <span className="text-sm font-medium">
-                    {props.signer ? "Connected" : "Not Connected"}
+                    {props.signer ? (
+                      <div className="flex items-center gap-2">
+                        <span>Connected</span>
+                        {balance && (
+                          <span className="px-2 py-0.5 bg-green-500/20 rounded-full text-xs">
+                            {formatBalance(balance, decimals)}
+                          </span>
+                        )}
+                      </div>
+                    ) : "Not Connected"}
                   </span>
                 </div>
               </div>

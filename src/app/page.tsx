@@ -16,8 +16,8 @@ export default function Home() {
       <main className="min-h-[calc(100vh-4rem)] bg-background">
         <div className="container mx-auto px-4">
           <div className="flex min-h-[calc(100vh-4rem)] flex-col items-center justify-center">
-            <div className="max-w-3xl w-full space-y-12 text-center">
-              <div className="space-y-4">
+            <div className="max-w-3xl w-full space-y-16 text-center">
+              <div className="space-y-">
                 <h1 className="text-5xl font-bold tracking-tight text-foreground">
                   <AuroraText>Explore the Koinos blockchain</AuroraText>
                 </h1>

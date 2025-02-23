@@ -15,12 +15,21 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from "./ui/dropdown-menu";
 import { toast } from "sonner";
 import { useWallet } from "@/contexts/WalletContext";
+import { useEffect, useState } from "react";
+import * as kondor from "kondor-js";
+import { Check, ChevronDown } from "lucide-react";
 
 interface ExtendedSigner extends SignerInterface {
   name?: "kondor" | "walletConnect" | "mkw";
+}
+
+interface KondorAccount {
+  address: string;
+  name?: string;
 }
 
 function shortAddress(address: string): string {
@@ -31,6 +40,33 @@ export function WalletButton() {
   const { signer, setSigner } = useWallet();
   const addr = (signer as ExtendedSigner)?.getAddress();
   const walletName = (signer as ExtendedSigner)?.name;
+  const [kondorAccounts, setKondorAccounts] = useState<KondorAccount[]>([]);
+
+  // Fetch Kondor accounts
+  useEffect(() => {
+    const fetchKondorAccounts = async () => {
+      if (walletName === "kondor") {
+        try {
+          const accounts = await kondor.getAccounts();
+          setKondorAccounts(accounts || []);
+        } catch (error) {
+          console.error("Failed to fetch Kondor accounts:", error);
+        }
+      }
+    };
+
+    fetchKondorAccounts();
+
+    // Listen for account changes
+    const handleAccountsChanged = () => {
+      fetchKondorAccounts();
+    };
+
+    window.addEventListener("kondor_accountsChanged", handleAccountsChanged);
+    return () => {
+      window.removeEventListener("kondor_accountsChanged", handleAccountsChanged);
+    };
+  }, [walletName]);
 
   const handleWalletAction = async (action: WalletName | "disconnect") => {
     try {
@@ -53,20 +89,29 @@ export function WalletButton() {
     }
   };
 
+  const switchKondorAccount = async (account: KondorAccount) => {
+    try {
+      const newSigner = getWalletSigner("kondor", account.address);
+      (newSigner as ExtendedSigner).name = "kondor";
+      setSigner(newSigner as ExtendedSigner);
+    } catch (error) {
+      toast.error((error as Error).message);
+      console.error(error);
+    }
+  };
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button
           variant="ghost"
-          size="icon"
-          className={`relative flex items-center justify-center transition-all ${
-            addr ? "w-32 px-2" : "w-10"
+          className={`relative flex items-center justify-center gap-2 transition-all ${
+            addr ? "w-auto px-3" : "w-10"
           } h-10 rounded-full focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 hover:bg-transparent`}
         >
           {addr ? (
             <>
-              <span className="text-xs truncate">{shortAddress(addr)}</span>
-              <div className="w-4 h-4 flex-shrink-0 ml-1.5 rounded-full bg-background/80 p-0.5">
+              <div className="w-5 h-5 flex-shrink-0 rounded-full bg-background/80 p-0.5">
                 <Image
                   src={
                     walletName === "kondor"
@@ -83,6 +128,8 @@ export function WalletButton() {
                   className="w-full h-full object-contain rounded-full"
                 />
               </div>
+              <span className="text-sm">{shortAddress(addr)}</span>
+              <ChevronDown className="w-4 h-4 ml-1 text-muted-foreground" />
             </>
           ) : (
             <svg
@@ -100,7 +147,7 @@ export function WalletButton() {
       </DropdownMenuTrigger>
       <DropdownMenuContent 
         align="end" 
-        className="w-56 p-2 bg-background/80 backdrop-blur-sm border border-border shadow-lg"
+        className="w-64 p-2 bg-background/80 backdrop-blur-sm border border-border shadow-lg"
         sideOffset={8}
       >
         {!addr ? (
@@ -141,28 +188,71 @@ export function WalletButton() {
             </DropdownMenuItem>
           </>
         ) : (
-          <DropdownMenuItem 
-            onClick={() => handleWalletAction("disconnect")}
-            className="flex items-center px-4 py-3 my-1 rounded-lg cursor-pointer text-red-600 dark:text-red-400 focus:bg-red-50 dark:focus:bg-red-950/50 hover:bg-red-50 dark:hover:bg-red-950/50"
-          >
-            <div className="flex items-center gap-3 text-sm font-medium">
-              <svg 
-                xmlns="http://www.w3.org/2000/svg" 
-                viewBox="0 0 24 24" 
-                fill="none" 
-                stroke="currentColor" 
-                strokeWidth="2" 
-                strokeLinecap="round" 
-                strokeLinejoin="round" 
-                className="w-5 h-5"
-              >
-                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-                <polyline points="16 17 21 12 16 7" />
-                <line x1="21" y1="12" x2="9" y2="12" />
-              </svg>
-              Disconnect
-            </div>
-          </DropdownMenuItem>
+          <>
+            {/* Show Kondor accounts if using Kondor */}
+            {walletName === "kondor" && kondorAccounts.length > 0 && (
+              <>
+                <div className="px-3 py-2 text-xs font-medium text-muted-foreground">
+                  Switch Account
+                </div>
+                {kondorAccounts.map((account) => (
+                  <DropdownMenuItem
+                    key={account.address}
+                    onClick={() => switchKondorAccount(account)}
+                    className="flex items-center justify-between px-4 py-3 my-1 rounded-lg cursor-pointer focus:bg-muted/80 hover:bg-muted/80"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-6 h-6 p-1 rounded-full bg-violet-100 dark:bg-violet-950/50">
+                        <Image
+                          src={kondorLogo}
+                          alt="kondor"
+                          width={20}
+                          height={20}
+                          className="w-full h-full object-contain"
+                        />
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-sm font-medium">
+                          {account.name || shortAddress(account.address)}
+                        </span>
+                        {account.name && (
+                          <span className="text-xs text-muted-foreground">
+                            {shortAddress(account.address)}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    {account.address === addr && (
+                      <Check className="w-4 h-4 text-green-500" />
+                    )}
+                  </DropdownMenuItem>
+                ))}
+                <DropdownMenuSeparator className="my-2" />
+              </>
+            )}
+            <DropdownMenuItem 
+              onClick={() => handleWalletAction("disconnect")}
+              className="flex items-center px-4 py-3 my-1 rounded-lg cursor-pointer text-red-600 dark:text-red-400 focus:bg-red-50 dark:focus:bg-red-950/50 hover:bg-red-50 dark:hover:bg-red-950/50"
+            >
+              <div className="flex items-center gap-3 text-sm font-medium">
+                <svg 
+                  xmlns="http://www.w3.org/2000/svg" 
+                  viewBox="0 0 24 24" 
+                  fill="none" 
+                  stroke="currentColor" 
+                  strokeWidth="2" 
+                  strokeLinecap="round" 
+                  strokeLinejoin="round" 
+                  className="w-5 h-5"
+                >
+                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                  <polyline points="16 17 21 12 16 7" />
+                  <line x1="21" y1="12" x2="9" y2="12" />
+                </svg>
+                Disconnect
+              </div>
+            </DropdownMenuItem>
+          </>
         )}
       </DropdownMenuContent>
     </DropdownMenu>

@@ -280,7 +280,13 @@ export const KoinosForm = (props: KoinosFormProps) => {
             <Input
               value={arg.value as string}
               onChange={(e) => handleInputChange(arg.name, e.target.value)}
+              placeholder={`Enter ${arg.format.toLowerCase()}`}
             />
+          )}
+          {arg.format && (
+            <div className="text-xs text-muted-foreground">
+              Format: {arg.format}
+            </div>
           )}
         </div>
       ))}

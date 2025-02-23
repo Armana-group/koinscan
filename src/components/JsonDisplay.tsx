@@ -35,11 +35,11 @@ const JsonNode = ({ data, level = 0, isLast = true, initialExpanded = true }: Js
         className="flex items-center py-1"
         style={{ paddingLeft: `${level * 1.5}rem` }}
       >
-        <CircleDot className="w-4 h-4 text-muted-foreground/50 mr-2" />
-        <span className={`${typeof data === 'string' ? 'text-green-500' : 'text-blue-500'}`}>
+        <CircleDot className="w-4 h-4 text-white/30 mr-2" />
+        <span className={`${typeof data === 'string' ? 'text-emerald-400' : 'text-sky-400'}`}>
           {formattedValue}
         </span>
-        {!isLast && <span className="text-muted-foreground">,</span>}
+        {!isLast && <span className="text-white/50">,</span>}
       </div>
     );
   }
@@ -54,15 +54,15 @@ const JsonNode = ({ data, level = 0, isLast = true, initialExpanded = true }: Js
         onClick={toggleExpand}
       >
         {isExpanded ? (
-          <ChevronDown className="w-4 h-4 text-muted-foreground/50 mr-2" />
+          <ChevronDown className="w-4 h-4 text-white/30 mr-2" />
         ) : (
-          <ChevronRight className="w-4 h-4 text-muted-foreground/50 mr-2" />
+          <ChevronRight className="w-4 h-4 text-white/30 mr-2" />
         )}
-        <span className="text-purple-500">
+        <span className="text-fuchsia-400">
           {type === 'array' ? '[' : '{'}
         </span>
         {!isExpanded && (
-          <span className="text-muted-foreground ml-1">
+          <span className="text-white/50 ml-1">
             {entries.length} {type === 'array' ? 'items' : 'properties'}
           </span>
         )}
@@ -76,8 +76,8 @@ const JsonNode = ({ data, level = 0, isLast = true, initialExpanded = true }: Js
                 className="py-1 select-none"
                 style={{ paddingLeft: `${(level + 1) * 1.5}rem` }}
               >
-                <span className="text-yellow-500">{type === 'array' ? index : key}</span>
-                <span className="text-muted-foreground mx-2">:</span>
+                <span className="text-amber-400">{type === 'array' ? index : key}</span>
+                <span className="text-white/50 mx-2">:</span>
               </div>
               <div className="flex-1">
                 <JsonNode
@@ -93,10 +93,10 @@ const JsonNode = ({ data, level = 0, isLast = true, initialExpanded = true }: Js
             className="py-1"
             style={{ paddingLeft: `${level * 1.5}rem` }}
           >
-            <span className="text-purple-500">
+            <span className="text-fuchsia-400">
               {type === 'array' ? ']' : '}'}
             </span>
-            {!isLast && <span className="text-muted-foreground">,</span>}
+            {!isLast && <span className="text-white/50">,</span>}
           </div>
         </>
       )}
@@ -106,7 +106,7 @@ const JsonNode = ({ data, level = 0, isLast = true, initialExpanded = true }: Js
 
 export const JsonDisplay = ({ data, initialExpanded = true }: JsonDisplayProps) => {
   return (
-    <div className="font-mono text-sm bg-muted/50 rounded-lg p-4 overflow-x-auto">
+    <div className="font-mono text-sm bg-[#1d1d1f] dark:bg-[#1d1d1f]/90 text-white/90 rounded-xl p-4 overflow-x-auto">
       <JsonNode data={data} initialExpanded={initialExpanded} />
     </div>
   );

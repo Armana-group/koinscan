@@ -20,6 +20,8 @@ import {
 import { ContractInfo } from "@/components/ContractInfo";
 import { JsonDisplay } from "@/components/JsonDisplay";
 import { useRouter } from "next/navigation";
+import { Navbar } from "@/components/Navbar";
+import { useWallet } from "@/contexts/WalletContext";
 
 export default function ContractPage({
   params,
@@ -28,10 +30,14 @@ export default function ContractPage({
 }) {
   const router = useRouter();
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const [methodStates, setMethodStates] = useState<Record<string, {
+    args: unknown;
+    loading: boolean;
+    results: string;
+  }>>({});
   const [selectedMethod, setSelectedMethod] = useState<string>("");
   const [submitText, setSubmitText] = useState<string>("");
-  const [args, setArgs] = useState<unknown>({});
-  const [signer, setSigner] = useState<SignerInterface | undefined>(undefined);
+  const { signer } = useWallet();
   const [code, setCode] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
   const [results, setResults] = useState<string>("");
@@ -184,22 +190,33 @@ export default function ContractPage({
     if (!contract) return;
     
     try {
-      setSelectedMethod(methodName);
-      setResults("");
-      setCode("");
-      setSubmitText(isRead ? "Read" : "Send");
-      setLoading(true);
+      setMethodStates(prev => ({
+        ...prev,
+        [methodName]: {
+          ...prev[methodName],
+          loading: true,
+          results: ""
+        }
+      }));
 
       const { read_only: readOnly } = contract.abi!.methods[methodName];
+      const currentArgs = methodStates[methodName]?.args || {};
 
       if (readOnly) {
-        const { result } = await contract.functions[methodName](args);
-        setResults(JSON.stringify(result));
+        const { result } = await contract.functions[methodName](currentArgs);
+        setMethodStates(prev => ({
+          ...prev,
+          [methodName]: {
+            ...prev[methodName],
+            loading: false,
+            results: JSON.stringify(result)
+          }
+        }));
       } else {
         if (!signer) throw new Error("Connect wallet");
 
         contract.signer = signer;
-        const { transaction, receipt } = await contract.functions[methodName](args, {
+        const { transaction, receipt } = await contract.functions[methodName](currentArgs, {
           rcLimit: 10_00000000,
         });
 
@@ -207,7 +224,15 @@ export default function ContractPage({
           description: "the transaction is in the mempool waiting to be mined",
           duration: 15000,
         });
-        setResults(JSON.stringify(receipt));
+        
+        setMethodStates(prev => ({
+          ...prev,
+          [methodName]: {
+            ...prev[methodName],
+            loading: false,
+            results: JSON.stringify(receipt)
+          }
+        }));
 
         await transaction!.wait();
 
@@ -227,215 +252,327 @@ export default function ContractPage({
           duration: 15000,
         });
       }
-      setLoading(false);
     } catch (error) {
+      setMethodStates(prev => ({
+        ...prev,
+        [methodName]: {
+          ...prev[methodName],
+          loading: false
+        }
+      }));
       toast.error((error as Error).message, {
         duration: 15000,
       });
-      setLoading(false);
     }
-  }, [args, signer, contract]);
+  }, [contract, signer, methodStates]);
+
+  const handleMethodArgsChange = useCallback((methodName: string, newArgs: unknown) => {
+    setMethodStates(prev => ({
+      ...prev,
+      [methodName]: {
+        ...prev[methodName],
+        args: newArgs
+      }
+    }));
+  }, []);
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (searchInputRef.current?.value) {
+      router.push(`/contracts/${searchInputRef.current.value}`);
+    }
+  };
 
   return (
-    <main className="min-h-screen bg-background p-8">
-      <div className="container mx-auto space-y-8">
-        <HeaderComponent onChange={(s) => setSigner(s)} />
-        {!error && contract && <ContractInfo {...info} />}
-        
-        {/* Function Groups */}
-        {error ? (
-          <div className="flex items-center justify-center min-h-[400px]">
-            <Card className="max-w-md w-full p-8">
-              <div className="flex flex-col items-center gap-6">
-                <div className="rounded-full bg-red-500/10 p-4">
-                  <svg
-                    className="h-8 w-8 text-red-500"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth="2"
-                      d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-                    />
-                  </svg>
-                </div>
-                <div>
-                  <div className="text-xl font-semibold text-red-500 text-center">Contract Not Found</div>
-                  <div className="text-center text-muted-foreground mt-2">{error}</div>
-                </div>
-                
-                <div className="w-full space-y-4">
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
-                      <Search className="h-4 w-4 text-muted-foreground" />
+    <>
+      <Navbar />
+      <main className="min-h-screen bg-[#f5f5f7] p-4 md:p-8 pb-20 pt-24">
+        <div className="container max-w-[980px] mx-auto space-y-8">
+          {/* Contract Info Section */}
+          {!error && contract && (
+            <div className="space-y-8">
+              <div className="text-center space-y-4 py-8">
+                <h1 className="text-5xl font-semibold text-[#1d1d1f]">
+                  {info.nickname ? `@${info.nickname}` : "Smart Contract"}
+                </h1>
+                <p className="text-xl text-[#6e6e73] max-w-2xl mx-auto">
+                  {info.description || "Interact with this smart contract on the Koinos blockchain"}
+                </p>
+              </div>
+              
+              <ContractInfo {...info} signer={signer} />
+              
+              {/* Stats Overview */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <Card className="bg-white/80 backdrop-blur-xl border-0 shadow-[0_2px_4px_rgba(0,0,0,0.04)] rounded-2xl overflow-hidden hover:shadow-[0_4px_8px_rgba(0,0,0,0.04)] transition-all">
+                  <CardContent className="p-6">
+                    <div className="flex items-center gap-3">
+                      <div className="p-3 rounded-2xl bg-blue-500/10">
+                        <BookOpen className="w-5 h-5 text-blue-600" />
+                      </div>
+                      <div>
+                        <div className="text-2xl font-semibold text-[#1d1d1f]">
+                          {contractMethods?.filter((m) => m.readOnly).length || 0}
+                        </div>
+                        <div className="text-sm text-[#6e6e73]">Read Methods</div>
+                      </div>
                     </div>
-                    <Input
-                      ref={searchInputRef}
-                      className="pl-9 bg-background"
-                      placeholder="Try another contract address or @nickname"
-                      defaultValue=""
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" && searchInputRef.current?.value) {
-                          router.push(`/contracts/${searchInputRef.current.value}`);
-                        }
-                      }}
-                    />
+                  </CardContent>
+                </Card>
+                
+                <Card className="bg-white/80 backdrop-blur-xl border-0 shadow-[0_2px_4px_rgba(0,0,0,0.04)] rounded-2xl overflow-hidden hover:shadow-[0_4px_8px_rgba(0,0,0,0.04)] transition-all">
+                  <CardContent className="p-6">
+                    <div className="flex items-center gap-3">
+                      <div className="p-3 rounded-2xl bg-purple-500/10">
+                        <PenLine className="w-5 h-5 text-purple-600" />
+                      </div>
+                      <div>
+                        <div className="text-2xl font-semibold text-[#1d1d1f]">
+                          {contractMethods?.filter((m) => !m.readOnly).length || 0}
+                        </div>
+                        <div className="text-sm text-[#6e6e73]">Write Methods</div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-white/80 backdrop-blur-xl border-0 shadow-[0_2px_4px_rgba(0,0,0,0.04)] rounded-2xl overflow-hidden hover:shadow-[0_4px_8px_rgba(0,0,0,0.04)] transition-all">
+                  <CardContent className="p-6">
+                    <div className="flex items-center gap-3">
+                      <div className="p-3 rounded-2xl bg-green-500/10">
+                        <div className="w-5 h-5 text-green-600 flex items-center justify-center text-lg">
+                          {signer ? "🔓" : "🔒"}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-sm font-medium text-[#1d1d1f] truncate max-w-[180px]">
+                          {signer ? signer.getAddress() : "Not Connected"}
+                        </div>
+                        <div className="text-sm text-[#6e6e73]">Wallet Status</div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+          )}
+          
+          {/* Function Groups */}
+          {error ? (
+            <div className="flex items-center justify-center min-h-[400px]">
+              <Card className="max-w-md w-full p-8 bg-white/80 backdrop-blur-xl border-0 shadow-[0_2px_4px_rgba(0,0,0,0.04)] rounded-2xl">
+                <div className="flex flex-col items-center gap-6">
+                  <div className="rounded-full bg-red-500/10 p-4">
+                    <svg
+                      className="h-8 w-8 text-red-500"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth="2"
+                        d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                      />
+                    </svg>
                   </div>
-                  <Button 
-                    variant="outline" 
-                    className="w-full"
-                    onClick={() => {
-                      if (searchInputRef.current?.value) {
-                        router.push(`/contracts/${searchInputRef.current.value}`);
-                      }
-                    }}
-                  >
-                    Search Contract
-                    <ArrowRight className="w-4 h-4 ml-2" />
-                  </Button>
+                  <div>
+                    <div className="text-xl font-semibold text-red-500 text-center">Contract Not Found</div>
+                    <div className="text-center text-muted-foreground mt-2">{error}</div>
+                  </div>
+                  
+                  <form onSubmit={handleSearch} className="w-full space-y-4">
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
+                        <Search className="h-4 w-4 text-muted-foreground" />
+                      </div>
+                      <Input
+                        ref={searchInputRef}
+                        className="pl-9 bg-background"
+                        placeholder="Try another contract address or @nickname"
+                        defaultValue=""
+                      />
+                    </div>
+                    <Button 
+                      type="submit"
+                      variant="outline" 
+                      className="w-full"
+                    >
+                      Search Contract
+                      <ArrowRight className="w-4 h-4 ml-2" />
+                    </Button>
+                  </form>
+                </div>
+              </Card>
+            </div>
+          ) : loading ? (
+            <div className="flex items-center justify-center h-32">
+              <div className="text-lg text-[#6e6e73]">Loading contract...</div>
+            </div>
+          ) : contract ? (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              {/* Read Functions */}
+              <div className="space-y-6">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 rounded-2xl bg-blue-500/10">
+                    <BookOpen className="w-6 h-6 text-blue-600" />
+                  </div>
+                  <h2 className="text-2xl font-semibold text-[#1d1d1f]">Read Functions</h2>
+                </div>
+                <div className="space-y-6">
+                  {contractMethods
+                    ?.filter((method) => method.readOnly)
+                    .map((method) => (
+                      <Card key={method.name} className="group bg-white/80 backdrop-blur-xl border-0 shadow-[0_2px_4px_rgba(0,0,0,0.04)] rounded-2xl overflow-hidden hover:shadow-[0_4px_8px_rgba(0,0,0,0.08)] transition-all">
+                        <CardHeader className="p-6 pb-0">
+                          <div className="flex items-start justify-between">
+                            <div>
+                              <CardTitle className="text-xl font-semibold text-[#1d1d1f]">{method.prettyName}</CardTitle>
+                              <CardDescription className="mt-1 text-[#6e6e73]">
+                                {contract.abi?.methods[method.name].description || "No description available"}
+                              </CardDescription>
+                            </div>
+                            <Badge className="bg-blue-500/10 text-blue-600 rounded-full border-0 px-3">
+                              Read
+                            </Badge>
+                          </div>
+                        </CardHeader>
+                        <CardContent className="p-6">
+                          <div className="bg-[#f5f5f7] rounded-xl p-4">
+                            <KoinosForm
+                              contract={contract}
+                              protobufType={method.name}
+                              onChange={(newArgs) => handleMethodArgsChange(method.name, newArgs)}
+                            />
+                          </div>
+                          <Button 
+                            type="button"
+                            className="mt-4 w-full bg-blue-600 text-white hover:bg-blue-700 transition-colors rounded-full h-12 text-base font-medium"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              handleMethodSubmit(method.name, true);
+                            }}
+                            disabled={methodStates[method.name]?.loading}
+                          >
+                            {methodStates[method.name]?.loading ? (
+                              <div className="flex items-center gap-2 justify-center">
+                                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                <span>Reading...</span>
+                              </div>
+                            ) : (
+                              <>
+                                Read Data
+                                <ArrowRight className="w-4 h-4 ml-2" />
+                              </>
+                            )}
+                          </Button>
+                          {methodStates[method.name]?.results && (
+                            <div className="mt-6 animate-in fade-in slide-in-from-top-4">
+                              <div className="text-sm font-medium text-[#1d1d1f] mb-2">
+                                Result
+                              </div>
+                              <div className="bg-[#f5f5f7] rounded-xl p-4 overflow-x-auto">
+                                <JsonDisplay data={JSON.parse(methodStates[method.name].results)} />
+                              </div>
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    ))}
                 </div>
               </div>
-            </Card>
-          </div>
-        ) : loading ? (
-          <div className="flex items-center justify-center h-32">
-            <div className="text-lg text-muted-foreground">Loading contract...</div>
-          </div>
-        ) : contract ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Read Functions */}
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 mb-4">
-                <BookOpen className="w-5 h-5 text-blue-500" />
-                <h2 className="text-xl font-semibold">Read Functions</h2>
-              </div>
-              <div className="space-y-4">
-                {contractMethods
-                  ?.filter((method) => method.readOnly)
-                  .map((method) => (
-                    <Card key={method.name} className="overflow-hidden bg-card/50 backdrop-blur-sm border-border/50 transition-all hover:shadow-lg">
-                      <CardHeader className="p-4">
-                        <div className="flex items-start justify-between">
-                          <div>
-                            <CardTitle className="text-lg font-medium">{method.prettyName}</CardTitle>
-                            <CardDescription className="mt-1 text-sm text-muted-foreground">
-                              {contract.abi?.methods[method.name].description || "No description available"}
-                            </CardDescription>
-                          </div>
-                          <Badge variant="secondary" className="bg-blue-500/10 text-blue-500 border-blue-500/20">
-                            Read
-                          </Badge>
-                        </div>
-                      </CardHeader>
-                      <CardContent className="p-4 pt-0">
-                        <KoinosForm
-                          contract={contract}
-                          protobufType={method.name}
-                          onChange={(newArgs) => {
-                            if (selectedMethod === method.name) {
-                              setArgs(newArgs);
-                            }
-                          }}
-                        />
-                        <Button 
-                          className="mt-4 w-full"
-                          variant="outline"
-                          onClick={() => handleMethodSubmit(method.name, true)}
-                          disabled={loading && selectedMethod === method.name}
-                        >
-                          Read Data
-                          <ArrowRight className="w-4 h-4 ml-2" />
-                        </Button>
-                        {selectedMethod === method.name && results && (
-                          <div className="mt-4">
-                            <div className="text-sm font-medium text-muted-foreground mb-2">
-                              Result:
-                            </div>
-                            <JsonDisplay data={JSON.parse(results)} />
-                          </div>
-                        )}
-                      </CardContent>
-                    </Card>
-                  ))}
-              </div>
-            </div>
 
-            {/* Write Functions */}
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 mb-4">
-                <PenLine className="w-5 h-5 text-purple-500" />
-                <h2 className="text-xl font-semibold">Write Functions</h2>
-              </div>
-              <div className="space-y-4">
-                {contractMethods
-                  ?.filter((method) => !method.readOnly)
-                  .map((method) => (
-                    <Card key={method.name} className="overflow-hidden bg-card/50 backdrop-blur-sm border-border/50 transition-all hover:shadow-lg">
-                      <CardHeader className="p-4">
-                        <div className="flex items-start justify-between">
-                          <div>
-                            <CardTitle className="text-lg font-medium">{method.prettyName}</CardTitle>
-                            <CardDescription className="mt-1 text-sm text-muted-foreground">
-                              {contract.abi?.methods[method.name].description || "No description available"}
-                            </CardDescription>
-                          </div>
-                          <Badge variant="secondary" className="bg-purple-500/10 text-purple-500 border-purple-500/20">
-                            Write
-                          </Badge>
-                        </div>
-                      </CardHeader>
-                      <CardContent className="p-4 pt-0">
-                        <KoinosForm
-                          contract={contract}
-                          protobufType={method.name}
-                          onChange={(newArgs) => {
-                            if (selectedMethod === method.name) {
-                              setArgs(newArgs);
-                            }
-                          }}
-                        />
-                        {signer ? (
-                          <div className="mt-2 text-sm text-muted-foreground">
-                            Signing as: {signer.getAddress()}
-                          </div>
-                        ) : (
-                          <div className="mt-2 text-sm text-yellow-500">
-                            Please connect your wallet to execute this function
-                          </div>
-                        )}
-                        <Button 
-                          className="mt-4 w-full"
-                          variant={signer ? "default" : "outline"}
-                          onClick={() => handleMethodSubmit(method.name, false)}
-                          disabled={(!signer && !method.readOnly) || (loading && selectedMethod === method.name)}
-                        >
-                          {signer ? "Execute Transaction" : "Connect Wallet"}
-                          <ArrowRight className="w-4 h-4 ml-2" />
-                        </Button>
-                        {selectedMethod === method.name && results && (
-                          <div className="mt-4">
-                            <div className="text-sm font-medium text-muted-foreground mb-2">
-                              Receipt:
+              {/* Write Functions */}
+              <div className="space-y-6">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 rounded-2xl bg-purple-500/10">
+                    <PenLine className="w-6 h-6 text-purple-600" />
+                  </div>
+                  <h2 className="text-2xl font-semibold text-[#1d1d1f]">Write Functions</h2>
+                </div>
+                <div className="space-y-6">
+                  {contractMethods
+                    ?.filter((method) => !method.readOnly)
+                    .map((method) => (
+                      <Card key={method.name} className="group bg-white/80 backdrop-blur-xl border-0 shadow-[0_2px_4px_rgba(0,0,0,0.04)] rounded-2xl overflow-hidden hover:shadow-[0_4px_8px_rgba(0,0,0,0.08)] transition-all">
+                        <CardHeader className="p-6 pb-0">
+                          <div className="flex items-start justify-between">
+                            <div>
+                              <CardTitle className="text-xl font-semibold text-[#1d1d1f]">{method.prettyName}</CardTitle>
+                              <CardDescription className="mt-1 text-[#6e6e73]">
+                                {contract.abi?.methods[method.name].description || "No description available"}
+                              </CardDescription>
                             </div>
-                            <JsonDisplay data={JSON.parse(results)} />
+                            <Badge className="bg-purple-500/10 text-purple-600 rounded-full border-0 px-3">
+                              Write
+                            </Badge>
                           </div>
-                        )}
-                      </CardContent>
-                    </Card>
-                  ))}
+                        </CardHeader>
+                        <CardContent className="p-6">
+                          <div className="bg-[#f5f5f7] rounded-xl p-4">
+                            <KoinosForm
+                              contract={contract}
+                              protobufType={method.name}
+                              onChange={(newArgs) => handleMethodArgsChange(method.name, newArgs)}
+                            />
+                          </div>
+                          {signer ? (
+                            <div className="mt-3 text-sm text-[#6e6e73] flex items-center gap-2">
+                              <div className="w-2 h-2 rounded-full bg-green-500" />
+                              <span>Signing as: {signer.getAddress()}</span>
+                            </div>
+                          ) : (
+                            <div className="mt-3 text-sm text-[#6e6e73] flex items-center gap-2">
+                              <div className="w-2 h-2 rounded-full bg-yellow-500" />
+                              <span>Please connect your wallet to execute this function</span>
+                            </div>
+                          )}
+                          <Button 
+                            type="button"
+                            className={`mt-4 w-full rounded-full h-12 text-base font-medium ${
+                              signer 
+                                ? "bg-purple-600 text-white hover:bg-purple-700"
+                                : "bg-[#f5f5f7] text-[#6e6e73] hover:bg-[#ebebeb]"
+                            } transition-colors`}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              handleMethodSubmit(method.name, false);
+                            }}
+                            disabled={(!signer && !method.readOnly) || methodStates[method.name]?.loading}
+                          >
+                            {methodStates[method.name]?.loading ? (
+                              <div className="flex items-center gap-2 justify-center">
+                                <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                                <span>Executing...</span>
+                              </div>
+                            ) : (
+                              <>
+                                {signer ? "Execute Transaction" : "Connect Wallet"}
+                                <ArrowRight className="w-4 h-4 ml-2" />
+                              </>
+                            )}
+                          </Button>
+                          {methodStates[method.name]?.results && (
+                            <div className="mt-6 animate-in fade-in slide-in-from-top-4">
+                              <div className="text-sm font-medium text-[#1d1d1f] mb-2">
+                                Receipt
+                              </div>
+                              <div className="bg-[#f5f5f7] rounded-xl p-4 overflow-x-auto">
+                                <JsonDisplay data={JSON.parse(methodStates[method.name].results)} />
+                              </div>
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    ))}
+                </div>
               </div>
             </div>
-          </div>
-        ) : (
-          <div className="flex items-center justify-center h-32">
-            <div className="text-lg text-muted-foreground">Loading contract...</div>
-          </div>
-        )}
-        <FooterComponent />
-      </div>
-    </main>
+          ) : null}
+          <FooterComponent />
+        </div>
+      </main>
+    </>
   );
 }

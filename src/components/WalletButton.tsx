@@ -20,7 +20,7 @@ import { toast } from "sonner";
 import { useWallet } from "@/contexts/WalletContext";
 
 interface ExtendedSigner extends SignerInterface {
-  name?: "kondor" | "walletConnect";
+  name?: "kondor" | "walletConnect" | "mkw";
 }
 
 function shortAddress(address: string): string {
@@ -32,7 +32,7 @@ export function WalletButton() {
   const addr = (signer as ExtendedSigner)?.getAddress();
   const walletName = (signer as ExtendedSigner)?.name;
 
-  const handleWalletAction = async (action: "kondor" | "walletConnect" | "disconnect") => {
+  const handleWalletAction = async (action: WalletName | "disconnect") => {
     try {
       if (action === "disconnect") {
         if (walletName) {
@@ -45,8 +45,8 @@ export function WalletButton() {
       const wName = action;
       const address = await connectWallet(wName);
       const signer = getWalletSigner(wName, address);
-
-      setSigner(signer);
+      (signer as ExtendedSigner).name = wName;
+      setSigner(signer as ExtendedSigner);
     } catch (error) {
       toast.error((error as Error).message);
       console.error(error);
@@ -65,7 +65,7 @@ export function WalletButton() {
         >
           {addr ? (
             <>
-              <span className="text-xs truncate">{addr}</span>
+              <span className="text-xs truncate">{shortAddress(addr)}</span>
               <div className="w-4 h-4 flex-shrink-0 ml-1.5 rounded-full bg-background/80 p-0.5">
                 <Image
                   src={
@@ -73,6 +73,8 @@ export function WalletButton() {
                       ? kondorLogo
                       : walletName === "walletConnect"
                       ? walletConnectLogo
+                      : walletName === "mkw"
+                      ? mkwLogo
                       : mkwLogo
                   }
                   alt="wallet"

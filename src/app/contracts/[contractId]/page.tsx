@@ -310,11 +310,11 @@ export default function ContractPage({
                       <div className="p-3 rounded-2xl bg-blue-500/10">
                         <BookOpen className="w-5 h-5 text-blue-600" />
                       </div>
-                      <div>
-                        <div className="text-2xl font-semibold text-foreground">
+                      <div className="flex flex-row items-center gap-2">
+                        <span className="text-2xl font-semibold text-foreground">
                           {contractMethods?.filter((m) => m.readOnly).length || 0}
-                        </div>
-                        <div className="text-sm text-muted-foreground">Read Methods</div>
+                        </span>
+                        <span className="text-sm text-muted-foreground">Read Methods</span>
                       </div>
                     </div>
                   </CardContent>
@@ -326,11 +326,11 @@ export default function ContractPage({
                       <div className="p-3 rounded-2xl bg-purple-500/10">
                         <PenLine className="w-5 h-5 text-purple-600" />
                       </div>
-                      <div>
-                        <div className="text-2xl font-semibold text-foreground">
+                      <div className="flex flex-row items-center gap-2">
+                        <span className="text-2xl font-semibold text-foreground">
                           {contractMethods?.filter((m) => !m.readOnly).length || 0}
-                        </div>
-                        <div className="text-sm text-muted-foreground">Write Methods</div>
+                        </span>
+                        <span className="text-sm text-muted-foreground">Write Methods</span>
                       </div>
                     </div>
                   </CardContent>
@@ -348,7 +348,7 @@ export default function ContractPage({
                         <div className="text-sm font-medium text-foreground truncate max-w-[180px]">
                           {signer ? signer.getAddress() : "Not Connected"}
                         </div>
-                        <div className="text-sm text-muted-foreground">Wallet Status</div>
+                        {/* <div className="text-sm text-muted-foreground">Wallet Status</div> */}
                       </div>
                     </div>
                   </CardContent>

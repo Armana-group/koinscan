@@ -4,7 +4,7 @@ import { SignerInterface } from "koilib";
 import { createContext, useContext, useState, ReactNode } from "react";
 
 interface ExtendedSigner extends SignerInterface {
-  name?: "kondor" | "walletConnect";
+  name?: "kondor" | "walletConnect" | "mkw";
 }
 
 interface WalletContextType {

@@ -38,7 +38,7 @@ export function Navigation() {
   };
 
   return (
-    <nav className="flex-1">
+    <nav>
       <ul
         onMouseLeave={handleMouseLeave}
         className="relative mx-auto flex w-fit rounded-full border border-border bg-background/50 p-1"

@@ -10,7 +10,6 @@ import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import styles from "../../page.module.css";
 import { KoinosForm, prettyName } from "../../../components/KoinosForm";
-import { HeaderComponent } from "@/components/HeaderComponent";
 import { FooterComponent } from "@/components/FooterComponent";
 import {
   BLOCK_EXPLORER,
@@ -287,7 +286,7 @@ export default function ContractPage({
     <>
       <Navbar />
       <main className="min-h-screen bg-background p-4 md:p-8">
-        <div className="container max-w-[980px] mx-auto space-y-8">
+        <div className="container max-w-[980px] mx-auto space-y-2">
           {/* Contract Info Section */}
           {!error && contract && (
             <div className="space-y-8">
@@ -301,59 +300,6 @@ export default function ContractPage({
               </div>
               
               <ContractInfo {...info} signer={signer} />
-              
-              {/* Stats Overview */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <Card className="bg-background/80 backdrop-blur-xl border-border shadow-sm rounded-2xl overflow-hidden hover:shadow-md transition-all">
-                  <CardContent className="p-6">
-                    <div className="flex items-center gap-3">
-                      <div className="p-3 rounded-2xl bg-blue-500/10">
-                        <BookOpen className="w-5 h-5 text-blue-600" />
-                      </div>
-                      <div className="flex flex-row items-center gap-2">
-                        <span className="text-2xl font-semibold text-foreground">
-                          {contractMethods?.filter((m) => m.readOnly).length || 0}
-                        </span>
-                        <span className="text-sm text-muted-foreground">Read Methods</span>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-                
-                <Card className="bg-background/80 backdrop-blur-xl border-border shadow-sm rounded-2xl overflow-hidden hover:shadow-md transition-all">
-                  <CardContent className="p-6">
-                    <div className="flex items-center gap-3">
-                      <div className="p-3 rounded-2xl bg-purple-500/10">
-                        <PenLine className="w-5 h-5 text-purple-600" />
-                      </div>
-                      <div className="flex flex-row items-center gap-2">
-                        <span className="text-2xl font-semibold text-foreground">
-                          {contractMethods?.filter((m) => !m.readOnly).length || 0}
-                        </span>
-                        <span className="text-sm text-muted-foreground">Write Methods</span>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="bg-background/80 backdrop-blur-xl border-border shadow-sm rounded-2xl overflow-hidden hover:shadow-md transition-all">
-                  <CardContent className="p-6">
-                    <div className="flex items-center gap-3">
-                      <div className="p-3 rounded-2xl bg-green-500/10">
-                        <div className="w-5 h-5 text-green-600 flex items-center justify-center text-lg">
-                          {signer ? "🔓" : "🔒"}
-                        </div>
-                      </div>
-                      <div>
-                        <div className="text-sm font-medium text-foreground truncate max-w-[180px]">
-                          {signer ? signer.getAddress() : "Not Connected"}
-                        </div>
-                        {/* <div className="text-sm text-muted-foreground">Wallet Status</div> */}
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
             </div>
           )}
           
@@ -411,14 +357,16 @@ export default function ContractPage({
               <div className="text-lg text-muted-foreground">Loading contract...</div>
             </div>
           ) : contract ? (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 pt-16">
               {/* Read Functions */}
               <div className="space-y-6">
                 <div className="flex items-center gap-3">
-                  <div className="p-3 rounded-2xl bg-blue-500/10">
-                    <BookOpen className="w-6 h-6 text-blue-600" />
+                  <div className="p-2 rounded-xl bg-blue-500/10">
+                    <BookOpen className="w-4 h-4 text-blue-600" />
                   </div>
-                  <h2 className="text-2xl font-semibold text-foreground">Read Functions</h2>
+                  <h2 className="text-2xl font-semibold text-foreground">
+                    Read Functions <span className="text-muted-foreground">({contractMethods?.filter((m) => m.readOnly).length || 0})</span>
+                  </h2>
                 </div>
                 <div className="space-y-6">
                   {contractMethods
@@ -486,10 +434,12 @@ export default function ContractPage({
               {/* Write Functions */}
               <div className="space-y-6">
                 <div className="flex items-center gap-3">
-                  <div className="p-3 rounded-2xl bg-purple-500/10">
-                    <PenLine className="w-6 h-6 text-purple-600" />
+                  <div className="p-2 rounded-xl bg-purple-500/10">
+                    <PenLine className="w-4 h-4 text-purple-600" />
                   </div>
-                  <h2 className="text-2xl font-semibold text-foreground">Write Functions</h2>
+                  <h2 className="text-2xl font-semibold text-foreground">
+                    Write Functions <span className="text-muted-foreground">({contractMethods?.filter((m) => !m.readOnly).length || 0})</span>
+                  </h2>
                 </div>
                 <div className="space-y-6">
                   {contractMethods

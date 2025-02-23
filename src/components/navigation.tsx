@@ -69,7 +69,7 @@ export function Navigation() {
           animate={{ left, width, opacity }}
           initial={{ opacity: 0 }}
           transition={{ type: "spring", stiffness: 400, damping: 30 }}
-          className="absolute inset-y-1 rounded-full bg-accent"
+          className="absolute inset-y-1 rounded-full bg-accent hidden md:block"
           style={{ position: 'absolute', height: 'calc(100% - 8px)' }}
         />
       </ul>

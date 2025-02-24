@@ -5,7 +5,7 @@ import { Contract, Provider, Serializer, SignerInterface, utils } from "koilib";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ArrowRight, BookOpen, PenLine, Search } from "lucide-react";
+import { ArrowRight, BookOpen, PenLine, Search, ChevronDown, ChevronRight } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import styles from "../../page.module.css";
@@ -21,6 +21,7 @@ import { JsonDisplay } from "@/components/JsonDisplay";
 import { useRouter } from "next/navigation";
 import { Navbar } from "@/components/Navbar";
 import { useWallet } from "@/contexts/WalletContext";
+import { cn } from "@/lib/utils";
 
 export default function ContractPage({
   params,
@@ -199,7 +200,7 @@ export default function ContractPage({
       const { read_only: readOnly } = contract.abi!.methods[methodName];
       const currentArgs = methodStates[methodName]?.args || {};
 
-      if (readOnly) {
+      if (isRead) {
         const { result } = await contract.functions[methodName](currentArgs);
         setMethodStates(prev => ({
           ...prev,
@@ -284,7 +285,7 @@ export default function ContractPage({
     <>
       <Navbar />
       <main className="min-h-screen bg-background p-4 md:p-8">
-        <div className="container max-w-[980px] mx-auto space-y-2">
+        <div className="max-w-[980px] mx-auto space-y-2">
           {/* Contract Info Section */}
           {!error && contract && (
             <div className="space-y-8">
@@ -355,7 +356,7 @@ export default function ContractPage({
               <div className="text-lg text-muted-foreground">Loading contract...</div>
             </div>
           ) : contract ? (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 pt-16">
+            <div className="space-y-6">
               {/* Read Functions */}
               <div className="space-y-6">
                 <div className="flex items-center gap-3">
@@ -363,101 +364,51 @@ export default function ContractPage({
                     <BookOpen className="w-4 h-4 text-blue-600" />
                   </div>
                   <h2 className="text-2xl font-semibold text-foreground">
-                    Read Functions <span className="text-muted-foreground">({contractMethods?.filter((m) => m.readOnly).length || 0})</span>
+                    Functions <span className="text-muted-foreground">({contractMethods?.length || 0})</span>
                   </h2>
                 </div>
-                <div className="space-y-6">
-                  {contractMethods
-                    ?.filter((method) => method.readOnly)
-                    .map((method) => (
-                      <Card key={method.name} className="group bg-background/80 backdrop-blur-xl border-border shadow-sm rounded-2xl overflow-hidden hover:shadow-md transition-all">
-                        <CardHeader className="p-6 pb-0">
-                          <div className="flex items-start justify-between">
-                            <div>
-                              <CardTitle className="text-xl font-semibold text-foreground">{method.prettyName}</CardTitle>
-                              <CardDescription className="mt-1 text-muted-foreground">
-                                {contract.abi?.methods[method.name].description || "No description available"}
-                              </CardDescription>
-                            </div>
-                            <Badge className="bg-blue-500/10 text-blue-600 rounded-full border-0 px-3">
-                              Read
-                            </Badge>
-                          </div>
-                        </CardHeader>
-                        <CardContent className="p-6">
-                          <div className="bg-muted rounded-xl p-4">
-                            <KoinosForm
-                              contract={contract}
-                              protobufType={method.name}
-                              onChange={(newArgs) => handleMethodArgsChange(method.name, newArgs)}
-                            />
-                          </div>
-                          <Button 
-                            type="button"
-                            className="mt-4 w-full bg-blue-600 text-white hover:bg-blue-700 transition-colors rounded-full h-12 text-base font-medium"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              handleMethodSubmit(method.name, true);
-                            }}
-                            disabled={methodStates[method.name]?.loading}
-                          >
-                            {methodStates[method.name]?.loading ? (
-                              <div className="flex items-center gap-2 justify-center">
-                                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                <span>Reading...</span>
-                              </div>
+                <div className="space-y-4">
+                  {contractMethods?.map((method) => (
+                    <Card 
+                      key={method.name} 
+                      className="group bg-background/80 backdrop-blur-xl border-border shadow-sm rounded-2xl overflow-hidden hover:shadow-md transition-all"
+                    >
+                      <CardHeader 
+                        className="p-6 cursor-pointer"
+                        onClick={() => {
+                          setSelectedMethod(selectedMethod === method.name ? "" : method.name);
+                        }}
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex items-center gap-3">
+                            {selectedMethod === method.name ? (
+                              <ChevronDown className="w-4 h-4 text-muted-foreground" />
                             ) : (
-                              <>
-                                Read Data
-                                <ArrowRight className="w-4 h-4 ml-2" />
-                              </>
+                              <ChevronRight className="w-4 h-4 text-muted-foreground" />
                             )}
-                          </Button>
-                          {methodStates[method.name]?.results && (
-                            <div className="mt-6 animate-in fade-in slide-in-from-top-4">
-                              <div className="text-sm font-medium text-foreground mb-2">
-                                Result
-                              </div>
-                              <div className="bg-muted rounded-xl p-4 overflow-x-auto">
-                                <JsonDisplay data={JSON.parse(methodStates[method.name].results)} />
-                              </div>
-                            </div>
-                          )}
-                        </CardContent>
-                      </Card>
-                    ))}
-                </div>
-              </div>
-
-              {/* Write Functions */}
-              <div className="space-y-6">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-xl bg-purple-500/10">
-                    <PenLine className="w-4 h-4 text-purple-600" />
-                  </div>
-                  <h2 className="text-2xl font-semibold text-foreground">
-                    Write Functions <span className="text-muted-foreground">({contractMethods?.filter((m) => !m.readOnly).length || 0})</span>
-                  </h2>
-                </div>
-                <div className="space-y-6">
-                  {contractMethods
-                    ?.filter((method) => !method.readOnly)
-                    .map((method) => (
-                      <Card key={method.name} className="group bg-background/80 backdrop-blur-xl border-border shadow-sm rounded-2xl overflow-hidden hover:shadow-md transition-all">
-                        <CardHeader className="p-6 pb-0">
-                          <div className="flex items-start justify-between">
                             <div>
-                              <CardTitle className="text-xl font-semibold text-foreground">{method.prettyName}</CardTitle>
+                              <CardTitle className="text-xl font-semibold text-foreground">
+                                {method.prettyName}
+                              </CardTitle>
                               <CardDescription className="mt-1 text-muted-foreground">
                                 {contract.abi?.methods[method.name].description || "No description available"}
                               </CardDescription>
                             </div>
-                            <Badge className="bg-purple-500/10 text-purple-600 rounded-full border-0 px-3">
-                              Write
-                            </Badge>
                           </div>
-                        </CardHeader>
-                        <CardContent className="p-6">
+                          <Badge 
+                            className={cn(
+                              "rounded-full border-0 px-3",
+                              method.readOnly 
+                                ? "bg-blue-500/10 text-blue-600" 
+                                : "bg-purple-500/10 text-purple-600"
+                            )}
+                          >
+                            {method.readOnly ? "Read" : "Write"}
+                          </Badge>
+                        </div>
+                      </CardHeader>
+                      {selectedMethod === method.name && (
+                        <CardContent className="p-6 pt-0">
                           <div className="bg-muted rounded-xl p-4">
                             <KoinosForm
                               contract={contract}
@@ -465,38 +416,45 @@ export default function ContractPage({
                               onChange={(newArgs) => handleMethodArgsChange(method.name, newArgs)}
                             />
                           </div>
-                          {signer ? (
+                          {!method.readOnly && signer ? (
                             <div className="mt-3 text-sm text-muted-foreground flex items-center gap-2">
                               <div className="w-2 h-2 rounded-full bg-green-500" />
                               <span>Signing as: {signer.getAddress()}</span>
                             </div>
-                          ) : (
+                          ) : !method.readOnly ? (
                             <div className="mt-3 text-sm text-muted-foreground flex items-center gap-2">
                               <div className="w-2 h-2 rounded-full bg-yellow-500" />
                               <span>Please connect your wallet to execute this function</span>
                             </div>
-                          )}
+                          ) : null}
                           <Button 
                             type="button"
-                            className={`mt-4 w-full rounded-full h-12 text-base font-medium ${
-                              signer 
+                            className={cn(
+                              "mt-4 w-full rounded-full h-12 text-base font-medium",
+                              method.readOnly
+                                ? "bg-blue-600 text-white hover:bg-blue-700"
+                                : signer
                                 ? "bg-purple-600 text-white hover:bg-purple-700"
                                 : "bg-background text-muted-foreground hover:bg-border"
-                            } transition-colors`}
+                            )}
                             onClick={(e) => {
                               e.preventDefault();
-                              handleMethodSubmit(method.name, false);
+                              handleMethodSubmit(method.name, Boolean(method.readOnly));
                             }}
                             disabled={(!signer && !method.readOnly) || methodStates[method.name]?.loading}
                           >
                             {methodStates[method.name]?.loading ? (
                               <div className="flex items-center gap-2 justify-center">
                                 <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                                <span>Executing...</span>
+                                <span>{method.readOnly ? "Reading..." : "Executing..."}</span>
                               </div>
                             ) : (
                               <>
-                                {signer ? "Execute Transaction" : "Connect Wallet"}
+                                {method.readOnly
+                                  ? "Read Data"
+                                  : signer
+                                  ? "Execute Transaction"
+                                  : "Connect Wallet"}
                                 <ArrowRight className="w-4 h-4 ml-2" />
                               </>
                             )}
@@ -504,7 +462,7 @@ export default function ContractPage({
                           {methodStates[method.name]?.results && (
                             <div className="mt-6 animate-in fade-in slide-in-from-top-4">
                               <div className="text-sm font-medium text-foreground mb-2">
-                                Receipt
+                                {method.readOnly ? "Result" : "Receipt"}
                               </div>
                               <div className="bg-muted rounded-xl p-4 overflow-x-auto">
                                 <JsonDisplay data={JSON.parse(methodStates[method.name].results)} />
@@ -512,8 +470,9 @@ export default function ContractPage({
                             </div>
                           )}
                         </CardContent>
-                      </Card>
-                    ))}
+                      )}
+                    </Card>
+                  ))}
                 </div>
               </div>
             </div>

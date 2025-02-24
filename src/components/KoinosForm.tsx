@@ -259,6 +259,32 @@ const RecursiveFormField = ({
     );
   }
 
+  // Handle boolean type
+  if (type === "bool") {
+    return (
+      <div className="space-y-2">
+        <Label>
+          {fieldPrettyName}
+          <span className="ml-2 text-xs text-muted-foreground">({format})</span>
+        </Label>
+        <RadioGroup
+          value={String(value)}
+          onValueChange={(newValue) => onChange(newValue === "true")}
+          className="flex gap-4"
+        >
+          <div className="flex items-center space-x-2">
+            <RadioGroupItem value="true" id={`${name}-true`} />
+            <Label htmlFor={`${name}-true`}>True</Label>
+          </div>
+          <div className="flex items-center space-x-2">
+            <RadioGroupItem value="false" id={`${name}-false`} />
+            <Label htmlFor={`${name}-false`}>False</Label>
+          </div>
+        </RadioGroup>
+      </div>
+    );
+  }
+
   // Handle basic types with format consideration
   return (
     <div className="space-y-2">

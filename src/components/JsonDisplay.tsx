@@ -1,113 +1,96 @@
-import { useMemo, useState } from 'react';
-import { ChevronDown, ChevronRight, CircleDot } from 'lucide-react';
+import { useState } from "react";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 
 interface JsonDisplayProps {
   data: unknown;
-  initialExpanded?: boolean;
 }
 
-interface JsonNodeProps extends JsonDisplayProps {
-  level?: number;
-  isLast?: boolean;
-}
+export const JsonDisplay = ({ data }: JsonDisplayProps) => {
+  const [isCompact, setIsCompact] = useState(false);
 
-const JsonNode = ({ data, level = 0, isLast = true, initialExpanded = true }: JsonNodeProps) => {
-  const [isExpanded, setIsExpanded] = useState(initialExpanded);
-  const type = Array.isArray(data) ? 'array' : typeof data;
-  const isExpandable = type === 'object' || type === 'array';
-  
-  const formattedValue = useMemo(() => {
-    if (data === null) return 'null';
-    if (data === undefined) return 'undefined';
-    if (typeof data === 'string') return `"${data}"`;
-    return String(data);
-  }, [data]);
-
-  const toggleExpand = () => {
-    if (isExpandable) {
-      setIsExpanded(!isExpanded);
+  const formatValue = (value: unknown): string => {
+    if (typeof value === "string" && value.startsWith("0x")) {
+      // Truncate long hex strings
+      return value.length > 10 ? `${value.slice(0, 6)}...${value.slice(-4)}` : value;
     }
+    return JSON.stringify(value);
   };
 
-  if (!isExpandable) {
+  const renderCompactArray = (arr: unknown[]) => {
     return (
-      <div 
-        className="flex items-center py-1"
-        style={{ paddingLeft: `${level * 1.5}rem` }}
-      >
-        <CircleDot className="w-4 h-4 text-white/30 mr-2" />
-        <span className={`${typeof data === 'string' ? 'text-emerald-400' : 'text-sky-400'}`}>
-          {formattedValue}
-        </span>
-        {!isLast && <span className="text-white/50">,</span>}
+      <div className="flex flex-wrap gap-2">
+        {arr.map((item, index) => (
+          <div key={index} className="bg-muted px-2 py-1 rounded text-sm">
+            {formatValue(item)}
+          </div>
+        ))}
       </div>
     );
-  }
+  };
 
-  const entries = Object.entries(data as object);
-
-  return (
-    <div>
-      <div 
-        className="flex items-center py-1 cursor-pointer select-none"
-        style={{ paddingLeft: `${level * 1.5}rem` }}
-        onClick={toggleExpand}
-      >
-        {isExpanded ? (
-          <ChevronDown className="w-4 h-4 text-white/30 mr-2" />
-        ) : (
-          <ChevronRight className="w-4 h-4 text-white/30 mr-2" />
-        )}
-        <span className="text-fuchsia-400">
-          {type === 'array' ? '[' : '{'}
-        </span>
-        {!isExpanded && (
-          <span className="text-white/50 ml-1">
-            {entries.length} {type === 'array' ? 'items' : 'properties'}
-          </span>
-        )}
-      </div>
-      
-      {isExpanded && (
-        <>
-          {entries.map(([key, value], index) => (
-            <div key={key} className="flex">
-              <div 
-                className="py-1 select-none"
-                style={{ paddingLeft: `${(level + 1) * 1.5}rem` }}
-              >
-                <span className="text-amber-400">{type === 'array' ? index : key}</span>
-                <span className="text-white/50 mx-2">:</span>
-              </div>
-              <div className="flex-1">
-                <JsonNode
-                  data={value}
-                  level={level + 1}
-                  isLast={index === entries.length - 1}
-                  initialExpanded={level < 2}
-                />
-              </div>
+  const renderExpandedJson = (obj: unknown, level = 0): JSX.Element => {
+    if (Array.isArray(obj)) {
+      return (
+        <div className="space-y-1">
+          {obj.map((item, index) => (
+            <div key={index} className="flex items-start gap-2">
+              <span className="text-muted-foreground">{index}:</span>
+              {renderExpandedJson(item, level + 1)}
             </div>
           ))}
-          <div 
-            className="py-1"
-            style={{ paddingLeft: `${level * 1.5}rem` }}
-          >
-            <span className="text-fuchsia-400">
-              {type === 'array' ? ']' : '}'}
-            </span>
-            {!isLast && <span className="text-white/50">,</span>}
-          </div>
-        </>
-      )}
-    </div>
-  );
-};
+        </div>
+      );
+    }
 
-export const JsonDisplay = ({ data, initialExpanded = true }: JsonDisplayProps) => {
+    if (obj && typeof obj === "object") {
+      return (
+        <div className="space-y-1">
+          {Object.entries(obj).map(([key, value]) => (
+            <div key={key} className="flex items-start gap-2">
+              <span className="text-muted-foreground">{key}:</span>
+              {renderExpandedJson(value, level + 1)}
+            </div>
+          ))}
+        </div>
+      );
+    }
+
+    return <span>{formatValue(obj)}</span>;
+  };
+
   return (
-    <div className="font-mono text-sm bg-muted/50 dark:bg-muted/90 text-foreground rounded-xl p-4 overflow-x-auto">
-      <JsonNode data={data} initialExpanded={initialExpanded} />
+    <div className="space-y-2">
+      <div className="flex items-center justify-between pb-2 border-b">
+        <Label htmlFor="format-switch" className="text-sm text-muted-foreground">
+          Compact View
+        </Label>
+        <Switch
+          id="format-switch"
+          checked={isCompact}
+          onCheckedChange={setIsCompact}
+        />
+      </div>
+      <div className="font-mono text-sm overflow-x-auto">
+        {isCompact ? (
+          <div className="space-y-2">
+            {Object.entries(data as object).map(([key, value]) => (
+              <div key={key} className="flex flex-col gap-1">
+                <div className="text-muted-foreground">{key}:</div>
+                <div className="pl-4">
+                  {Array.isArray(value) ? (
+                    renderCompactArray(value)
+                  ) : (
+                    <span>{formatValue(value)}</span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          renderExpandedJson(data)
+        )}
+      </div>
     </div>
   );
 }; 

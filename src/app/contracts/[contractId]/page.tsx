@@ -9,7 +9,7 @@ import { ArrowRight, BookOpen, PenLine, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import styles from "../../page.module.css";
-import { KoinosForm, prettyName } from "../../../components/KoinosForm";
+import { KoinosForm, prettyName } from "@/components/KoinosForm";
 import { FooterComponent } from "@/components/FooterComponent";
 import {
   BLOCK_EXPLORER,
@@ -176,13 +176,11 @@ export default function ContractPage({
 
   const contractMethods = useMemo(() => {
     if (!contract) return [];
-    return Object.keys(contract.abi!.methods).map((name) => {
-      return {
-        name,
-        prettyName: prettyName(name),
-        readOnly: contract.abi!.methods[name].read_only,
-      };
-    });
+    return Object.keys(contract.abi!.methods).map((name) => ({
+      name,
+      prettyName: prettyName(name),
+      readOnly: contract.abi!.methods[name].read_only,
+    }));
   }, [contract]);
 
   const handleMethodSubmit = useCallback(async (methodName: string, isRead: boolean) => {

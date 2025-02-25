@@ -241,7 +241,7 @@ export default function ContractPage({
               see confirmation in{" "}
               <a
                 target="_blank"
-                href={`https://koinosblocks.com/tx/${transaction!.id!}`}
+                href={`${BLOCK_EXPLORER}/tx/${transaction!.id!}`}
                 className="text-primary hover:underline"
               >
                 koinosblocks

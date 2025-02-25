@@ -4,7 +4,7 @@ import { Copy, ExternalLink, Shield, Wallet } from "lucide-react";
 import { toast } from "sonner";
 import { useEffect, useState } from "react";
 import { Contract, Provider, utils } from "koilib";
-import { RPC_NODE } from "@/koinos/constants";
+import { BLOCK_EXPLORER, RPC_NODE } from "@/koinos/constants";
 
 export const ContractInfo = (props: {
   nickname: string;
@@ -176,7 +176,7 @@ export const ContractInfo = (props: {
                       className="h-9 w-9 rounded-xl hover:bg-muted transition-colors"
                       asChild
                     >
-                      <a href={`https://koinosblocks.com/address/${props.address}`} target="_blank" rel="noopener noreferrer">
+                      <a href={`${BLOCK_EXPLORER}/address/${props.address}`} target="_blank" rel="noopener noreferrer">
                         <ExternalLink className="w-4 h-4 text-foreground" />
                       </a>
                     </Button>

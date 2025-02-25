@@ -10,10 +10,10 @@ export const JsonDisplay = ({ data }: JsonDisplayProps) => {
   const [isCompact, setIsCompact] = useState(false);
 
   const formatValue = (value: unknown): string => {
-    if (typeof value === "string" && value.startsWith("0x")) {
+    /* if (typeof value === "string" && value.startsWith("0x")) {
       // Truncate long hex strings
       return value.length > 10 ? `${value.slice(0, 6)}...${value.slice(-4)}` : value;
-    }
+    } */
     return JSON.stringify(value);
   };
 

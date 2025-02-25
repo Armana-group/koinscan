@@ -213,6 +213,7 @@ export default function ContractPage({
       } else {
         if (!signer) throw new Error("Connect wallet");
 
+        signer.provider = contract.provider;
         contract.signer = signer;
         const { transaction, receipt } = await contract.functions[methodName](currentArgs, {
           rcLimit: 10_00000000,

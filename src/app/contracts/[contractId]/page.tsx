@@ -363,8 +363,19 @@ export default function ContractPage({
                   <div className="p-2 rounded-xl bg-blue-500/10">
                     <BookOpen className="w-4 h-4 text-blue-600" />
                   </div>
-                  <h2 className="text-2xl font-semibold text-foreground">
-                    Functions <span className="text-muted-foreground">({contractMethods?.length || 0})</span>
+                  <h2 className="text-2xl font-semibold text-foreground flex items-center gap-2">
+                    Functions{" "}
+                    <span className="text-muted-foreground flex items-center">
+                      ({contractMethods?.length || 0})
+                      <span className="flex items-center gap-1 ml-2">
+                        <Badge variant="outline" className="text-xs py-0 h-5 bg-blue-500/10 text-blue-600 border-0">
+                          {contractMethods?.filter(m => m.readOnly).length || 0} Read
+                        </Badge>
+                        <Badge variant="outline" className="text-xs py-0 h-5 bg-purple-500/10 text-purple-600 border-0">
+                          {contractMethods?.filter(m => !m.readOnly).length || 0} Write
+                        </Badge>
+                      </span>
+                    </span>
                   </h2>
                 </div>
                 <div className="space-y-4">
@@ -409,7 +420,7 @@ export default function ContractPage({
                       </CardHeader>
                       {selectedMethod === method.name && (
                         <CardContent className="p-6 pt-0">
-                          <div className="bg-muted rounded-xl p-4">
+                          <div className="rounded-xl p-4">
                             <KoinosForm
                               contract={contract}
                               protobufType={method.name}
@@ -464,7 +475,7 @@ export default function ContractPage({
                               <div className="text-sm font-medium text-foreground mb-2">
                                 {method.readOnly ? "Result" : "Receipt"}
                               </div>
-                              <div className="bg-muted rounded-xl p-4 overflow-x-auto">
+                              <div className="rounded-xl p-4 overflow-x-auto">
                                 <JsonDisplay data={JSON.parse(methodStates[method.name].results)} />
                               </div>
                             </div>

@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import styles from "../app/page.module.css";
+import { PlusCircle, Trash2 } from "lucide-react";
 
 const nativeTypes = [
   "double",
@@ -134,6 +135,125 @@ const RecursiveFormField = ({
   onChange,
   level = 0,
 }: RecursiveFormFieldProps) => {
+  // Handle array of objects (repeated nested type)
+  if (repeated && nested && !isEnum && protobufType?.fields) {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <Label>{fieldPrettyName}</Label>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="flex items-center gap-1"
+            onClick={() => {
+              const newArray = [...(Array.isArray(value) ? value : [])];
+              // Create a new empty object with the structure of the protobuf type
+              const newItem: Record<string, unknown> = {};
+              Object.entries(protobufType.fields).forEach(([fieldName, field]) => {
+                const fieldType = field.type;
+                const fieldNested = !nativeTypes.includes(fieldType);
+                const fieldRepeated = field.rule === "repeated";
+                newItem[fieldName] = buildInitialInputValues(
+                  serializer,
+                  fieldType,
+                  fieldNested,
+                  fieldRepeated
+                );
+              });
+              newArray.push(newItem);
+              onChange(newArray);
+            }}
+          >
+            <PlusCircle className="h-4 w-4" />
+            <span>Add Item</span>
+          </Button>
+        </div>
+        
+        {Array.isArray(value) && value.length > 0 ? (
+          <div className="space-y-4">
+            {value.map((item, index) => (
+              <Card key={index} className="relative p-4 border-dashed">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="absolute top-2 right-2 h-8 w-8 text-destructive hover:text-destructive/80"
+                  onClick={() => {
+                    const newArray = [...(value as unknown[])];
+                    newArray.splice(index, 1);
+                    onChange(newArray);
+                  }}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+                
+                <div className="pt-4 space-y-4">
+                  {Object.entries(protobufType.fields).map(([fieldName, field]) => {
+                    const fieldType = field.type;
+                    const fieldNested = !nativeTypes.includes(fieldType);
+                    const fieldRepeated = field.rule === "repeated";
+                    const fieldFormat =
+                      field.options && (field.options["(koinos.btype)"] || field.options["(btype)"])
+                        ? field.options["(koinos.btype)"] || field.options["(btype)"]
+                        : fieldType.toUpperCase();
+
+                    let fieldProtobufType: INamespace2 | undefined;
+                    let fieldIsEnum = false;
+                    let fieldEnums: { name: string; value: number }[] | undefined;
+
+                    if (fieldNested) {
+                      fieldProtobufType = serializer.root.lookupTypeOrEnum(fieldType) as INamespace2;
+                      if (!fieldProtobufType.fields) {
+                        fieldIsEnum = true;
+                        fieldEnums = Object.keys((fieldProtobufType as unknown as Enum).values).map((v) => ({
+                          name: v,
+                          value: (fieldProtobufType as unknown as Enum).values[v],
+                        }));
+                      }
+                    }
+
+                    const itemValue = (item as Record<string, unknown>)?.[fieldName];
+
+                    return (
+                      <RecursiveFormField
+                        key={`${index}-${fieldName}`}
+                        name={fieldName}
+                        prettyName={prettyName(fieldName)}
+                        value={itemValue}
+                        type={fieldType}
+                        format={fieldFormat}
+                        isEnum={fieldIsEnum}
+                        enums={fieldEnums}
+                        nested={fieldNested}
+                        repeated={fieldRepeated}
+                        protobufType={fieldProtobufType}
+                        error=""
+                        serializer={serializer}
+                        onChange={(newValue) => {
+                          const newArray = [...(value as unknown[])];
+                          const newItem = { ...(newArray[index] as Record<string, unknown>) };
+                          newItem[fieldName] = newValue;
+                          newArray[index] = newItem;
+                          onChange(newArray);
+                        }}
+                        level={level + 1}
+                      />
+                    );
+                  })}
+                </div>
+              </Card>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center p-4 border border-dashed rounded-md text-muted-foreground">
+            No items added. Click &quot;Add Item&quot; to add a new entry.
+          </div>
+        )}
+      </div>
+    );
+  }
+
   if (nested && !isEnum && protobufType?.fields) {
     // Handle nested object
     return (

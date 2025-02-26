@@ -3,24 +3,59 @@
 import { SignerInterface } from "koilib";
 import { createContext, useContext, useState, ReactNode, useEffect } from "react";
 import * as kondor from "kondor-js";
-import { getWalletSigner } from "@/koinos/wallets";
+import { WalletName, connectWallet, disconnectWallet, getWalletSigner } from "@/koinos/wallets";
+
+// Local storage keys
+const ADDRESS_STORAGE_KEY = "koinos-explorer-address";
 
 interface ExtendedSigner extends SignerInterface {
-  name?: "kondor" | "walletConnect" | "mkw";
+  name?: WalletName;
 }
 
 interface WalletContextType {
   signer: ExtendedSigner | undefined;
   setSigner: (signer: ExtendedSigner | undefined) => void;
+  savedAddress: string | null;
+  forgetAddress: () => void;
 }
 
 const WalletContext = createContext<WalletContextType | undefined>(undefined);
 
 export function WalletProvider({ children }: { children: ReactNode }) {
   const [signer, setSigner] = useState<ExtendedSigner | undefined>(undefined);
+  const [savedAddress, setSavedAddress] = useState<string | null>(null);
 
+  // Load saved address on initial render
   useEffect(() => {
-    // Handle Kondor account changes
+    if (typeof window !== 'undefined') {
+      const storedAddress = localStorage.getItem(ADDRESS_STORAGE_KEY);
+      if (storedAddress) {
+        setSavedAddress(storedAddress);
+      }
+    }
+  }, []);
+
+  // Save address to localStorage when connected
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      if (signer && signer.getAddress) {
+        const address = signer.getAddress();
+        localStorage.setItem(ADDRESS_STORAGE_KEY, address);
+        setSavedAddress(address);
+      }
+    }
+  }, [signer]);
+
+  // Function to forget the saved address
+  const forgetAddress = () => {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem(ADDRESS_STORAGE_KEY);
+      setSavedAddress(null);
+    }
+  };
+
+  // Handle Kondor account changes
+  useEffect(() => {
     const handleAccountsChanged = async () => {
       if (!signer || signer.name !== "kondor") return;
       
@@ -38,16 +73,18 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     };
 
     // Subscribe to Kondor account changes
-    window.addEventListener("kondor_accountsChanged", handleAccountsChanged);
-
-    return () => {
-      // Cleanup subscription
-      window.removeEventListener("kondor_accountsChanged", handleAccountsChanged);
-    };
+    if (typeof window !== 'undefined') {
+      window.addEventListener("kondor_accountsChanged", handleAccountsChanged);
+      
+      return () => {
+        // Cleanup subscription
+        window.removeEventListener("kondor_accountsChanged", handleAccountsChanged);
+      };
+    }
   }, [signer]);
 
   return (
-    <WalletContext.Provider value={{ signer, setSigner }}>
+    <WalletContext.Provider value={{ signer, setSigner, savedAddress, forgetAddress }}>
       {children}
     </WalletContext.Provider>
   );

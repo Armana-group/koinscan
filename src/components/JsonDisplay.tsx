@@ -1,95 +1,105 @@
-import { useState } from "react";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
+import { Copy } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 
 interface JsonDisplayProps {
   data: unknown;
 }
 
 export const JsonDisplay = ({ data }: JsonDisplayProps) => {
-  const [isCompact, setIsCompact] = useState(false);
-
-  const formatValue = (value: unknown): string => {
-    /* if (typeof value === "string" && value.startsWith("0x")) {
-      // Truncate long hex strings
-      return value.length > 10 ? `${value.slice(0, 6)}...${value.slice(-4)}` : value;
-    } */
-    return JSON.stringify(value);
+  const copyToClipboard = () => {
+    navigator.clipboard.writeText(JSON.stringify(data, null, 2));
+    toast.success("Copied to clipboard");
   };
 
-  const renderCompactArray = (arr: unknown[]) => {
-    return (
-      <div className="flex flex-wrap gap-2">
-        {arr.map((item, index) => (
-          <div key={index} className="bg-muted px-2 py-1 rounded text-sm">
-            {formatValue(item)}
-          </div>
-        ))}
-      </div>
-    );
+  // Function to determine the type of a value for syntax highlighting
+  const getValueClass = (value: unknown): string => {
+    if (value === null) return "text-blue-300";
+    if (typeof value === "number") return "text-amber-300";
+    if (typeof value === "boolean") return "text-purple-300";
+    if (typeof value === "string") {
+      if (value.startsWith("0x")) return "text-green-300";
+      return "text-amber-400";
+    }
+    return "";
+  };
+
+  const getKeyClass = (): string => {
+    return "text-cyan-300";
   };
 
   const renderExpandedJson = (obj: unknown, level = 0): JSX.Element => {
+    const indent = "  ".repeat(level);
+    
     if (Array.isArray(obj)) {
+      if (obj.length === 0) return <span>[<span className="text-gray-400">]</span></span>;
+      
       return (
-        <div className="space-y-1">
+        <div className="flex flex-col">
+          <span>[</span>
           {obj.map((item, index) => (
-            <div key={index} className="flex items-start gap-2">
-              <span className="text-muted-foreground">{index}:</span>
+            <div key={index} className="flex">
+              <span className="whitespace-pre">{indent}  </span>
               {renderExpandedJson(item, level + 1)}
+              {index < obj.length - 1 && <span className="text-gray-400">,</span>}
             </div>
           ))}
+          <div>
+            <span className="whitespace-pre">{indent}</span>
+            <span>]</span>
+          </div>
         </div>
       );
     }
 
     if (obj && typeof obj === "object") {
+      const entries = Object.entries(obj);
+      if (entries.length === 0) return <span>{"{"}<span className="text-gray-400">{"}"}</span></span>;
+      
       return (
-        <div className="space-y-1">
-          {Object.entries(obj).map(([key, value]) => (
-            <div key={key} className="flex items-start gap-2">
-              <span className="text-muted-foreground">{key}:</span>
+        <div className="flex flex-col">
+          <span>{"{"}</span>
+          {entries.map(([key, value], index) => (
+            <div key={key} className="flex">
+              <span className="whitespace-pre">{indent}  </span>
+              <span className={getKeyClass()}>&quot;{key}&quot;</span>
+              <span className="text-gray-200">: </span>
               {renderExpandedJson(value, level + 1)}
+              {index < entries.length - 1 && <span className="text-gray-400">,</span>}
             </div>
           ))}
+          <div>
+            <span className="whitespace-pre">{indent}</span>
+            <span>{"}"}</span>
+          </div>
         </div>
       );
     }
 
-    return <span>{formatValue(obj)}</span>;
+    if (typeof obj === "string") {
+      return <span className={getValueClass(obj)}>&quot;{obj}&quot;</span>;
+    }
+
+    return <span className={getValueClass(obj)}>{JSON.stringify(obj)}</span>;
   };
 
   return (
     <div className="space-y-2">
-      <div className="flex items-center justify-between pb-2 border-b">
-        <Label htmlFor="format-switch" className="text-sm text-muted-foreground">
-          Compact View
-        </Label>
-        <Switch
-          id="format-switch"
-          checked={isCompact}
-          onCheckedChange={setIsCompact}
-        />
+      <div className="flex justify-end pb-2">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-8 px-2 rounded-md text-xs"
+          onClick={copyToClipboard}
+        >
+          <Copy className="h-3.5 w-3.5 mr-1" />
+          Copy
+        </Button>
       </div>
-      <div className="font-mono text-sm overflow-x-auto">
-        {isCompact ? (
-          <div className="space-y-2">
-            {Object.entries(data as object).map(([key, value]) => (
-              <div key={key} className="flex flex-col gap-1">
-                <div className="text-muted-foreground">{key}:</div>
-                <div className="pl-4">
-                  {Array.isArray(value) ? (
-                    renderCompactArray(value)
-                  ) : (
-                    <span>{formatValue(value)}</span>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          renderExpandedJson(data)
-        )}
+      <div className="overflow-x-auto rounded-md">
+        <pre className="font-mono text-sm bg-zinc-900 text-gray-100 p-4 rounded-md">
+          {renderExpandedJson(data)}
+        </pre>
       </div>
     </div>
   );

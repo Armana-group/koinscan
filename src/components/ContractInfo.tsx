@@ -1,6 +1,6 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Copy, ExternalLink, Shield, Wallet } from "lucide-react";
+import { Copy, ExternalLink, Shield, Wallet, Coins } from "lucide-react";
 import { toast } from "sonner";
 import { useEffect, useState } from "react";
 import { Contract, Provider, utils } from "koilib";
@@ -16,21 +16,40 @@ export const ContractInfo = (props: {
   const [balance, setBalance] = useState<string | null>(null);
   const [decimals, setDecimals] = useState<number>(8); // Default to 8 decimals
   const [symbol, setSymbol] = useState<string>("");
+  const [isToken, setIsToken] = useState<boolean | null>(null); // Track if it's a token contract
 
   useEffect(() => {
     const fetchTokenInfo = async () => {
-      if (props.signer) {
-        try {
-          console.log("Fetching token info for address:", props.address);
-          console.log("Signer address:", props.signer.getAddress());
-          
-          const provider = new Provider([RPC_NODE]);
-          const contract = new Contract({
-            id: props.address,
-            provider,
-            abi: utils.tokenAbi
-          });
+      if (!props.address) return;
+      
+      try {
+        console.log("Checking if contract is a token:", props.address);
+        
+        const provider = new Provider([RPC_NODE]);
+        const contract = new Contract({
+          id: props.address,
+          provider,
+          abi: utils.tokenAbi
+        });
 
+        // First try to fetch decimals to check if it's a token
+        let isTokenContract = false;
+        try {
+          const { result: decimalsResult } = await contract.functions.decimals({});
+          if (decimalsResult?.value !== undefined) {
+            setDecimals(decimalsResult.value);
+            console.log("Token decimals:", decimalsResult.value);
+            isTokenContract = true;
+          }
+        } catch (error) {
+          console.warn("Not a token contract (no decimals function):", error);
+          isTokenContract = false;
+        }
+
+        setIsToken(isTokenContract);
+
+        // Only proceed if it's a token contract
+        if (isTokenContract) {
           // Fetch symbol
           try {
             const { result: symbolResult } = await contract.functions.symbol({});
@@ -42,70 +61,65 @@ export const ContractInfo = (props: {
             console.warn("Failed to fetch symbol:", error);
           }
 
-          // Fetch decimals
-          try {
-            const { result: decimalsResult } = await contract.functions.decimals({});
-            if (decimalsResult?.value !== undefined) {
-              setDecimals(decimalsResult.value);
-              console.log("Token decimals:", decimalsResult.value);
-            }
-          } catch (error) {
-            console.warn("Failed to fetch decimals:", error);
-          }
-
-          // Fetch balance
-          try {
-            const signerAddress = props.signer.getAddress();
-            console.log("Fetching balance for address:", signerAddress);
-            
-            const { result } = await contract.functions.balanceOf({
-              owner: signerAddress
-            });
-            
-            console.log("Balance result:", result);
-            
-            if (result?.value) {
-              setBalance(result.value);
-              console.log("Setting balance to:", result.value);
-            } else {
-              console.log("No balance value in result");
-              // Try alternative balance field name
-              if (result?.balance) {
-                setBalance(result.balance);
-                console.log("Setting balance from alternative field to:", result.balance);
-              }
-            }
-          } catch (error) {
-            console.error("Failed to fetch balance:", error);
-            
-            // Try alternative balance endpoint
+          // Only fetch balance if we have a signer
+          if (props.signer) {
             try {
-              console.log("Trying alternative balance endpoint...");
-              const { result } = await contract.functions.balance({
-                owner: props.signer.getAddress()
+              const signerAddress = props.signer.getAddress();
+              console.log("Fetching balance for address:", signerAddress);
+              
+              const { result } = await contract.functions.balanceOf({
+                owner: signerAddress
               });
               
-              console.log("Alternative balance result:", result);
+              console.log("Balance result:", result);
               
               if (result?.value) {
                 setBalance(result.value);
-                console.log("Setting balance from alternative endpoint to:", result.value);
-              } else if (result?.balance) {
-                setBalance(result.balance);
-                console.log("Setting balance from alternative endpoint field to:", result.balance);
+                console.log("Setting balance to:", result.value);
+              } else {
+                console.log("No balance value in result");
+                // Try alternative balance field name
+                if (result?.balance) {
+                  setBalance(result.balance);
+                  console.log("Setting balance from alternative field to:", result.balance);
+                }
               }
-            } catch (altError) {
-              console.error("Failed to fetch balance from alternative endpoint:", altError);
-              toast.error("Failed to fetch balance");
+            } catch (error) {
+              console.error("Failed to fetch balance:", error);
+              
+              // Try alternative balance endpoint
+              try {
+                console.log("Trying alternative balance endpoint...");
+                const { result } = await contract.functions.balance({
+                  owner: props.signer.getAddress()
+                });
+                
+                console.log("Alternative balance result:", result);
+                
+                if (result?.value) {
+                  setBalance(result.value);
+                  console.log("Setting balance from alternative endpoint to:", result.value);
+                } else if (result?.balance) {
+                  setBalance(result.balance);
+                  console.log("Setting balance from alternative endpoint field to:", result.balance);
+                }
+              } catch (altError) {
+                console.error("Failed to fetch balance from alternative endpoint:", altError);
+                toast.error("Failed to fetch balance");
+              }
             }
+          } else {
+            console.log("No signer available");
+            setBalance(null);
           }
-        } catch (error) {
-          console.error("Failed to initialize contract:", error);
-          toast.error("Failed to load token information");
+        } else {
+          // Reset token-related states if not a token
+          setBalance(null);
+          setSymbol("");
         }
-      } else {
-        console.log("No signer available");
-        setBalance(null);
+      } catch (error) {
+        console.error("Failed to initialize contract:", error);
+        setIsToken(false);
       }
     };
 
@@ -194,7 +208,7 @@ export const ContractInfo = (props: {
                     {props.signer ? (
                       <div className="flex items-center gap-2">
                         <span>Connected</span>
-                        {balance && (
+                        {isToken === true && balance && (
                           <span className="px-2 py-0.5 bg-green-500/20 rounded-full text-xs">
                             {formatBalance(balance, decimals)}
                           </span>
@@ -203,6 +217,15 @@ export const ContractInfo = (props: {
                     ) : "Not Connected"}
                   </span>
                 </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                {isToken === true && (
+                  <div className="flex items-center gap-2 bg-blue-500/10 text-blue-700 dark:text-blue-400 px-3 py-1 rounded-full text-sm">
+                    <Coins className="w-3.5 h-3.5" />
+                    <span>{symbol} Token</span>
+                  </div>
+                )}
               </div>
 
               {props.description && (

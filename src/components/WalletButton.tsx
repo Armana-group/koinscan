@@ -37,7 +37,7 @@ function shortAddress(address: string): string {
 }
 
 export function WalletButton() {
-  const { signer, setSigner } = useWallet();
+  const { signer, setSigner, savedAddress, forgetAddress } = useWallet();
   const addr = (signer as ExtendedSigner)?.getAddress();
   const walletName = (signer as ExtendedSigner)?.name;
   const [kondorAccounts, setKondorAccounts] = useState<KondorAccount[]>([]);
@@ -68,13 +68,23 @@ export function WalletButton() {
     };
   }, [walletName]);
 
-  const handleWalletAction = async (action: WalletName | "disconnect") => {
+  const handleWalletAction = async (action: WalletName | "disconnect" | "forget") => {
     try {
       if (action === "disconnect") {
         if (walletName) {
           await disconnectWallet(walletName);
         }
         setSigner(undefined);
+        return;
+      }
+
+      if (action === "forget") {
+        if (walletName) {
+          await disconnectWallet(walletName);
+        }
+        setSigner(undefined);
+        forgetAddress();
+        toast.success("Address forgotten");
         return;
       }
 
@@ -100,36 +110,43 @@ export function WalletButton() {
     }
   };
 
+  // Show connected state if we have a signer or a saved address
+  const isConnected = !!addr;
+  const displayAddress = addr || savedAddress;
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button
           variant="ghost"
-          className={`relative flex items-center justify-center gap-2 transition-all ${
-            addr ? "w-auto px-3" : "w-10"
-          } h-10 rounded-full focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 hover:bg-transparent`}
+          className="relative flex items-center justify-center gap-2 transition-all w-auto px-3 h-10 rounded-lg focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 hover:bg-background/60 hover:shadow-sm bg-background/40 backdrop-blur-sm border border-border/40"
         >
-          {addr ? (
+          {displayAddress ? (
             <>
-              <div className="w-5 h-5 flex-shrink-0 rounded-full bg-background/80 p-0.5">
-                <Image
-                  src={
-                    walletName === "kondor"
-                      ? kondorLogo
-                      : walletName === "walletConnect"
-                      ? walletConnectLogo
-                      : walletName === "mkw"
-                      ? mkwLogo
-                      : mkwLogo
-                  }
-                  alt="wallet"
-                  width={16}
-                  height={16}
-                  className="w-full h-full object-contain rounded-full"
-                />
+              <div className="flex items-center gap-2 max-w-[160px]">
+                <div className="flex-shrink-0 w-5 h-5 rounded-full p-0.5 bg-background">
+                  <Image
+                    src={
+                      walletName === "kondor"
+                        ? kondorLogo
+                        : walletName === "walletConnect"
+                        ? walletConnectLogo
+                        : walletName === "mkw"
+                        ? mkwLogo
+                        : mkwLogo
+                    }
+                    alt="wallet"
+                    width={16}
+                    height={16}
+                    className="w-full h-full object-contain rounded-full"
+                  />
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div className={`w-2 h-2 rounded-full flex-shrink-0 ${isConnected ? 'bg-green-500' : 'bg-amber-500'}`}></div>
+                  <span className="text-sm font-medium truncate">{shortAddress(displayAddress)}</span>
+                </div>
               </div>
-              <span className="text-sm">{shortAddress(addr)}</span>
-              <ChevronDown className="w-4 h-4 ml-1 text-muted-foreground" />
+              <ChevronDown className="w-4 h-4 ml-1 text-muted-foreground flex-shrink-0" />
             </>
           ) : (
             <svg
@@ -147,11 +164,14 @@ export function WalletButton() {
       </DropdownMenuTrigger>
       <DropdownMenuContent 
         align="end" 
-        className="w-64 p-2 bg-background/80 backdrop-blur-sm border border-border shadow-lg"
+        className="w-72 p-3 bg-background/95 backdrop-blur-sm border border-border/80 shadow-lg rounded-xl"
         sideOffset={8}
       >
-        {!addr ? (
+        {!displayAddress ? (
           <>
+            <div className="px-3 py-2 mb-1 text-sm font-medium text-muted-foreground">
+              Connect Wallet
+            </div>
             <DropdownMenuItem 
               onClick={() => handleWalletAction("kondor")}
               className="flex items-center px-4 py-3 my-1 rounded-lg cursor-pointer focus:bg-muted/80 hover:bg-muted/80"
@@ -189,8 +209,43 @@ export function WalletButton() {
           </>
         ) : (
           <>
-            {/* Show Kondor accounts if using Kondor */}
-            {walletName === "kondor" && kondorAccounts.length > 0 && (
+            {/* Address card at the top */}
+            <div className="px-4 py-3 mb-3 bg-muted/40 rounded-lg border border-border/60">
+              <div className="flex flex-col gap-1.5">
+                <div className="flex items-center gap-2">
+                  <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-amber-500'}`}></div>
+                  <span className="text-xs font-medium text-muted-foreground">
+                    {isConnected ? 'Wallet Connected' : 'Remembered Address'}
+                  </span>
+                </div>
+                <div className="text-sm font-medium">
+                  {shortAddress(displayAddress)}
+                </div>
+                <div className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1.5 cursor-pointer hover:text-foreground transition-colors" 
+                  onClick={() => {
+                    navigator.clipboard.writeText(displayAddress);
+                    toast.success("Address copied to clipboard");
+                  }}>
+                  <svg 
+                    xmlns="http://www.w3.org/2000/svg" 
+                    viewBox="0 0 24 24" 
+                    fill="none" 
+                    stroke="currentColor" 
+                    strokeWidth="2" 
+                    strokeLinecap="round" 
+                    strokeLinejoin="round" 
+                    className="w-3 h-3"
+                  >
+                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                  </svg>
+                  <span>Copy full address</span>
+                </div>
+              </div>
+            </div>
+            
+            {/* Show Kondor accounts if actively connected with Kondor */}
+            {isConnected && walletName === "kondor" && kondorAccounts.length > 0 && (
               <>
                 <div className="px-3 py-2 text-xs font-medium text-muted-foreground">
                   Switch Account
@@ -230,28 +285,82 @@ export function WalletButton() {
                 <DropdownMenuSeparator className="my-2" />
               </>
             )}
-            <DropdownMenuItem 
-              onClick={() => handleWalletAction("disconnect")}
-              className="flex items-center px-4 py-3 my-1 rounded-lg cursor-pointer text-red-600 dark:text-red-400 focus:bg-red-50 dark:focus:bg-red-950/50 hover:bg-red-50 dark:hover:bg-red-950/50"
-            >
-              <div className="flex items-center gap-3 text-sm font-medium">
-                <svg 
-                  xmlns="http://www.w3.org/2000/svg" 
-                  viewBox="0 0 24 24" 
-                  fill="none" 
-                  stroke="currentColor" 
-                  strokeWidth="2" 
-                  strokeLinecap="round" 
-                  strokeLinejoin="round" 
-                  className="w-5 h-5"
+            
+            {/* Connect/Disconnect Options */}
+            <div className="space-y-1">
+              {!isConnected && (
+                <DropdownMenuItem 
+                  onClick={() => handleWalletAction("kondor")}
+                  className="flex items-center px-4 py-3 my-1 rounded-lg cursor-pointer focus:bg-muted/80 hover:bg-muted/80"
                 >
-                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-                  <polyline points="16 17 21 12 16 7" />
-                  <line x1="21" y1="12" x2="9" y2="12" />
-                </svg>
-                Disconnect
-              </div>
-            </DropdownMenuItem>
+                  <div className="flex items-center gap-3 text-sm font-medium">
+                    <svg 
+                      xmlns="http://www.w3.org/2000/svg" 
+                      viewBox="0 0 24 24" 
+                      fill="none" 
+                      stroke="currentColor" 
+                      strokeWidth="2" 
+                      strokeLinecap="round" 
+                      strokeLinejoin="round" 
+                      className="w-5 h-5"
+                    >
+                      <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
+                      <polyline points="10 17 15 12 10 7" />
+                      <line x1="15" y1="12" x2="3" y2="12" />
+                    </svg>
+                    Connect Wallet
+                  </div>
+                </DropdownMenuItem>
+              )}
+              
+              {isConnected && (
+                <DropdownMenuItem 
+                  onClick={() => handleWalletAction("disconnect")}
+                  className="flex items-center px-4 py-3 my-1 rounded-lg cursor-pointer text-amber-600 dark:text-amber-400 focus:bg-amber-50 dark:focus:bg-amber-950/50 hover:bg-amber-50 dark:hover:bg-amber-950/50"
+                >
+                  <div className="flex items-center gap-3 text-sm font-medium">
+                    <svg 
+                      xmlns="http://www.w3.org/2000/svg" 
+                      viewBox="0 0 24 24" 
+                      fill="none" 
+                      stroke="currentColor" 
+                      strokeWidth="2" 
+                      strokeLinecap="round" 
+                      strokeLinejoin="round" 
+                      className="w-5 h-5"
+                    >
+                      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                      <polyline points="16 17 21 12 16 7" />
+                      <line x1="21" y1="12" x2="9" y2="12" />
+                    </svg>
+                    Disconnect Wallet
+                  </div>
+                </DropdownMenuItem>
+              )}
+              
+              <DropdownMenuItem 
+                onClick={() => handleWalletAction("forget")}
+                className="flex items-center px-4 py-3 my-1 rounded-lg cursor-pointer text-red-600 dark:text-red-400 focus:bg-red-50 dark:focus:bg-red-950/50 hover:bg-red-50 dark:hover:bg-red-950/50"
+              >
+                <div className="flex items-center gap-3 text-sm font-medium">
+                  <svg 
+                    xmlns="http://www.w3.org/2000/svg" 
+                    viewBox="0 0 24 24" 
+                    fill="none" 
+                    stroke="currentColor" 
+                    strokeWidth="2" 
+                    strokeLinecap="round" 
+                    strokeLinejoin="round" 
+                    className="w-5 h-5"
+                  >
+                    <path d="M3 6h18" />
+                    <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+                    <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+                  </svg>
+                  Forget Address
+                </div>
+              </DropdownMenuItem>
+            </div>
           </>
         )}
       </DropdownMenuContent>

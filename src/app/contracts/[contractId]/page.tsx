@@ -5,7 +5,7 @@ import { Contract, Provider, Serializer, SignerInterface, utils } from "koilib";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ArrowRight, BookOpen, PenLine, Search, ChevronDown, ChevronRight } from "lucide-react";
+import { AlertCircle, ArrowRight, BookOpen, Copy, PenLine, Search, ChevronDown, ChevronRight } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import styles from "../../page.module.css";
@@ -34,6 +34,7 @@ export default function ContractPage({
     args: unknown;
     loading: boolean;
     results: string;
+    error?: string;
   }>>({});
   const [selectedMethod, setSelectedMethod] = useState<string>("");
   const [submitText, setSubmitText] = useState<string>("");
@@ -193,7 +194,8 @@ export default function ContractPage({
         [methodName]: {
           ...prev[methodName],
           loading: true,
-          results: ""
+          results: "",
+          error: undefined
         }
       }));
 
@@ -252,14 +254,16 @@ export default function ContractPage({
         });
       }
     } catch (error) {
+      const errorMessage = (error as Error).message;
       setMethodStates(prev => ({
         ...prev,
         [methodName]: {
           ...prev[methodName],
-          loading: false
+          loading: false,
+          error: errorMessage
         }
       }));
-      toast.error((error as Error).message, {
+      toast.error(errorMessage, {
         duration: 15000,
       });
     }
@@ -280,6 +284,12 @@ export default function ContractPage({
     if (searchInputRef.current?.value) {
       router.push(`/contracts/${searchInputRef.current.value}`);
     }
+  };
+
+  // Add a copy to clipboard function
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    toast.success("Copied to clipboard");
   };
 
   return (
@@ -476,8 +486,34 @@ export default function ContractPage({
                               <div className="text-sm font-medium text-foreground mb-2">
                                 {method.readOnly ? "Result" : "Receipt"}
                               </div>
-                              <div className="rounded-xl p-4 overflow-x-auto">
+                              <div className="rounded-xl p-4 overflow-x-auto relative">
                                 <JsonDisplay data={JSON.parse(methodStates[method.name].results)} />
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Error display */}
+                          {methodStates[method.name]?.error && (
+                            <div className="mt-6 animate-in fade-in slide-in-from-top-4">
+                              <div className="text-sm font-medium text-red-500 mb-2 flex items-center justify-between gap-2">
+                                <div className="flex items-center gap-2">
+                                  <AlertCircle className="h-4 w-4" />
+                                  Error
+                                </div>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-6 px-2 rounded-md text-xs opacity-80 hover:opacity-100 hover:bg-red-100 dark:hover:bg-red-900/30"
+                                  onClick={() => copyToClipboard(methodStates[method.name].error || "")}
+                                >
+                                  <Copy className="h-3.5 w-3.5 mr-1" />
+                                  Copy
+                                </Button>
+                              </div>
+                              <div className="rounded-xl p-4 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800">
+                                <div className="font-mono text-sm text-red-700 dark:text-red-400 whitespace-pre-wrap break-words">
+                                  {methodStates[method.name].error}
+                                </div>
                               </div>
                             </div>
                           )}

@@ -38,7 +38,7 @@ export function Navigation() {
   };
 
   return (
-    <nav className="flex-1">
+    <nav>
       <ul
         onMouseLeave={handleMouseLeave}
         className="relative mx-auto flex w-fit rounded-full border border-border bg-background/50 p-1"
@@ -69,7 +69,7 @@ export function Navigation() {
           animate={{ left, width, opacity }}
           initial={{ opacity: 0 }}
           transition={{ type: "spring", stiffness: 400, damping: 30 }}
-          className="absolute inset-y-1 rounded-full bg-[#f1f5f9] dark:bg-gray-800"
+          className="absolute inset-y-1 rounded-full bg-accent hidden md:block"
           style={{ position: 'absolute', height: 'calc(100% - 8px)' }}
         />
       </ul>

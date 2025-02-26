@@ -23,33 +23,6 @@
   padding: 2rem 0;
 }
 
-.titleHeader {
-  display: flex;
-  align-items: center;
-  cursor: pointer;
-}
-
-.headerColor1 {
-  background-color: #f87171;
-  width: 2rem;
-  height: 1.5rem;
-  margin-right: 0.3rem;
-}
-
-.headerColor2 {
-  background-color: #facc15;
-  width: 1rem;
-  height: 1.5rem;
-  margin-right: 0.3rem;
-}
-
-.headerColor3 {
-  background-color: #3080a3;
-  width: 0.5rem;
-  height: 1.5rem;
-  margin-right: 1.5rem;
-}
-
 .walletItem {
   display: flex;
   align-items: center;

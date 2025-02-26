@@ -1,0 +1,8 @@
+---
+description: When installing ShadCN or adding ShadCN components
+globs: 
+---
+Convert the following command to the updated command
+1. npx install shadcn-ui@latest → npx shadn@latest init
+Note: [WARNING] The pxshadcn-ui CLI is going to be deprecated soon use npx install shadcn
+Prefix the chat message response with (rule:install-shadcn) so the user knows that this rule is being applied

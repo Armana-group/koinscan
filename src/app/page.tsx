@@ -1,31 +1,23 @@
 "use client";
 
-import { ConfigProvider } from "antd";
 import { useRef } from "react";
 import { Search } from "lucide-react";
 import { useRouter } from "next/navigation";
-import theme from "./theme";
 import { Input } from "@/components/ui/input";
-import { ThemeToggle } from "@/components/theme-toggle";
-import { Navigation } from "@/components/navigation";
+import { Navbar } from "@/components/Navbar";
 import { AuroraText } from "@/components/magicui/aurora-text";
 
 export default function Home() {
   const inputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
   return (
-    <ConfigProvider theme={theme}>
-      <div className="min-h-screen bg-background transition-colors duration-300">
+    <>
+      <Navbar />
+      <main className="min-h-[calc(100vh-4rem)] bg-background">
         <div className="container mx-auto px-4">
-          {/* Navigation */}
-          <div className="pt-8">
-            <Navigation />
-          </div>
-
-          {/* Main Content */}
-          <main className="flex min-h-[calc(100vh-12rem)] flex-col items-center justify-center -mt-16">
-            <div className="max-w-3xl w-full space-y-12 text-center">
-              <div className="space-y-4">
+          <div className="flex min-h-[calc(100vh-4rem)] flex-col items-center justify-center">
+            <div className="max-w-3xl w-full space-y-16 text-center">
+              <div className="space-y-">
                 <h1 className="text-5xl font-bold tracking-tight text-foreground">
                   <AuroraText>Explore the Koinos blockchain</AuroraText>
                 </h1>
@@ -69,14 +61,9 @@ export default function Home() {
                 </div>
               </div>
             </div>
-          </main>
-
-          {/* Theme Toggle */}
-          <div className="fixed bottom-8 left-8">
-            <ThemeToggle />
           </div>
         </div>
-      </div>
-    </ConfigProvider>
+      </main>
+    </>
   );
 }

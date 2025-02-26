@@ -1,8 +1,14 @@
 import { useMemo, useState } from "react";
 import { Enum } from "protobufjs";
-import { Button, Input, Radio, RadioChangeEvent } from "antd";
 import { Contract, Serializer } from "koilib";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
+import { Card } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 import styles from "../app/page.module.css";
+import { PlusCircle, Trash2 } from "lucide-react";
 
 const nativeTypes = [
   "double",
@@ -22,9 +28,17 @@ const nativeTypes = [
   "bytes",
 ];
 
+// Export the function so it can be used by other components
+export function prettyName(name: string): string {
+  return name
+    .split("_")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+}
+
 export interface Field {
   type: string;
-  rule?: string;
+  rule?: "repeated" | "required" | "optional";
   options?: {
     "(koinos.btype)": string;
     "(btype)": string;
@@ -33,18 +47,16 @@ export interface Field {
 
 export interface INamespace2 {
   fields: {
-    [x: string]: Field;
+    [key: string]: Field;
   };
 }
 
 export interface KoinosFormProps {
   contract?: Contract;
-  typeName?: string;
-  protobufType?: INamespace2;
+  protobufType?: string;
   serializer?: Serializer;
   norepeated?: boolean;
-  drawLine?: boolean;
-  onChange?: (newValue: unknown) => void;
+  onChange?: (value: unknown) => void;
 }
 
 function buildInitialInputValues(
@@ -54,83 +66,401 @@ function buildInitialInputValues(
   repeated: boolean,
 ): unknown {
   if (repeated) {
-    if (nested) {
-      const protobufType = serializer.root.lookupTypeOrEnum(type);
-      if (!protobufType.fields) return "";
-      const nestedArgs = Object.keys(protobufType.fields).map((f) => {
-        const { type } = protobufType.fields[f];
-        const nested = !nativeTypes.includes(type);
-        return buildInitialInputValues(serializer, type, nested, false);
-      });
-      // build 1 element
-      return [nestedArgs];
+    return [];
+  }
+
+  if (!nested) {
+    switch (type) {
+      case "bool":
+        return false;
+      case "string":
+        return "";
+      case "bytes":
+        return "";
+      default:
+        return "0";
     }
-    return [""];
   }
 
-  if (nested) {
-    const protobufType = serializer.root.lookupTypeOrEnum(type);
-    if (!protobufType.fields) return "";
-    const nestedArgs = Object.keys(protobufType.fields).map((f) => {
-      const { type, rule } = protobufType.fields[f] as Field;
-      const nested = !nativeTypes.includes(type);
-      const repeated = rule === "repeated";
-      return buildInitialInputValues(serializer, type, nested, repeated);
-    });
-    return nestedArgs;
+  const protobufType = serializer.root.lookupTypeOrEnum(type) as INamespace2;
+  if (!protobufType.fields) {
+    return "0";
   }
 
-  if (type === "bool") return false;
-
-  return "";
+  const value: Record<string, unknown> = {};
+  Object.keys(protobufType.fields).forEach((name) => {
+    const { type: fieldType, rule } = protobufType.fields[name];
+    const fieldNested = !nativeTypes.includes(fieldType);
+    const fieldRepeated = rule === "repeated";
+    value[name] = buildInitialInputValues(
+      serializer,
+      fieldType,
+      fieldNested,
+      fieldRepeated,
+    );
+  });
+  return value;
 }
 
-export function prettyName(name: string): string {
-  return name
-    .split("_")
-    .map((word) => {
-      return `${word.charAt(0).toUpperCase()}${word.slice(1)}`;
-    })
-    .join(" ");
+interface RecursiveFormFieldProps {
+  name: string;
+  prettyName: string;
+  value: unknown;
+  type: string;
+  format: string;
+  isEnum: boolean;
+  enums?: { name: string; value: number }[];
+  nested: boolean;
+  repeated: boolean;
+  protobufType?: INamespace2;
+  error: string;
+  serializer: Serializer;
+  onChange: (value: unknown) => void;
+  level?: number;
 }
+
+const RecursiveFormField = ({
+  name,
+  prettyName: fieldPrettyName,
+  value,
+  type,
+  format,
+  isEnum,
+  enums,
+  nested,
+  repeated,
+  protobufType,
+  error,
+  serializer,
+  onChange,
+  level = 0,
+}: RecursiveFormFieldProps) => {
+  // Handle array of objects (repeated nested type)
+  if (repeated && nested && !isEnum && protobufType?.fields) {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <Label>{fieldPrettyName}</Label>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="flex items-center gap-1"
+            onClick={() => {
+              const newArray = [...(Array.isArray(value) ? value : [])];
+              // Create a new empty object with the structure of the protobuf type
+              const newItem: Record<string, unknown> = {};
+              Object.entries(protobufType.fields).forEach(([fieldName, field]) => {
+                const fieldType = field.type;
+                const fieldNested = !nativeTypes.includes(fieldType);
+                const fieldRepeated = field.rule === "repeated";
+                newItem[fieldName] = buildInitialInputValues(
+                  serializer,
+                  fieldType,
+                  fieldNested,
+                  fieldRepeated
+                );
+              });
+              newArray.push(newItem);
+              onChange(newArray);
+            }}
+          >
+            <PlusCircle className="h-4 w-4" />
+            <span>Add Item</span>
+          </Button>
+        </div>
+        
+        {Array.isArray(value) && value.length > 0 ? (
+          <div className="space-y-4">
+            {value.map((item, index) => (
+              <Card key={index} className="relative p-4 border-dashed">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="absolute top-2 right-2 h-8 w-8 text-destructive hover:text-destructive/80"
+                  onClick={() => {
+                    const newArray = [...(value as unknown[])];
+                    newArray.splice(index, 1);
+                    onChange(newArray);
+                  }}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+                
+                <div className="pt-4 space-y-4">
+                  {Object.entries(protobufType.fields).map(([fieldName, field]) => {
+                    const fieldType = field.type;
+                    const fieldNested = !nativeTypes.includes(fieldType);
+                    const fieldRepeated = field.rule === "repeated";
+                    const fieldFormat =
+                      field.options && (field.options["(koinos.btype)"] || field.options["(btype)"])
+                        ? field.options["(koinos.btype)"] || field.options["(btype)"]
+                        : fieldType.toUpperCase();
+
+                    let fieldProtobufType: INamespace2 | undefined;
+                    let fieldIsEnum = false;
+                    let fieldEnums: { name: string; value: number }[] | undefined;
+
+                    if (fieldNested) {
+                      fieldProtobufType = serializer.root.lookupTypeOrEnum(fieldType) as INamespace2;
+                      if (!fieldProtobufType.fields) {
+                        fieldIsEnum = true;
+                        fieldEnums = Object.keys((fieldProtobufType as unknown as Enum).values).map((v) => ({
+                          name: v,
+                          value: (fieldProtobufType as unknown as Enum).values[v],
+                        }));
+                      }
+                    }
+
+                    const itemValue = (item as Record<string, unknown>)?.[fieldName];
+
+                    return (
+                      <RecursiveFormField
+                        key={`${index}-${fieldName}`}
+                        name={fieldName}
+                        prettyName={prettyName(fieldName)}
+                        value={itemValue}
+                        type={fieldType}
+                        format={fieldFormat}
+                        isEnum={fieldIsEnum}
+                        enums={fieldEnums}
+                        nested={fieldNested}
+                        repeated={fieldRepeated}
+                        protobufType={fieldProtobufType}
+                        error=""
+                        serializer={serializer}
+                        onChange={(newValue) => {
+                          const newArray = [...(value as unknown[])];
+                          const newItem = { ...(newArray[index] as Record<string, unknown>) };
+                          newItem[fieldName] = newValue;
+                          newArray[index] = newItem;
+                          onChange(newArray);
+                        }}
+                        level={level + 1}
+                      />
+                    );
+                  })}
+                </div>
+              </Card>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center p-4 border border-dashed rounded-md text-muted-foreground">
+            No items added. Click &quot;Add Item&quot; to add a new entry.
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  if (nested && !isEnum && protobufType?.fields) {
+    // Handle nested object
+    return (
+      <Card className={cn("p-4", level > 0 && "border-dashed")}>
+        <div className="font-medium mb-2">{fieldPrettyName}</div>
+        <div className="space-y-4">
+          {Object.entries(protobufType.fields).map(([fieldName, field]) => {
+            const fieldType = field.type;
+            const fieldNested = !nativeTypes.includes(fieldType);
+            const fieldRepeated = field.rule === "repeated";
+            const fieldFormat =
+              field.options && (field.options["(koinos.btype)"] || field.options["(btype)"])
+                ? field.options["(koinos.btype)"] || field.options["(btype)"]
+                : fieldType.toUpperCase();
+
+            let fieldProtobufType: INamespace2 | undefined;
+            let fieldIsEnum = false;
+            let fieldEnums: { name: string; value: number }[] | undefined;
+
+            if (fieldNested) {
+              fieldProtobufType = serializer.root.lookupTypeOrEnum(fieldType) as INamespace2;
+              if (!fieldProtobufType.fields) {
+                fieldIsEnum = true;
+                fieldEnums = Object.keys((fieldProtobufType as unknown as Enum).values).map((v) => ({
+                  name: v,
+                  value: (fieldProtobufType as unknown as Enum).values[v],
+                }));
+              }
+            }
+
+            const nestedValue = (value as Record<string, unknown>)?.[fieldName];
+
+            return (
+              <RecursiveFormField
+                key={fieldName}
+                name={fieldName}
+                prettyName={prettyName(fieldName)}
+                value={nestedValue}
+                type={fieldType}
+                format={fieldFormat}
+                isEnum={fieldIsEnum}
+                enums={fieldEnums}
+                nested={fieldNested}
+                repeated={fieldRepeated}
+                protobufType={fieldProtobufType}
+                error=""
+                serializer={serializer}
+                onChange={(newValue) => {
+                  const newObj = { ...(value as Record<string, unknown>) };
+                  newObj[fieldName] = newValue;
+                  onChange(newObj);
+                }}
+                level={level + 1}
+              />
+            );
+          })}
+        </div>
+      </Card>
+    );
+  }
+
+  if (isEnum && enums) {
+    return (
+      <div className="space-y-2">
+        <Label>{fieldPrettyName}</Label>
+        <RadioGroup
+          value={value as string}
+          onValueChange={(newValue) => onChange(newValue)}
+          className="flex flex-col space-y-1"
+        >
+          {enums.map((enumValue) => (
+            <div key={enumValue.name} className="flex items-center space-x-2">
+              <RadioGroupItem value={enumValue.name} id={`${name}-${enumValue.name}`} />
+              <Label htmlFor={`${name}-${enumValue.name}`}>{enumValue.name}</Label>
+            </div>
+          ))}
+        </RadioGroup>
+      </div>
+    );
+  }
+
+  if (repeated) {
+    return (
+      <div className="space-y-2">
+        <Label>{fieldPrettyName}</Label>
+        <div className="space-y-2">
+          {Array.isArray(value) &&
+            value.map((item, index) => (
+              <div key={index} className="flex gap-2">
+                <Input
+                  value={item as string}
+                  onChange={(e) => {
+                    const newArray = [...(value as unknown[])];
+                    newArray[index] = e.target.value;
+                    onChange(newArray);
+                  }}
+                />
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => {
+                    const newArray = [...(value as unknown[])];
+                    newArray.splice(index, 1);
+                    onChange(newArray);
+                  }}
+                >
+                  Remove
+                </Button>
+              </div>
+            ))}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              const newArray = [...(value as unknown[]), ""];
+              onChange(newArray);
+            }}
+          >
+            Add Item
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // Handle boolean type
+  if (type === "bool") {
+    return (
+      <div className="space-y-2">
+        <Label>
+          {fieldPrettyName}
+          <span className="ml-2 text-xs text-muted-foreground">({format})</span>
+        </Label>
+        <RadioGroup
+          value={String(value)}
+          onValueChange={(newValue) => onChange(newValue === "true")}
+          className="flex gap-4"
+        >
+          <div className="flex items-center space-x-2">
+            <RadioGroupItem value="true" id={`${name}-true`} />
+            <Label htmlFor={`${name}-true`}>True</Label>
+          </div>
+          <div className="flex items-center space-x-2">
+            <RadioGroupItem value="false" id={`${name}-false`} />
+            <Label htmlFor={`${name}-false`}>False</Label>
+          </div>
+        </RadioGroup>
+      </div>
+    );
+  }
+
+  // Handle basic types with format consideration
+  return (
+    <div className="space-y-2">
+      <Label>
+        {fieldPrettyName}
+        <span className="ml-2 text-xs text-muted-foreground">({format})</span>
+      </Label>
+      <Input
+        value={value as string}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={`Enter ${format.toLowerCase()}`}
+      />
+      {error && <p className="text-sm text-destructive">{error}</p>}
+    </div>
+  );
+};
 
 export const KoinosForm = (props: KoinosFormProps) => {
   const [value, setValue] = useState<Record<string, unknown>>({});
-  // counter is used to trigger changes in args
-  const [counter, setCounter] = useState<number>(0);
-  const serializer = useMemo(() => {
-    if (props.contract) return props.contract.serializer!;
-    return props.serializer!;
-  }, []);
 
-  useMemo(() => {
-    setValue({});
-    // TODO: fix error in console because of the next line
-    //
-    // Warning: Cannot update a component (`Home`) while rendering
-    // a different component (`KoinosForm`). To locate the bad
-    // setState() call inside `KoinosForm`
-    if (props.onChange) props.onChange({});
-  }, [setValue, props.typeName]);
+  const serializer = useMemo(() => {
+    if (!props.contract?.serializer && !props.serializer) {
+      throw new Error("No serializer provided");
+    }
+    return props.contract?.serializer || props.serializer;
+  }, [props.contract?.serializer, props.serializer]);
+
+  const fields = useMemo(() => {
+    if (!serializer) {
+      return {};
+    }
+
+    try {
+      const protobufType = props.contract && props.protobufType
+        ? serializer.root.lookupType(
+            props.contract.abi!.methods[props.protobufType].argument || "",
+          )
+        : props.protobufType
+        ? serializer.root.lookupType(props.protobufType)
+        : null;
+
+      return protobufType?.fields || {};
+    } catch (error) {
+      console.error("Error looking up protobuf type:", error);
+      return {};
+    }
+  }, [props.contract, props.protobufType, serializer]);
 
   const args = useMemo(() => {
-    if (!props.contract && (!props.protobufType || !props.serializer)) {
-      throw new Error("invalid properties for KoinosForm");
+    if (!serializer) {
+      return [];
     }
 
-    let fields: INamespace2["fields"];
-    if (props.contract) {
-      if (props.typeName) {
-        fields = (serializer.root.lookupType(props.typeName) as INamespace2)
-          .fields;
-      } else {
-        fields = {};
-      }
-    } else {
-      fields = props.protobufType!.fields;
-    }
     return Object.keys(fields).map((name) => {
-      const { type, rule, options } = fields[name];
+      const field = fields[name] as Field;
+      const { type, rule, options } = field;
       const nested = !nativeTypes.includes(type);
       const repeated = rule === "repeated" && !props.norepeated;
       const format =
@@ -151,12 +481,10 @@ export const KoinosForm = (props: KoinosFormProps) => {
         if (!protobufType.fields) {
           isEnum = true;
           enums = Object.keys((protobufType as unknown as Enum).values).map(
-            (v) => {
-              return {
-                name: v,
-                value: (protobufType as unknown as Enum).values[v],
-              };
-            },
+            (v) => ({
+              name: v,
+              value: (protobufType as unknown as Enum).values[v],
+            }),
           );
         }
       }
@@ -182,193 +510,29 @@ export const KoinosForm = (props: KoinosFormProps) => {
         error: "",
       };
     });
-  }, [counter, props]);
+  }, [fields, props, serializer, value]);
 
-  const updateValue = ({
-    name,
-    updateArray,
-    index,
-    event,
-    val,
-    push,
-    pop,
-  }: {
-    name: string;
-    index?: number;
-    event?:
-      | React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
-      | RadioChangeEvent;
-    val?: unknown;
-    updateArray?: boolean;
-    push?: boolean;
-    pop?: boolean;
-  }) => {
-    let newValue: Record<string, unknown>;
-    if (updateArray) {
-      const copyValue = JSON.parse(JSON.stringify(value)) as {
-        [x: string]: unknown[];
-      };
-      if (!copyValue[name]) copyValue[name] = [];
-      if (index === undefined) {
-        if (push) copyValue[name].push(val);
-        else if (pop) copyValue[name].pop();
-      } else {
-        copyValue[name][index] = event ? event.target.value : val;
-      }
-      newValue = copyValue;
-    } else {
-      newValue = {
-        ...value,
-        [name]: event ? event.target.value : val,
-      };
-    }
-
-    setValue(newValue);
-    if (props.onChange) props.onChange(newValue);
-  };
-
-  if (typeof props.protobufType === "string")
-    throw Error("protobuftype must be an object");
+  if (!serializer) {
+    return null;
+  }
 
   return (
-    <div className={styles.koinosForm}>
-      {props.drawLine ? <div className={styles.koinosFormLine}></div> : null}
-      <div className={styles.koinosFormContent}>
-        {args.map((arg) => {
-          return (
-            <div key={arg.name} className={styles.arg}>
-              <div className={styles.argName}>
-                {arg.prettyName}{" "}
-                <span className={styles.argFormat}>({arg.format})</span>
-              </div>
-              {arg.repeated ? (
-                <>
-                  {(arg.value as unknown[]).map((value, i) => (
-                    <div key={i} className={styles.item}>
-                      <div className={styles.itemNumber}>#{i + 1}</div>
-                      {arg.nested && !arg.isEnum ? (
-                        <KoinosForm
-                          protobufType={arg.protobufType!}
-                          serializer={serializer}
-                          norepeated={true}
-                          drawLine={true}
-                          onChange={(v) =>
-                            updateValue({
-                              name: arg.name,
-                              updateArray: true,
-                              index: i,
-                              val: v,
-                            })
-                          }
-                        ></KoinosForm>
-                      ) : null}
-                      {arg.nested && arg.isEnum ? (
-                        <Radio.Group
-                          onChange={(event) =>
-                            updateValue({
-                              name: arg.name,
-                              updateArray: true,
-                              index: i,
-                              event,
-                            })
-                          }
-                        >
-                          {arg.enums!.map((en) => (
-                            <Radio key={en.value} value={en.value}>
-                              {en.name}
-                            </Radio>
-                          ))}
-                        </Radio.Group>
-                      ) : null}
-                      {!arg.nested ? (
-                        <Input
-                          type="text"
-                          onChange={(event) =>
-                            updateValue({
-                              name: arg.name,
-                              updateArray: true,
-                              index: i,
-                              event,
-                            })
-                          }
-                        ></Input>
-                      ) : null}
-                    </div>
-                  ))}
-                  <div className={styles.arrayButtons}>
-                    <Button
-                      className={styles.r1}
-                      onClick={() => {
-                        updateValue({
-                          name: arg.name,
-                          updateArray: true,
-                          push: true,
-                          val: (
-                            buildInitialInputValues(
-                              serializer,
-                              arg.type,
-                              arg.nested,
-                              arg.repeated,
-                            ) as unknown[]
-                          )[0],
-                        });
-                        setCounter(counter + 1);
-                      }}
-                    >
-                      Add
-                    </Button>
-                    <Button
-                      onClick={() => {
-                        updateValue({
-                          name: arg.name,
-                          updateArray: true,
-                          pop: true,
-                        });
-                        setCounter(counter + 1);
-                      }}
-                    >
-                      Remove
-                    </Button>
-                  </div>
-                </>
-              ) : null}
-              {!arg.repeated && arg.nested && !arg.isEnum ? (
-                <KoinosForm
-                  protobufType={arg.protobufType!}
-                  serializer={serializer}
-                  drawLine={true}
-                  onChange={(v) => updateValue({ name: arg.name, val: v })}
-                ></KoinosForm>
-              ) : null}
-              {!arg.repeated && arg.nested && arg.isEnum ? (
-                <Radio.Group
-                  onChange={(event) => updateValue({ name: arg.name, event })}
-                >
-                  {arg.enums!.map((en) => (
-                    <Radio key={en.value} value={en.value}>
-                      {en.name}
-                    </Radio>
-                  ))}
-                </Radio.Group>
-              ) : null}
-              {!arg.repeated && !arg.nested && arg.type === "bool" ? (
-                <Radio.Group
-                  onChange={(event) => updateValue({ name: arg.name, event })}
-                >
-                  <Radio value={false}>false</Radio>
-                  <Radio value={true}>true</Radio>
-                </Radio.Group>
-              ) : null}
-              {!arg.repeated && !arg.nested && arg.type !== "bool" ? (
-                <Input
-                  type="text"
-                  onChange={(event) => updateValue({ name: arg.name, event })}
-                ></Input>
-              ) : null}
-            </div>
-          );
-        })}
-      </div>
+    <div className="space-y-6">
+      {args.map((arg) => (
+        <RecursiveFormField
+          key={arg.name}
+          {...arg}
+          serializer={serializer}
+          onChange={(newValue) => {
+            const newValues = { ...value };
+            newValues[arg.name] = newValue;
+            setValue(newValues);
+            if (props.onChange) {
+              props.onChange(newValues);
+            }
+          }}
+        />
+      ))}
     </div>
   );
 };

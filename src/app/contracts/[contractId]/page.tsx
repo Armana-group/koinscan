@@ -140,11 +140,11 @@ export default function ContractPage({
           Object.keys(abi.methods).forEach((m) => {
             if (abi.methods[m].entry_point === undefined) {
               abi.methods[m].entry_point = Number(
-                abi.methods[m]["entry-point" as "entry_point"],
+                (abi.methods[m] as any)["entry-point"]
               );
             }
             if (abi.methods[m].read_only === undefined) {
-              abi.methods[m].read_only = abi.methods[m]["read-only" as "read_only"];
+              abi.methods[m].read_only = (abi.methods[m] as any)["read-only"];
             }
           });
 
@@ -154,7 +154,12 @@ export default function ContractPage({
           if (c.abi.koilib_types) {
             c.serializer = new Serializer(c.abi.koilib_types);
           } else if (c.abi.types) {
-            c.serializer = new Serializer(c.abi.types);
+            try {
+              c.serializer = new Serializer(c.abi.types);
+            } catch (serializerError) {
+              console.error("Error initializing serializer:", serializerError);
+              // Continue without a serializer
+            }
           }
           
           setContract(c);
@@ -165,6 +170,7 @@ export default function ContractPage({
             image,
           });
         } catch (error) {
+          console.error("Failed to load contract ABI:", error);
           throw new Error(`Failed to load contract ABI: ${(error as Error).message}`);
         }
       } catch (error) {

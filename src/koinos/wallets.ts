@@ -1,6 +1,5 @@
 import { SignerInterface } from "koilib";
 import * as kondor from "kondor-js";
-import MyKoinosWallet from "@roamin/my-koinos-wallet-sdk";
 import {
   ChainIds,
   Methods,
@@ -8,14 +7,11 @@ import {
 } from "@armana/walletconnect-koinos-sdk-js";
 import { NETWORK_NAME, WALLET_CONNECT_MODAL_SIGN_OPTIONS } from "./constants";
 
-export type WalletName = "kondor" | "mkw" | "walletConnect";
+export type WalletName = "kondor" | "walletConnect";
 
 // setup wallets
 const walletConnectKoinos = new WebWalletConnectKoinos(
   WALLET_CONNECT_MODAL_SIGN_OPTIONS,
-);
-const mkw = new MyKoinosWallet(
-  "https://my-koinos-wallet.vercel.app/embed/wallet-connector",
 );
 
 // Track Kondor connection state
@@ -94,16 +90,6 @@ export async function connectWallet(walletName: WalletName) {
       );
       return address;
     }
-    case "mkw": {
-      await mkw.connect();
-      await mkw.requestPermissions({
-        accounts: ["getAccounts"],
-        provider: ["readContract", "wait"],
-        signer: ["signAndSendTransaction"],
-      });
-      const accounts = await mkw.getAccounts();
-      return accounts[0].address;
-    }
     default: {
       throw new Error(`"${walletName}" not implemented`);
     }
@@ -121,9 +107,6 @@ export async function disconnectWallet(walletName: WalletName) {
       await walletConnectKoinos.disconnect();
       return;
     }
-    case "mkw": {
-      return;
-    }
     default: {
       throw new Error(`"${walletName}" not implemented`);
     }
@@ -136,13 +119,10 @@ export function getWalletSigner(
 ): SignerInterface {
   switch (walletName) {
     case "kondor": {
-      return kondor.getSigner(address) as SignerInterface;
+      return kondor.getSigner(address) as any as SignerInterface;
     }
     case "walletConnect": {
       return walletConnectKoinos.getSigner(address);
-    }
-    case "mkw": {
-      return mkw.getSigner(address);
     }
     default: {
       throw new Error(`"${walletName}" not implemented`);

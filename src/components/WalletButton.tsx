@@ -8,7 +8,6 @@ import {
 } from "../koinos/wallets";
 import kondorLogo from "./images/kondor-logo.png";
 import walletConnectLogo from "./images/wallet-connect-logo.png";
-import mkwLogo from "./images/mkw-logo.png";
 import { Button } from "./ui/button";
 import {
   DropdownMenu,
@@ -24,7 +23,7 @@ import * as kondor from "kondor-js";
 import { Check, ChevronDown } from "lucide-react";
 
 interface ExtendedSigner extends SignerInterface {
-  name?: "kondor" | "walletConnect" | "mkw";
+  name?: "kondor" | "walletConnect";
 }
 
 interface KondorAccount {
@@ -131,9 +130,7 @@ export function WalletButton() {
                         ? kondorLogo
                         : walletName === "walletConnect"
                         ? walletConnectLogo
-                        : walletName === "mkw"
-                        ? mkwLogo
-                        : mkwLogo
+                        : kondorLogo
                     }
                     alt="wallet"
                     width={16}
@@ -289,28 +286,45 @@ export function WalletButton() {
             {/* Connect/Disconnect Options */}
             <div className="space-y-1">
               {!isConnected && (
-                <DropdownMenuItem 
-                  onClick={() => handleWalletAction("kondor")}
-                  className="flex items-center px-4 py-3 my-1 rounded-lg cursor-pointer focus:bg-muted/80 hover:bg-muted/80"
-                >
-                  <div className="flex items-center gap-3 text-sm font-medium">
-                    <svg 
-                      xmlns="http://www.w3.org/2000/svg" 
-                      viewBox="0 0 24 24" 
-                      fill="none" 
-                      stroke="currentColor" 
-                      strokeWidth="2" 
-                      strokeLinecap="round" 
-                      strokeLinejoin="round" 
-                      className="w-5 h-5"
-                    >
-                      <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
-                      <polyline points="10 17 15 12 10 7" />
-                      <line x1="15" y1="12" x2="3" y2="12" />
-                    </svg>
+                <>
+                  <div className="px-3 py-2 mb-1 text-sm font-medium text-muted-foreground">
                     Connect Wallet
                   </div>
-                </DropdownMenuItem>
+                  <DropdownMenuItem 
+                    onClick={() => handleWalletAction("kondor")}
+                    className="flex items-center px-4 py-3 my-1 rounded-lg cursor-pointer focus:bg-muted/80 hover:bg-muted/80"
+                  >
+                    <div className="flex items-center gap-3 text-sm font-medium">
+                      <div className="w-6 h-6 p-1 rounded-full bg-violet-100 dark:bg-violet-950/50">
+                        <Image
+                          src={kondorLogo}
+                          alt="kondor"
+                          width={20}
+                          height={20}
+                          className="w-full h-full object-contain"
+                        />
+                      </div>
+                      Kondor
+                    </div>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => handleWalletAction("walletConnect")}
+                    className="flex items-center px-4 py-3 my-1 rounded-lg cursor-pointer focus:bg-muted/80 hover:bg-muted/80"
+                  >
+                    <div className="flex items-center gap-3 text-sm font-medium">
+                      <div className="w-6 h-6 p-1 rounded-full bg-blue-100 dark:bg-blue-950/50">
+                        <Image
+                          src={walletConnectLogo}
+                          alt="wallet-connect"
+                          width={20}
+                          height={20}
+                          className="w-full h-full object-contain"
+                        />
+                      </div>
+                      Wallet Connect
+                    </div>
+                  </DropdownMenuItem>
+                </>
               )}
               
               {isConnected && (

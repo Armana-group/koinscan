@@ -4,6 +4,7 @@ export const RPC_NODE = "https://api.koinosblocks.com";
 export const BLOCK_EXPLORER = "https://koinosblocks.com";
 export const NETWORK_NAME = "mainnet";
 export const NICKNAMES_CONTRACT_ID = "1KD9Es7LBBjA1FY3ViCgQJ7e6WH1ipKbhz";
+export const GOVERNANCE_CONTRACT_ID = "19qj51eTbSFJYU7ZagudkpxPgNSzPMfdPX";
 
 export const WALLET_CONNECT_MODAL_SIGN_OPTIONS = {
   // Get your projectId by creating a free WalletConnect

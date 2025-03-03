@@ -40,6 +40,7 @@ export default function ContractPage({
   }>>({});
   const [selectedMethod, setSelectedMethod] = useState<string>("");
   const [submitText, setSubmitText] = useState<string>("");
+  const [functionSearchQuery, setFunctionSearchQuery] = useState<string>("");
   const { signer } = useWallet();
   const [code, setCode] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
@@ -199,6 +200,37 @@ export default function ContractPage({
     }));
   }, [contract]);
 
+  // Group and sort methods: read functions first, then write functions, each sorted alphabetically
+  const organizedMethods = useMemo(() => {
+    if (!contractMethods.length) return [];
+    
+    // Separate read and write methods
+    const readMethods = contractMethods.filter(method => method.readOnly);
+    const writeMethods = contractMethods.filter(method => !method.readOnly);
+    
+    // Sort each group alphabetically by prettyName
+    const sortByName = (a: typeof contractMethods[0], b: typeof contractMethods[0]) => 
+      a.prettyName.localeCompare(b.prettyName);
+    
+    readMethods.sort(sortByName);
+    writeMethods.sort(sortByName);
+    
+    // Combine with read methods first, then write methods
+    return [...readMethods, ...writeMethods];
+  }, [contractMethods]);
+
+  // Filter methods based on search query
+  const filteredMethods = useMemo(() => {
+    if (!organizedMethods.length) return [];
+    if (!functionSearchQuery.trim()) return organizedMethods;
+    
+    const query = functionSearchQuery.toLowerCase();
+    return organizedMethods.filter(method => 
+      method.prettyName.toLowerCase().includes(query) || 
+      method.name.toLowerCase().includes(query)
+    );
+  }, [organizedMethods, functionSearchQuery]);
+
   const handleMethodSubmit = useCallback(async (methodName: string, isRead: boolean) => {
     if (!contract) return;
     
@@ -223,7 +255,7 @@ export default function ContractPage({
           [methodName]: {
             ...prev[methodName],
             loading: false,
-            results: JSON.stringify(result)
+            results: JSON.stringify(result, null, 2)
           }
         }));
       } else {
@@ -245,7 +277,7 @@ export default function ContractPage({
           [methodName]: {
             ...prev[methodName],
             loading: false,
-            results: JSON.stringify(receipt)
+            results: JSON.stringify(receipt, null, 2)
           }
         }));
 
@@ -304,6 +336,11 @@ export default function ContractPage({
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
     toast.success("Copied to clipboard");
+  };
+
+  // Handler for function search input
+  const handleFunctionSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setFunctionSearchQuery(e.target.value);
   };
 
   return (
@@ -403,138 +440,158 @@ export default function ContractPage({
                     </span>
                   </h2>
                 </div>
-                <div className="space-y-4">
-                  {contractMethods?.map((method) => (
-                    <Card 
-                      key={method.name} 
-                      className="group bg-background/80 backdrop-blur-xl border-border shadow-sm rounded-2xl overflow-hidden hover:shadow-md transition-all"
-                    >
-                      <CardHeader 
-                        className="p-6 cursor-pointer"
-                        onClick={() => {
-                          setSelectedMethod(selectedMethod === method.name ? "" : method.name);
-                        }}
-                      >
-                        <div className="flex items-start justify-between">
-                          <div className="flex items-center gap-3">
-                            {selectedMethod === method.name ? (
-                              <ChevronDown className="w-4 h-4 text-muted-foreground" />
-                            ) : (
-                              <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                            )}
-                            <div>
-                              <CardTitle className="text-xl font-semibold text-foreground">
-                                {method.prettyName}
-                              </CardTitle>
-                              <CardDescription className="mt-1 text-muted-foreground">
-                                {contract.abi?.methods[method.name].description || "No description available"}
-                              </CardDescription>
-                            </div>
-                          </div>
-                          <Badge 
-                            className={cn(
-                              "rounded-full border-0 px-3",
-                              method.readOnly 
-                                ? "bg-blue-500/10 text-blue-600" 
-                                : "bg-purple-500/10 text-purple-600"
-                            )}
-                          >
-                            {method.readOnly ? "Read" : "Write"}
-                          </Badge>
-                        </div>
-                      </CardHeader>
-                      {selectedMethod === method.name && (
-                        <CardContent className="p-6 pt-0">
-                          <div className="rounded-xl p-4">
-                            <KoinosForm
-                              contract={contract}
-                              protobufType={method.name}
-                              onChange={(newArgs) => handleMethodArgsChange(method.name, newArgs)}
-                            />
-                          </div>
-                          {!method.readOnly && signer ? (
-                            <div className="mt-3 text-sm text-muted-foreground flex items-center gap-2">
-                              <div className="w-2 h-2 rounded-full bg-green-500" />
-                              <span>Signing as: {signer.getAddress()}</span>
-                            </div>
-                          ) : !method.readOnly ? (
-                            <div className="mt-3 text-sm text-muted-foreground flex items-center gap-2">
-                              <div className="w-2 h-2 rounded-full bg-yellow-500" />
-                              <span>Please connect your wallet to execute this function</span>
-                            </div>
-                          ) : null}
-                          <Button 
-                            type="button"
-                            className={cn(
-                              "mt-4 w-full rounded-full h-12 text-base font-medium",
-                              method.readOnly
-                                ? "bg-blue-600 text-white hover:bg-blue-700"
-                                : signer
-                                ? "bg-purple-600 text-white hover:bg-purple-700"
-                                : "bg-background text-muted-foreground hover:bg-border"
-                            )}
-                            onClick={(e) => {
-                              e.preventDefault();
-                              handleMethodSubmit(method.name, Boolean(method.readOnly));
-                            }}
-                            disabled={(!signer && !method.readOnly) || methodStates[method.name]?.loading}
-                          >
-                            {methodStates[method.name]?.loading ? (
-                              <div className="flex items-center gap-2 justify-center">
-                                <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                                <span>{method.readOnly ? "Reading..." : "Executing..."}</span>
-                              </div>
-                            ) : (
-                              <>
-                                {method.readOnly
-                                  ? "Read Data"
-                                  : signer
-                                  ? "Execute Transaction"
-                                  : "Connect Wallet"}
-                                <ArrowRight className="w-4 h-4 ml-2" />
-                              </>
-                            )}
-                          </Button>
-                          {methodStates[method.name]?.results && (
-                            <div className="mt-6 animate-in fade-in slide-in-from-top-4">
-                              <div className="text-sm font-medium text-foreground mb-2">
-                                {method.readOnly ? "Result" : "Receipt"}
-                              </div>
-                              <div className="rounded-xl p-4 overflow-x-auto relative">
-                                <JsonDisplay data={JSON.parse(methodStates[method.name].results)} />
-                              </div>
-                            </div>
-                          )}
 
-                          {/* Error display */}
-                          {methodStates[method.name]?.error && (
-                            <div className="mt-6 animate-in fade-in slide-in-from-top-4">
-                              <div className="text-sm font-medium text-red-500 mb-2 flex items-center justify-between gap-2">
-                                <div className="flex items-center gap-2">
-                                  <AlertCircle className="h-4 w-4" />
-                                  Error
-                                </div>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-6 px-2 rounded-md text-xs opacity-80 hover:opacity-100 hover:bg-red-100 dark:hover:bg-red-900/30"
-                                  onClick={() => copyToClipboard(methodStates[method.name].error || "")}
-                                >
-                                  <Copy className="h-3.5 w-3.5 mr-1" />
-                                  Copy
-                                </Button>
-                              </div>
-                              <div className="rounded-xl p-4 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800">
-                                <div className="font-mono text-sm text-red-700 dark:text-red-400 whitespace-pre-wrap break-words">
-                                  {methodStates[method.name].error}
-                                </div>
+                {/* Function search input */}
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
+                    <Search className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                  <Input
+                    className="pl-9 bg-background"
+                    placeholder="Search functions..."
+                    value={functionSearchQuery}
+                    onChange={handleFunctionSearch}
+                  />
+                </div>
+
+                <div className="space-y-4">
+                  {filteredMethods.length === 0 ? (
+                    <div className="text-center py-10 text-muted-foreground">
+                      No functions match your search
+                    </div>
+                  ) : (
+                    filteredMethods.map((method) => (
+                      <Card 
+                        key={method.name} 
+                        className="group bg-background/80 backdrop-blur-xl border-border shadow-sm rounded-2xl overflow-hidden hover:shadow-md transition-all"
+                      >
+                        <CardHeader 
+                          className="p-6 cursor-pointer"
+                          onClick={() => {
+                            setSelectedMethod(selectedMethod === method.name ? "" : method.name);
+                          }}
+                        >
+                          <div className="flex items-start justify-between">
+                            <div className="flex items-center gap-3">
+                              {selectedMethod === method.name ? (
+                                <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                              ) : (
+                                <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                              )}
+                              <div>
+                                <CardTitle className="text-xl font-semibold text-foreground">
+                                  {method.prettyName}
+                                </CardTitle>
+                                <CardDescription className="mt-1 text-muted-foreground">
+                                  {contract.abi?.methods[method.name].description || "No description available"}
+                                </CardDescription>
                               </div>
                             </div>
-                          )}
-                        </CardContent>
-                      )}
-                    </Card>
-                  ))}
+                            <Badge 
+                              className={cn(
+                                "rounded-full border-0 px-3",
+                                method.readOnly 
+                                  ? "bg-blue-500/10 text-blue-600" 
+                                  : "bg-purple-500/10 text-purple-600"
+                              )}
+                            >
+                              {method.readOnly ? "Read" : "Write"}
+                            </Badge>
+                          </div>
+                        </CardHeader>
+                        {selectedMethod === method.name && (
+                          <CardContent className="p-6 pt-0">
+                            <div className="rounded-xl p-4">
+                              <KoinosForm
+                                contract={contract}
+                                protobufType={method.name}
+                                onChange={(newArgs) => handleMethodArgsChange(method.name, newArgs)}
+                              />
+                            </div>
+                            {!method.readOnly && signer ? (
+                              <div className="mt-3 text-sm text-muted-foreground flex items-center gap-2">
+                                <div className="w-2 h-2 rounded-full bg-green-500" />
+                                <span>Signing as: {signer.getAddress()}</span>
+                              </div>
+                            ) : !method.readOnly ? (
+                              <div className="mt-3 text-sm text-muted-foreground flex items-center gap-2">
+                                <div className="w-2 h-2 rounded-full bg-yellow-500" />
+                                <span>Please connect your wallet to execute this function</span>
+                              </div>
+                            ) : null}
+                            <Button 
+                              type="button"
+                              className={cn(
+                                "mt-4 w-full rounded-full h-12 text-base font-medium",
+                                method.readOnly
+                                  ? "bg-blue-600 text-white hover:bg-blue-700"
+                                  : signer
+                                  ? "bg-purple-600 text-white hover:bg-purple-700"
+                                  : "bg-background text-muted-foreground hover:bg-border"
+                              )}
+                              onClick={(e) => {
+                                e.preventDefault();
+                                handleMethodSubmit(method.name, Boolean(method.readOnly));
+                              }}
+                              disabled={(!signer && !method.readOnly) || methodStates[method.name]?.loading}
+                            >
+                              {methodStates[method.name]?.loading ? (
+                                <div className="flex items-center gap-2 justify-center">
+                                  <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                                  <span>{method.readOnly ? "Reading..." : "Executing..."}</span>
+                                </div>
+                              ) : (
+                                <>
+                                  {method.readOnly
+                                    ? "Read Data"
+                                    : signer
+                                    ? "Execute Transaction"
+                                    : "Connect Wallet"}
+                                  <ArrowRight className="w-4 h-4 ml-2" />
+                                </>
+                              )}
+                            </Button>
+                            {methodStates[method.name]?.results && (
+                              <div className="mt-6 animate-in fade-in slide-in-from-top-4">
+                                <div className="text-sm font-medium text-foreground mb-2">
+                                  {method.readOnly ? "Result" : "Receipt"}
+                                </div>
+                                <div className="rounded-xl p-4 overflow-x-auto relative">
+                                  <JsonDisplay data={JSON.parse(methodStates[method.name].results)} />
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Error display */}
+                            {methodStates[method.name]?.error && (
+                              <div className="mt-6 animate-in fade-in slide-in-from-top-4">
+                                <div className="text-sm font-medium text-red-500 mb-2 flex items-center justify-between gap-2">
+                                  <div className="flex items-center gap-2">
+                                    <AlertCircle className="h-4 w-4" />
+                                    Error
+                                  </div>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-6 px-2 rounded-md text-xs opacity-80 hover:opacity-100 hover:bg-red-100 dark:hover:bg-red-900/30"
+                                    onClick={() => copyToClipboard(methodStates[method.name].error || "")}
+                                  >
+                                    <Copy className="h-3.5 w-3.5 mr-1" />
+                                    Copy
+                                  </Button>
+                                </div>
+                                <div className="rounded-xl p-4 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800">
+                                  <div className="font-mono text-sm text-red-700 dark:text-red-400 whitespace-pre-wrap break-words">
+                                    {methodStates[method.name].error}
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                          </CardContent>
+                        )}
+                      </Card>
+                    ))
+                  )}
                 </div>
               </div>
             </div>

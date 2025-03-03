@@ -97,7 +97,7 @@ export const JsonDisplay = ({ data }: JsonDisplayProps) => {
         </Button>
       </div>
       <div className="overflow-x-auto rounded-md">
-        <pre className="font-mono text-sm bg-zinc-900 text-gray-100 p-4 rounded-md">
+        <pre className="font-mono text-sm bg-zinc-950 text-gray-100 p-4 rounded-md">
           {renderExpandedJson(data)}
         </pre>
       </div>

@@ -16,7 +16,7 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from "./ui/dropdown-menu";
-import { toast } from "sonner";
+import * as toast from "@/lib/toast";
 import { useWallet } from "@/contexts/WalletContext";
 import { useEffect, useState } from "react";
 import * as kondor from "kondor-js";

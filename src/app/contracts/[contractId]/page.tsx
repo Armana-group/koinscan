@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { AlertCircle, ArrowRight, BookOpen, Copy, PenLine, Search, ChevronDown, ChevronRight } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { toast } from "sonner";
+import * as toast from "@/lib/toast";
 import styles from "../../page.module.css";
 import { KoinosForm, prettyName } from "@/components/KoinosForm";
 import { FooterComponent } from "@/components/FooterComponent";
@@ -268,7 +268,6 @@ export default function ContractPage({
         });
 
         toast.success("Transaction submitted", {
-          description: "the transaction is in the mempool waiting to be mined",
           duration: 15000,
         });
         
@@ -283,9 +282,10 @@ export default function ContractPage({
 
         await transaction!.wait();
 
-        toast.success("Transaction mined", {
-          description: (
-            <span>
+        toast.custom(
+          <div className="flex flex-col gap-2">
+            <div className="font-medium">Transaction mined</div>
+            <div>
               see confirmation in{" "}
               <a
                 target="_blank"
@@ -294,10 +294,13 @@ export default function ContractPage({
               >
                 koinosblocks
               </a>
-            </span>
-          ),
-          duration: 15000,
-        });
+            </div>
+          </div>,
+          {
+            duration: 15000,
+            icon: '✅',
+          }
+        );
       }
     } catch (error) {
       const errorMessage = (error as Error).message;

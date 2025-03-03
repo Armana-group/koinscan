@@ -1,7 +1,7 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Copy, ExternalLink, Shield, Wallet, Coins } from "lucide-react";
-import { toast } from "sonner";
+import * as toast from "@/lib/toast";
 import { useEffect, useState } from "react";
 import { Contract, Provider, utils } from "koilib";
 import { BLOCK_EXPLORER, RPC_NODE } from "@/koinos/constants";

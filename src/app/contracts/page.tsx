@@ -24,54 +24,54 @@ const contracts = [
     name: "Koin",
     description: "Koin token",
     address: "15DJN4a8SgrbGhhGksSBASiSYjGnMU8dGL",
-    category: "token",
+    categories: ["token", "system"],
   },
   {
     id: "vhp",
     name: "VHP",
     description: "Virtual Hash Power token",
     address: "18tWNU7E4yuQzz7hMVpceb9ixmaWLVyQsr",
-    category: "token",
+    categories: ["token", "system"],
   },
   {
     id: "pob",
     name: "PoB",
     description: "Proof of Burn consensus algorithm",
     address: "159myq5YUhhoVWu3wsHKHiJYKPKGUrGiyv",
-    category: "consensus",
+    categories: ["consensus", "system"],
   },
   {
     id: "claim",
     name: "Claim",
     description: "Koin claiming contract",
     address: "18zw3ZokdfHtudzaWAUnU4tUvKzKiJeN76",
-    category: "utility",
+    categories: ["utility", "system"],
   },
   {
     id: "governance",
     name: "Governance",
     description: "Governance mechanism (proposals)",
     address: "19qj51eTbSFJYU7ZagudkpxPgNSzPMfdPX",
-    category: "governance",
+    categories: ["governance", "system"],
   },
   {
     id: "name_service",
     name: "Name Service",
     description: "Contract discovery service",
     address: "19WxDJ9Kcvx4VqQFkpwVmwVEy1hMuwXtQE",
-    category: "utility",
+    categories: ["utility", "system"],
   },
   {
     id: "resources",
     name: "Resources",
     description: "Blockchain resources contract (MANA)",
     address: "1HGN9h47CzoFwU2bQZwe6BYoX4TM6pXc4b",
-    category: "system",
+    categories: ["system"],
   },
 ];
 
 // Get unique categories
-const categories = ["all", ...Array.from(new Set(contracts.map((contract) => contract.category)))];
+const categories = ["all", ...Array.from(new Set(contracts.flatMap((contract) => contract.categories)))];
 
 export default function ContractsPage() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -87,7 +87,7 @@ export default function ContractsPage() {
       contract.description.toLowerCase().includes(query) ||
       contract.address.toLowerCase().includes(query);
       
-    const matchesCategory = selectedCategory === "all" || contract.category === selectedCategory;
+    const matchesCategory = selectedCategory === "all" || contract.categories.includes(selectedCategory);
     
     return matchesSearch && matchesCategory;
   });
@@ -232,12 +232,17 @@ export default function ContractsPage() {
                         <CardHeader>
                           <div className="flex justify-between items-start">
                             <CardTitle>{contract.name}</CardTitle>
-                            <motion.div 
-                              className="text-xs px-2 py-1 rounded-full bg-secondary text-secondary-foreground capitalize"
-                              whileHover={{ scale: 1.1 }}
-                            >
-                              {contract.category}
-                            </motion.div>
+                            <div className="flex flex-wrap gap-1 justify-end">
+                              {contract.categories.map((category) => (
+                                <motion.div 
+                                  key={`${contract.id}-${category}`}
+                                  className="text-xs px-2 py-1 rounded-full bg-secondary text-secondary-foreground capitalize"
+                                  whileHover={{ scale: 1.1 }}
+                                >
+                                  {category}
+                                </motion.div>
+                              ))}
+                            </div>
                           </div>
                           <CardDescription>{contract.description}</CardDescription>
                         </CardHeader>

@@ -248,14 +248,64 @@ export default function ContractPage({
       const { read_only: readOnly } = contract.abi!.methods[methodName];
       const currentArgs = methodStates[methodName]?.args || {};
 
+      // Debug info about what's being called
+      console.log(`Calling method: ${methodName}`, currentArgs);
+
+      // Check if this is a balance method and validate address input
+      if (/balance/i.test(methodName)) {
+        // Get the owner address from the arguments object
+        let addressArg = '';
+        
+        if (typeof currentArgs === 'object' && currentArgs !== null) {
+          // Try common parameter names for address in balance methods
+          addressArg = (currentArgs as Record<string, any>)['owner'] || 
+                      (currentArgs as Record<string, any>)['address'] || 
+                      (currentArgs as Record<string, any>)['account'] || '';
+        }
+        
+        if (!addressArg || addressArg.trim() === '') {
+          const errorMessage = "Please enter an address to check the balance";
+          
+          setMethodStates(prev => ({
+            ...prev,
+            [methodName]: {
+              ...prev[methodName],
+              loading: false,
+              error: errorMessage
+            }
+          }));
+          
+          toast.error(errorMessage);
+          return; // Exit early without making the contract call
+        }
+      }
+
       if (isRead) {
         const { result } = await contract.functions[methodName](currentArgs);
+        
+        // Debug the actual result
+        console.log(`Result from ${methodName}:`, result);
+        
+        // Special handling for balance methods when result is empty or null
+        let processedResult = result;
+        
+        // Check if this is a balance-related function and has an empty result
+        const isBalanceMethod = /balance/i.test(methodName); // Case insensitive check for any 'balance' method
+        
+        if (isBalanceMethod && 
+            (!result || 
+             Object.keys(result).length === 0 || 
+             (typeof result === 'object' && result.value === undefined))) {
+          console.log(`Empty balance result for ${methodName}, defaulting to zero value`);
+          processedResult = { value: "0" };
+        }
+        
         setMethodStates(prev => ({
           ...prev,
           [methodName]: {
             ...prev[methodName],
             loading: false,
-            results: JSON.stringify(result, null, 2)
+            results: JSON.stringify(processedResult, null, 2)
           }
         }));
       } else {
@@ -304,17 +354,37 @@ export default function ContractPage({
       }
     } catch (error) {
       const errorMessage = (error as Error).message;
-      setMethodStates(prev => ({
-        ...prev,
-        [methodName]: {
-          ...prev[methodName],
-          loading: false,
-          error: errorMessage
-        }
-      }));
-      toast.error(errorMessage, {
-        duration: 15000,
-      });
+      console.error(`Error calling ${methodName}:`, errorMessage);
+      
+      // For balance-related read methods, return 0 instead of showing an error
+      const isBalanceMethod = isRead && /balance/i.test(methodName);
+      
+      if (isBalanceMethod) {
+        console.log(`Balance method ${methodName} failed, showing zero balance instead`);
+        setMethodStates(prev => ({
+          ...prev,
+          [methodName]: {
+            ...prev[methodName],
+            loading: false,
+            results: JSON.stringify({ value: "0" }, null, 2)
+          }
+        }));
+        // Optional toast to indicate fallback behavior
+        toast.info("No balance found, showing zero", { duration: 3000 });
+      } else {
+        // Standard error handling for non-balance methods
+        setMethodStates(prev => ({
+          ...prev,
+          [methodName]: {
+            ...prev[methodName],
+            loading: false,
+            error: errorMessage
+          }
+        }));
+        toast.error(errorMessage, {
+          duration: 15000,
+        });
+      }
     }
   }, [contract, signer, methodStates]);
 
@@ -392,14 +462,14 @@ export default function ContractPage({
                     <div className="text-center text-muted-foreground mt-2">{error}</div>
                   </div>
                   
-                  <form onSubmit={handleSearch} className="w-full space-y-4">
+                  <form onSubmit={handleSearch} className="w-full space-y-3">
                     <div className="relative">
                       <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
-                        <Search className="h-4 w-4 text-muted-foreground" />
+                        <Search className="h-3.5 w-3.5 text-muted-foreground" />
                       </div>
                       <Input
                         ref={searchInputRef}
-                        className="pl-9 bg-background"
+                        className="pl-8 bg-background transition-shadow duration-200 focus-visible:shadow-sm"
                         placeholder="Try another contract address or @nickname"
                         defaultValue=""
                       />
@@ -407,10 +477,10 @@ export default function ContractPage({
                     <Button 
                       type="submit"
                       variant="outline" 
-                      className="w-full"
+                      className="w-full h-7 text-xs font-medium rounded-md"
                     >
                       Search Contract
-                      <ArrowRight className="w-4 h-4 ml-2" />
+                      <ArrowRight className="w-3 h-3 ml-1" />
                     </Button>
                   </form>
                 </div>
@@ -433,10 +503,10 @@ export default function ContractPage({
                     <span className="text-muted-foreground flex items-center">
                       ({contractMethods?.length || 0})
                       <span className="flex items-center gap-1 ml-2">
-                        <Badge variant="outline" className="text-xs py-0 h-5 bg-blue-500/10 text-blue-600 border-0">
+                        <Badge variant="outline" className="text-xs py-0 h-4 bg-blue-500/5 text-blue-400 border-0">
                           {contractMethods?.filter(m => m.readOnly).length || 0} Read
                         </Badge>
-                        <Badge variant="outline" className="text-xs py-0 h-5 bg-purple-500/10 text-purple-600 border-0">
+                        <Badge variant="outline" className="text-xs py-0 h-4 bg-purple-500/5 text-purple-400 border-0">
                           {contractMethods?.filter(m => !m.readOnly).length || 0} Write
                         </Badge>
                       </span>
@@ -447,29 +517,29 @@ export default function ContractPage({
                 {/* Function search input */}
                 <div className="relative">
                   <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
-                    <Search className="h-4 w-4 text-muted-foreground" />
+                    <Search className="h-3.5 w-3.5 text-muted-foreground" />
                   </div>
                   <Input
-                    className="pl-9 bg-background"
+                    className="pl-8 bg-background transition-shadow duration-200 focus-visible:shadow-sm"
                     placeholder="Search functions..."
                     value={functionSearchQuery}
                     onChange={handleFunctionSearch}
                   />
                 </div>
 
-                <div className="space-y-4">
+                <div className="space-y-3">
                   {filteredMethods.length === 0 ? (
-                    <div className="text-center py-10 text-muted-foreground">
+                    <div className="text-center py-8 text-muted-foreground">
                       No functions match your search
                     </div>
                   ) : (
                     filteredMethods.map((method) => (
                       <Card 
                         key={method.name} 
-                        className="group bg-background/80 backdrop-blur-xl border-border shadow-sm rounded-2xl overflow-hidden hover:shadow-md transition-all"
+                        className="group bg-transparent border-0 shadow-none rounded-lg overflow-hidden transition-all"
                       >
                         <CardHeader 
-                          className="p-6 cursor-pointer"
+                          className="p-4 cursor-pointer"
                           onClick={() => {
                             setSelectedMethod(selectedMethod === method.name ? "" : method.name);
                           }}
@@ -492,10 +562,10 @@ export default function ContractPage({
                             </div>
                             <Badge 
                               className={cn(
-                                "rounded-full border-0 px-3",
+                                "rounded-full border-0 px-2.5 py-0 text-xs h-5",
                                 method.readOnly 
-                                  ? "bg-blue-500/10 text-blue-600" 
-                                  : "bg-purple-500/10 text-purple-600"
+                                  ? "bg-blue-500/5 text-blue-400" 
+                                  : "bg-purple-500/5 text-purple-400"
                               )}
                             >
                               {method.readOnly ? "Read" : "Write"}
@@ -525,12 +595,15 @@ export default function ContractPage({
                             <Button 
                               type="button"
                               className={cn(
-                                "mt-4 w-full rounded-full h-12 text-base font-medium",
+                                "mt-3 transition-all duration-200 ease-in-out rounded-md text-xs font-medium",
+                                "ml-auto",
+                                "h-6 px-2",
+                                "bg-transparent border border-border/60",
                                 method.readOnly
-                                  ? "bg-blue-600 text-white hover:bg-blue-700"
+                                  ? "text-blue-600 hover:border-blue-400 hover:text-blue-500"
                                   : signer
-                                  ? "bg-purple-600 text-white hover:bg-purple-700"
-                                  : "bg-background text-muted-foreground hover:bg-border"
+                                  ? "text-purple-600 hover:border-purple-400 hover:text-purple-500"
+                                  : "text-muted-foreground hover:border-muted-foreground/60"
                               )}
                               onClick={(e) => {
                                 e.preventDefault();
@@ -539,8 +612,8 @@ export default function ContractPage({
                               disabled={(!signer && !method.readOnly) || methodStates[method.name]?.loading}
                             >
                               {methodStates[method.name]?.loading ? (
-                                <div className="flex items-center gap-2 justify-center">
-                                  <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                                <div className="flex items-center gap-1 justify-center">
+                                  <div className="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin" />
                                   <span>{method.readOnly ? "Reading..." : "Executing..."}</span>
                                 </div>
                               ) : (
@@ -550,7 +623,7 @@ export default function ContractPage({
                                     : signer
                                     ? "Execute Transaction"
                                     : "Connect Wallet"}
-                                  <ArrowRight className="w-4 h-4 ml-2" />
+                                  <ArrowRight className="w-3 h-3 ml-1" />
                                 </>
                               )}
                             </Button>

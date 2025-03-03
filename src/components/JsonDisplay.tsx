@@ -1,6 +1,6 @@
 import { Copy } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { toast } from "sonner";
+import * as toast from "@/lib/toast";
 
 interface JsonDisplayProps {
   data: unknown;

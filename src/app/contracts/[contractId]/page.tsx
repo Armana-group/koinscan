@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Contract, Provider, Serializer, SignerInterface, utils } from "koilib";
+import { Abi, Contract, Provider, Serializer, SignerInterface, utils } from "koilib";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -13,6 +13,7 @@ import { KoinosForm, prettyName } from "@/components/KoinosForm";
 import { FooterComponent } from "@/components/FooterComponent";
 import {
   BLOCK_EXPLORER,
+  GOVERNANCE_CONTRACT_ID,
   NICKNAMES_CONTRACT_ID,
   RPC_NODE,
 } from "@/koinos/constants";
@@ -22,6 +23,7 @@ import { useRouter } from "next/navigation";
 import { Navbar } from "@/components/Navbar";
 import { useWallet } from "@/contexts/WalletContext";
 import { cn } from "@/lib/utils";
+import { abiGovernance } from "@/koinos/abis";
 
 export default function ContractPage({
   params,
@@ -127,10 +129,16 @@ export default function ContractPage({
         });
 
         try {
-          const abi = await c.fetchAbi({
-            updateFunctions: false,
-            updateSerializer: false,
-          });
+          let abi: Abi | undefined;
+          if (contractId === GOVERNANCE_CONTRACT_ID) {
+            // special case to fix the abi of governance
+            abi = abiGovernance;
+          } else {
+            abi = await c.fetchAbi({
+              updateFunctions: false,
+              updateSerializer: false,
+            });
+          }
           
           if (!abi || !abi.methods) {
             throw new Error(`No ABI found for contract ${contractId}`);
@@ -140,11 +148,11 @@ export default function ContractPage({
           Object.keys(abi.methods).forEach((m) => {
             if (abi.methods[m].entry_point === undefined) {
               abi.methods[m].entry_point = Number(
-                abi.methods[m]["entry-point" as "entry_point"],
+                (abi.methods[m] as any)["entry-point"]
               );
             }
             if (abi.methods[m].read_only === undefined) {
-              abi.methods[m].read_only = abi.methods[m]["read-only" as "read_only"];
+              abi.methods[m].read_only = (abi.methods[m] as any)["read-only"];
             }
           });
 
@@ -154,7 +162,12 @@ export default function ContractPage({
           if (c.abi.koilib_types) {
             c.serializer = new Serializer(c.abi.koilib_types);
           } else if (c.abi.types) {
-            c.serializer = new Serializer(c.abi.types);
+            try {
+              c.serializer = new Serializer(c.abi.types);
+            } catch (serializerError) {
+              console.error("Error initializing serializer:", serializerError);
+              // Continue without a serializer
+            }
           }
           
           setContract(c);
@@ -165,6 +178,7 @@ export default function ContractPage({
             image,
           });
         } catch (error) {
+          console.error("Failed to load contract ABI:", error);
           throw new Error(`Failed to load contract ABI: ${(error as Error).message}`);
         }
       } catch (error) {

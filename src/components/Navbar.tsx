@@ -19,7 +19,7 @@ export function Navbar() {
 
   return (
     <div className="bg-background/80 backdrop-blur-sm">
-      <div className="container max-w-[980px] mx-auto flex items-center justify-between px-4  md:px-4 py-6">
+      <div className="container mx-auto flex items-center justify-between px-4 md:px-4 py-6">
         {/* Mobile Menu (Left) */}
         <div className="md:hidden">
           <DropdownMenu>
@@ -67,7 +67,7 @@ export function Navbar() {
         </div>
 
         {/* Desktop Logo (Left) */}
-        <div className="hidden md:block w-[120px]">
+        <div className="hidden md:flex w-[200px] justify-start">
           <Logo />
         </div>
 
@@ -77,7 +77,7 @@ export function Navbar() {
         </div>
 
         {/* Wallet Button (Right) */}
-        <div className="flex items-center gap-2">
+        <div className="flex w-[200px] justify-end items-center gap-2">
           <WalletButton />
           <div className="hidden md:block">
             <ThemeToggle />

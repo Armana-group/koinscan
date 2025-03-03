@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { Enum } from "protobufjs";
 import { Contract, Serializer } from "koilib";
 import { Button } from "@/components/ui/button";
@@ -424,13 +424,21 @@ const RecursiveFormField = ({
 
 export const KoinosForm = (props: KoinosFormProps) => {
   const [value, setValue] = useState<Record<string, unknown>>({});
+  const [serializerError, setSerializerError] = useState<string | null>(null);
 
   const serializer = useMemo(() => {
     if (!props.contract?.serializer && !props.serializer) {
-      throw new Error("No serializer provided");
+      setSerializerError("No serializer available for this contract. Form input is disabled.");
+      return null;
     }
     return props.contract?.serializer || props.serializer;
   }, [props.contract?.serializer, props.serializer]);
+
+  useEffect(() => {
+    if (!serializer && props.onChange) {
+      props.onChange({});
+    }
+  }, [serializer, props.onChange]);
 
   const fields = useMemo(() => {
     if (!serializer) {
@@ -513,7 +521,20 @@ export const KoinosForm = (props: KoinosFormProps) => {
   }, [fields, props, serializer, value]);
 
   if (!serializer) {
-    return null;
+    return (
+      <div className="px-4 py-3 rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-400">
+        <div className="flex items-start">
+          <svg className="h-5 w-5 mr-2 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          </svg>
+          <div>
+            <p className="font-medium">Serializer Unavailable</p>
+            <p className="text-sm mt-1">{serializerError || "Cannot display form inputs because the contract has no valid serializer."}</p>
+            <p className="text-sm mt-2">You can still try to call the function with an empty arguments object.</p>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (

@@ -629,9 +629,9 @@ export default function ContractPage({
                             </Button>
                             {methodStates[method.name]?.results && (
                               <div className="mt-6 animate-in fade-in slide-in-from-top-4">
-                                <div className="text-sm font-medium text-foreground mb-2">
+                                {/* <div className="text-sm font-medium text-foreground mb-2">
                                   {method.readOnly ? "Result" : "Receipt"}
-                                </div>
+                                </div> */}
                                 <div className="rounded-xl p-4 overflow-x-auto relative">
                                   <JsonDisplay data={JSON.parse(methodStates[method.name].results)} />
                                 </div>

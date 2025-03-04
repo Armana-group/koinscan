@@ -195,16 +195,23 @@ export function formatTransactions(transactions: BlockchainTransaction[]): Forma
  * @param limit Maximum number of transactions to fetch
  * @param ascending Sort order (true for ascending, false for descending)
  * @param irreversible Whether to include only irreversible transactions
+ * @param sequenceNumber Optional sequence number for pagination
  * @returns Array of detailed transactions
  */
 export async function getDetailedAccountHistory(
   address: string,
   limit: number = 10,
   ascending: boolean = false,
-  irreversible: boolean = true
+  irreversible: boolean = true,
+  sequenceNumber?: string
 ): Promise<DetailedTransaction[]> {
   try {
-    const url = `https://api.koinos.io/v1/account/${address}/history?limit=${limit}&ascending=${ascending}&irreversible=${irreversible}&decode_operations=true&decode_events=true`;
+    let url = `https://api.koinos.io/v1/account/${address}/history?limit=${limit}&ascending=${ascending}&irreversible=${irreversible}&decode_operations=true&decode_events=true`;
+    
+    // Add sequence_number parameter if provided
+    if (sequenceNumber) {
+      url += `&sequence_number=${sequenceNumber}`;
+    }
     
     const response = await fetch(url);
     
@@ -381,4 +388,28 @@ export async function enrichTransactionsWithTimestamps(transactions: any[]): Pro
   );
   
   return enrichedTransactions;
+}
+
+/**
+ * Fetches the token balance for a specific account and token
+ * @param address The account address to fetch the balance for
+ * @param tokenSymbol The token symbol (e.g., 'koin')
+ * @returns Promise resolving to the token balance as a string
+ */
+export async function getTokenBalance(address: string, tokenSymbol: string = 'koin'): Promise<string> {
+  try {
+    const url = `https://api.koinos.io/v1/account/${address}/balance/${tokenSymbol.toLowerCase()}`;
+    
+    const response = await fetch(url);
+    
+    if (!response.ok) {
+      throw new Error(`API request failed with status ${response.status}`);
+    }
+    
+    const data = await response.json();
+    return data.value || '0';
+  } catch (error) {
+    console.error(`Error fetching ${tokenSymbol} balance:`, error);
+    return '0';
+  }
 } 

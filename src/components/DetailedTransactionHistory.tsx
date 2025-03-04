@@ -1,13 +1,14 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { toast } from 'react-hot-toast';
+import toast from 'react-hot-toast';
 import { 
   getDetailedAccountHistory, 
   formatDetailedTransactions, 
   enrichTransactionsWithTimestamps,
   DetailedTransaction,
-  TransactionEvent
+  TransactionEvent,
+  getTokenBalance
 } from '@/lib/api';
 import { 
   Card,
@@ -44,6 +45,15 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface DetailedTransactionHistoryProps {
   address?: string;
@@ -78,19 +88,65 @@ export function DetailedTransactionHistory({ address }: DetailedTransactionHisto
   const [limit, setLimit] = useState<number>(10);
   const [ascending, setAscending] = useState<boolean>(false);
   const [page, setPage] = useState<number>(1);
+  
+  // Add state for token balance
+  const [tokenBalance, setTokenBalance] = useState<string>('0');
+  const [tokenSymbol, setTokenSymbol] = useState<string>('KOIN');
+  const [loadingBalance, setLoadingBalance] = useState<boolean>(false);
+  
+  // Add state for pagination
+  const [paginationHistory, setPaginationHistory] = useState<{[page: number]: {
+    transactions: DetailedTransaction[],
+    formattedTransactions: FormattedTransaction[],
+    sequenceNumber?: string
+  }}>({});
+  const [hasMore, setHasMore] = useState<boolean>(true);
+  const [totalTransactions, setTotalTransactions] = useState<number>(0);
 
-  // Fetch transactions when address changes
+  // Fetch token balance when address changes
   useEffect(() => {
     if (address) {
+      fetchTokenBalance(address);
+    }
+  }, [address]);
+
+  // Fetch transactions when address changes or when limit/ascending changes
+  useEffect(() => {
+    if (address) {
+      // Reset pagination when address, limit, or ascending changes
+      setPage(1);
+      setPaginationHistory({});
+      setHasMore(true);
+      setTotalTransactions(0);
       fetchTransactions(address);
     }
-  }, [address, limit, ascending, page]);
+  }, [address, limit, ascending]);
 
-  const fetchTransactions = async (accountAddress: string) => {
+  // Fetch transactions when page changes
+  useEffect(() => {
+    if (address && page > 1) {
+      // Check if we already have data for this page
+      if (paginationHistory[page]) {
+        setTransactions(paginationHistory[page].transactions);
+        setFormattedTransactions(paginationHistory[page].formattedTransactions);
+      } else {
+        // Fetch next page using sequence number from previous page
+        const prevPage = paginationHistory[page - 1];
+        if (prevPage && prevPage.transactions.length > 0) {
+          const lastTx = prevPage.transactions[prevPage.transactions.length - 1];
+          // Get the sequence number for pagination
+          const sequenceNumber = lastTx.seq_num;
+          fetchTransactions(address, sequenceNumber);
+        }
+      }
+    }
+  }, [page]);
+
+  const fetchTransactions = async (accountAddress: string, sequenceNumber?: string) => {
     setLoading(true);
     setError(null);
     try {
-      const data = await getDetailedAccountHistory(accountAddress, limit, ascending, true);
+      const data = await getDetailedAccountHistory(accountAddress, limit, ascending, true, sequenceNumber);
       
       if (data && Array.isArray(data)) {
         setTransactions(data);
@@ -99,9 +155,26 @@ export function DetailedTransactionHistory({ address }: DetailedTransactionHisto
         // Enrich transactions with timestamp information
         const enriched = await enrichTransactionsWithTimestamps(formatted);
         setFormattedTransactions(enriched);
+        
+        // Update pagination history
+        setPaginationHistory(prev => ({
+          ...prev,
+          [page]: {
+            transactions: data,
+            formattedTransactions: enriched,
+            sequenceNumber: sequenceNumber
+          }
+        }));
+        
+        // Update hasMore flag
+        setHasMore(data.length === limit);
+        
+        // Update total transactions count
+        setTotalTransactions(prev => prev + data.length);
       } else {
         setTransactions([]);
         setFormattedTransactions([]);
+        setHasMore(false);
       }
     } catch (err) {
       console.error('Error fetching detailed transactions:', err);
@@ -109,6 +182,21 @@ export function DetailedTransactionHistory({ address }: DetailedTransactionHisto
       toast.error("Failed to fetch transactions. Please try again.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Add function to fetch token balance
+  const fetchTokenBalance = async (accountAddress: string) => {
+    setLoadingBalance(true);
+    try {
+      const balance = await getTokenBalance(accountAddress);
+      // The API already returns the balance in KOIN format, no need to convert
+      setTokenBalance(balance);
+    } catch (err) {
+      console.error('Error fetching token balance:', err);
+      toast.error("Failed to fetch token balance. Please try again.");
+    } finally {
+      setLoadingBalance(false);
     }
   };
 
@@ -179,37 +267,9 @@ export function DetailedTransactionHistory({ address }: DetailedTransactionHisto
     return event.name;
   };
 
-  // Calculate total value transferred across all transactions
-  const calculateTotalValueAcrossTransactions = () => {
-    if (!formattedTransactions.length) return { value: '0', symbol: 'KOIN' };
-    
-    try {
-      // Group by token symbol
-      const tokenTotals: Record<string, bigint> = {};
-      
-      formattedTransactions.forEach(tx => {
-        if (tx.totalValueTransferred !== '0') {
-          const symbol = tx.tokenSymbol || 'TOKEN';
-          tokenTotals[symbol] = (tokenTotals[symbol] || BigInt(0)) + BigInt(tx.totalValueTransferred);
-        }
-      });
-      
-      // For simplicity, we'll just return the first/largest token total
-      // In a more complex app, you might want to display multiple token totals
-      const entries = Object.entries(tokenTotals);
-      if (entries.length === 0) return { value: '0', symbol: 'KOIN' };
-      
-      // Sort by value (largest first)
-      entries.sort((a, b) => (b[1] > a[1] ? 1 : -1));
-      
-      return { 
-        value: entries[0][1].toString(),
-        symbol: entries[0][0]
-      };
-    } catch (e) {
-      console.error('Error calculating total value:', e);
-      return { value: '0', symbol: 'KOIN' };
-    }
+  // Update the limit handler
+  const handleLimitChange = (newLimit: number) => {
+    setLimit(newLimit);
   };
 
   if (!address) return null;
@@ -217,7 +277,17 @@ export function DetailedTransactionHistory({ address }: DetailedTransactionHisto
   return (
     <Card className="w-full shadow-lg">
       <CardHeader>
-        <CardTitle>Transaction History</CardTitle>
+        <div className="flex justify-between items-center">
+          <CardTitle>Transaction History</CardTitle>
+          {loadingBalance ? (
+            <Skeleton className="h-6 w-32" />
+          ) : (
+            <div className="text-right">
+              <div className="text-sm text-muted-foreground">Balance</div>
+              <div className="text-xl font-bold">{tokenBalance} {tokenSymbol}</div>
+            </div>
+          )}
+        </div>
         <CardDescription>
           {transactions.length > 0 && (
             <span>Found {transactions.length} transactions for address {formatHex(address)}</span>
@@ -279,6 +349,25 @@ export function DetailedTransactionHistory({ address }: DetailedTransactionHisto
           </div>
         </div>
 
+        {/* Add limit selector */}
+        <div className="flex items-center space-x-2 mb-4">
+          <Label htmlFor="limit">Transactions per page:</Label>
+          <Select
+            value={limit.toString()}
+            onValueChange={(value: string) => handleLimitChange(parseInt(value))}
+          >
+            <SelectTrigger id="limit" className="w-[180px]">
+              <SelectValue placeholder="Select limit" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="10">10</SelectItem>
+              <SelectItem value="25">25</SelectItem>
+              <SelectItem value="50">50</SelectItem>
+              <SelectItem value="100">100</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
         {error && (
           <div className="bg-destructive/10 text-destructive p-3 rounded-md mb-4">
             {error}
@@ -299,25 +388,17 @@ export function DetailedTransactionHistory({ address }: DetailedTransactionHisto
               </div>
             ) : (
               <>
-                {/* Transaction Summary */}
-                {formattedTransactions.length > 0 && formattedTransactions.some(tx => tx.totalValueTransferred !== '0') && (
-                  <div className="mb-6 p-4 bg-muted/30 rounded-lg">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-sm font-medium flex items-center">
-                        <Coins className="h-4 w-4 mr-2 text-primary" />
-                        Transaction Summary
-                      </h3>
-                      <Badge variant="outline" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100">
-                        Total: {formatValue(calculateTotalValueAcrossTransactions().value)} {calculateTotalValueAcrossTransactions().symbol}
-                      </Badge>
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-2">
-                      Showing {formattedTransactions.length} of {transactions.length} transactions
-                      {formattedTransactions.filter(tx => tx.totalValueTransferred !== '0').length > 0 && 
-                        ` with ${formattedTransactions.filter(tx => tx.totalValueTransferred !== '0').length} transfers`}
-                    </p>
+                <div className="mb-6">
+                  <div className="flex items-center space-x-2 mb-2">
+                    <h3 className="text-lg font-semibold flex items-center">
+                      <span className="mr-2">Transaction Summary</span>
+                    </h3>
                   </div>
-                )}
+                  
+                  <p className="text-sm text-muted-foreground">
+                    Showing {formattedTransactions.length} of {totalTransactions}+ transactions with {formattedTransactions.filter(tx => tx.totalValueTransferred && parseFloat(tx.totalValueTransferred) > 0).length} transfers
+                  </p>
+                </div>
 
                 <Accordion type="single" collapsible className="w-full">
                   {formattedTransactions.map((tx, index) => (
@@ -515,7 +596,7 @@ export function DetailedTransactionHistory({ address }: DetailedTransactionHisto
         <CardFooter className="flex justify-between">
           <div className="flex items-center space-x-2">
             <span className="text-sm text-muted-foreground">
-              Page {page} · {limit} per page
+              Page {page} · {limit} per page · {totalTransactions}+ total transactions
             </span>
           </div>
           <div className="flex items-center space-x-2">
@@ -534,7 +615,7 @@ export function DetailedTransactionHistory({ address }: DetailedTransactionHisto
               variant="outline"
               size="sm"
               onClick={() => setPage(page + 1)}
-              disabled={transactions.length < limit || loading}
+              disabled={!hasMore || loading}
             >
               Next
               <ArrowRight className="h-4 w-4 ml-2" />

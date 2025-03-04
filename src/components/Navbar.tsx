@@ -48,6 +48,11 @@ export function Navbar() {
                   Transactions
                 </DropdownMenuItem>
               </Link>
+              <Link href="/transaction-history">
+                <DropdownMenuItem className={pathname === "/transaction-history" ? "bg-accent" : ""}>
+                  Transaction History
+                </DropdownMenuItem>
+              </Link>
               <Link href="/tokens">
                 <DropdownMenuItem className={pathname === "/tokens" ? "bg-accent" : ""}>
                   Tokens

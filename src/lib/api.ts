@@ -190,8 +190,8 @@ export function formatTransactions(transactions: BlockchainTransaction[]): Forma
 }
 
 /**
- * Fetches detailed transaction history for an account using the direct API endpoint
- * @param address The account address to fetch history for
+ * Fetches detailed transaction history for an account
+ * @param address Account address
  * @param limit Maximum number of transactions to fetch
  * @param ascending Sort order (true for ascending, false for descending)
  * @param irreversible Whether to include only irreversible transactions
@@ -210,8 +210,11 @@ export async function getDetailedAccountHistory(
     
     // Add sequence_number parameter if provided
     if (sequenceNumber) {
+      console.log('Using sequence number for pagination:', sequenceNumber);
       url += `&sequence_number=${sequenceNumber}`;
     }
+    
+    console.log('API Request URL:', url);
     
     const response = await fetch(url);
     
@@ -220,6 +223,8 @@ export async function getDetailedAccountHistory(
     }
     
     const data: DetailedTransaction[] = await response.json();
+    console.log(`API returned ${data.length} transactions`);
+    
     return data;
   } catch (error) {
     console.error('Error fetching detailed account history:', error);

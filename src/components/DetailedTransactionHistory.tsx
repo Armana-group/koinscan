@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import toast from 'react-hot-toast';
 import { 
   getDetailedAccountHistory, 
@@ -55,8 +55,15 @@ import {
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 
+type PaginationHistoryItem = {
+  transactions: DetailedTransaction[];
+  formattedTransactions: any[];
+};
+
 interface DetailedTransactionHistoryProps {
   address?: string;
+  contractId?: string;
+  transactionType?: string;
 }
 
 interface FormattedOperation {
@@ -80,14 +87,26 @@ interface FormattedTransaction {
   tokenSymbol: string;
 }
 
-export function DetailedTransactionHistory({ address }: DetailedTransactionHistoryProps) {
+export function DetailedTransactionHistory({ 
+  address,
+  contractId = "", 
+  transactionType = ""
+}: DetailedTransactionHistoryProps) {
   const [transactions, setTransactions] = useState<DetailedTransaction[]>([]);
-  const [formattedTransactions, setFormattedTransactions] = useState<FormattedTransaction[]>([]);
-  const [loading, setLoading] = useState<boolean>(false);
+  const [formattedTransactions, setFormattedTransactions] = useState<any[]>([]);
+  const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [totalTransactions, setTotalTransactions] = useState(0);
+  const [balance, setBalance] = useState<string | null>(null);
+  const [selectedFilter, setSelectedFilter] = useState<string>('all');
+  
+  // Constants
+  const ITEMS_PER_PAGE = 10;
   const [limit, setLimit] = useState<number>(10);
-  const [ascending, setAscending] = useState<boolean>(false);
-  const [page, setPage] = useState<number>(1);
+  const [ascending, setAscending] = useState<boolean>(false); // Default to descending order (newest first)
   
   // Add state for token balance
   const [tokenBalance, setTokenBalance] = useState<string>('0');
@@ -97,11 +116,104 @@ export function DetailedTransactionHistory({ address }: DetailedTransactionHisto
   // Add state for pagination
   const [paginationHistory, setPaginationHistory] = useState<{[page: number]: {
     transactions: DetailedTransaction[],
-    formattedTransactions: FormattedTransaction[],
-    sequenceNumber?: string
+    formattedTransactions: FormattedTransaction[]
   }}>({});
-  const [hasMore, setHasMore] = useState<boolean>(true);
-  const [totalTransactions, setTotalTransactions] = useState<number>(0);
+  const [hasNextPage, setHasNextPage] = useState<boolean>(false);
+
+  // Use refs to track if we've already started fetching
+  const fetchingRef = useRef<boolean>(false);
+  const paginationRef = useRef(paginationHistory);
+  
+  // Update the ref when the state changes
+  useEffect(() => {
+    paginationRef.current = paginationHistory;
+  }, [paginationHistory]);
+
+  // Memoize data to prevent unnecessary rerenders
+  const memoizedData = useMemo(() => {
+    return {
+      transactions,
+      formattedTransactions,
+    };
+  }, [transactions, formattedTransactions]);
+
+  // Define fetchTransactions with useCallback
+  const fetchTransactions = useCallback(
+    async (pageNumber: number) => {
+      setLoading(true);
+      setError(null);
+
+      try {
+        console.log(`Fetching transactions for ${address || "all accounts"}, page ${pageNumber}, items per page: ${ITEMS_PER_PAGE}, ascending: ${ascending}`);
+        
+        // Get the sequence number from the last transaction of the previous page if available
+        let sequenceNumberParam: string | undefined = undefined;
+        
+        if (pageNumber > 1 && paginationRef.current[pageNumber - 1]?.transactions?.length > 0) {
+          const lastTransaction = paginationRef.current[pageNumber - 1].transactions[paginationRef.current[pageNumber - 1].transactions.length - 1];
+          
+          if (lastTransaction.seq_num) {
+            // Important: Decrement the sequence number to get the next page
+            const seqNumAsNumber = parseInt(lastTransaction.seq_num, 10);
+            if (!isNaN(seqNumAsNumber)) {
+              sequenceNumberParam = (seqNumAsNumber - 1).toString();
+              console.log(`Using sequence number ${sequenceNumberParam} from last transaction of previous page`);
+            } else {
+              console.warn(`Invalid sequence number format: ${lastTransaction.seq_num}`);
+            }
+          } else {
+            console.warn("Last transaction doesn't have seq_num");
+          }
+        }
+
+        const response = await getDetailedAccountHistory(
+          address || "",
+          ITEMS_PER_PAGE,
+          ascending,
+          true, // irreversible
+          sequenceNumberParam
+        );
+
+        console.log(`Received ${response.length} transactions for page ${pageNumber}`);
+        
+        // Format the transactions for display
+        const formattedTransactions = await formatDetailedTransactions(response);
+        
+        // Only update the state if we're still on the same page
+        // to avoid issues with rapid page changes
+        // Add to pagination history without triggering a rerender of the fetchTransactions function
+        setPaginationHistory(prev => {
+          // Only update if this page data doesn't already exist
+          if (!prev[pageNumber]) {
+            return {
+              ...prev,
+              [pageNumber]: {
+                transactions: response,
+                formattedTransactions,
+              },
+            };
+          }
+          return prev;
+        });
+
+        // Update hasMore flag
+        setHasMore(response.length === ITEMS_PER_PAGE);
+        
+        setTransactions(response);
+        setFormattedTransactions(formattedTransactions);
+        setTotalTransactions(prev => prev + response.length);
+        
+        setLoading(false);
+        return response; // Return the response to allow promise chaining
+      } catch (err) {
+        console.error('Error fetching transactions:', err);
+        setError('Failed to fetch transactions');
+        setLoading(false);
+        throw err; // Re-throw to allow promise chaining
+      }
+    },
+    [address, ITEMS_PER_PAGE, ascending]
+  );
 
   // Fetch token balance when address changes
   useEffect(() => {
@@ -112,78 +224,48 @@ export function DetailedTransactionHistory({ address }: DetailedTransactionHisto
 
   // Fetch transactions when address changes or when limit/ascending changes
   useEffect(() => {
-    if (address) {
+    if (address && !fetchingRef.current) {
+      fetchingRef.current = true;
       // Reset pagination when address, limit, or ascending changes
       setPage(1);
       setPaginationHistory({});
       setHasMore(true);
       setTotalTransactions(0);
-      fetchTransactions(address);
+      fetchTransactions(1).finally(() => {
+        fetchingRef.current = false;
+      });
     }
-  }, [address, limit, ascending]);
+  }, [address, fetchTransactions, limit, ascending]);
 
   // Fetch transactions when page changes
   useEffect(() => {
-    if (address && page > 1) {
+    if (address && page > 1 && !fetchingRef.current) {
       // Check if we already have data for this page
-      if (paginationHistory[page]) {
-        setTransactions(paginationHistory[page].transactions);
-        setFormattedTransactions(paginationHistory[page].formattedTransactions);
+      if (paginationRef.current[page]) {
+        console.log('Using cached data for page', page);
+        setTransactions(paginationRef.current[page].transactions);
+        setFormattedTransactions(paginationRef.current[page].formattedTransactions);
       } else {
+        fetchingRef.current = true;
         // Fetch next page using sequence number from previous page
-        const prevPage = paginationHistory[page - 1];
-        if (prevPage && prevPage.transactions.length > 0) {
-          const lastTx = prevPage.transactions[prevPage.transactions.length - 1];
-          // Get the sequence number for pagination
+        const prevPage = page - 1;
+        if (paginationRef.current[prevPage] && paginationRef.current[prevPage].transactions.length > 0) {
+          // IMPORTANT: We need to use the sequence number from the LAST transaction of the previous page
+          const lastTx = paginationRef.current[prevPage].transactions[paginationRef.current[prevPage].transactions.length - 1];
           const sequenceNumber = lastTx.seq_num;
-          fetchTransactions(address, sequenceNumber);
+          
+          console.log('Fetching page', page, 'with sequence number', sequenceNumber);
+          fetchTransactions(page).finally(() => {
+            fetchingRef.current = false;
+          });
+        } else {
+          console.error('No sequence number available for previous page:', prevPage);
+          toast.error("Could not load next page. Missing sequence number.");
+          fetchingRef.current = false;
         }
       }
     }
-  }, [page]);
-
-  const fetchTransactions = async (accountAddress: string, sequenceNumber?: string) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await getDetailedAccountHistory(accountAddress, limit, ascending, true, sequenceNumber);
-      
-      if (data && Array.isArray(data)) {
-        setTransactions(data);
-        const formatted = formatDetailedTransactions(data);
-        
-        // Enrich transactions with timestamp information
-        const enriched = await enrichTransactionsWithTimestamps(formatted);
-        setFormattedTransactions(enriched);
-        
-        // Update pagination history
-        setPaginationHistory(prev => ({
-          ...prev,
-          [page]: {
-            transactions: data,
-            formattedTransactions: enriched,
-            sequenceNumber: sequenceNumber
-          }
-        }));
-        
-        // Update hasMore flag
-        setHasMore(data.length === limit);
-        
-        // Update total transactions count
-        setTotalTransactions(prev => prev + data.length);
-      } else {
-        setTransactions([]);
-        setFormattedTransactions([]);
-        setHasMore(false);
-      }
-    } catch (err) {
-      console.error('Error fetching detailed transactions:', err);
-      setError('Failed to fetch transactions. Please try again.');
-      toast.error("Failed to fetch transactions. Please try again.");
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [page, address, fetchTransactions]);
 
   // Add function to fetch token balance
   const fetchTokenBalance = async (accountAddress: string) => {
@@ -219,7 +301,7 @@ export function DetailedTransactionHistory({ address }: DetailedTransactionHisto
       // Koinos timestamps are in milliseconds since epoch
       const date = new Date(parseInt(timestamp));
       return date.toLocaleString();
-    } catch (e: any) {
+    } catch (e: unknown) {
       return 'Invalid date';
     }
   };
@@ -272,6 +354,19 @@ export function DetailedTransactionHistory({ address }: DetailedTransactionHisto
     setLimit(newLimit);
   };
 
+  // Handle filter change
+  const handleFilterChange = (value: string) => {
+    setSelectedFilter(value);
+    setPage(1);
+    setPaginationHistory({});
+    setTransactions([]);
+    setFormattedTransactions([]);
+    setTotalTransactions(0);
+    
+    // Fetch transactions with selected filter
+    fetchTransactions(1);
+  };
+
   if (!address) return null;
 
   return (
@@ -290,7 +385,7 @@ export function DetailedTransactionHistory({ address }: DetailedTransactionHisto
         </div>
         <CardDescription>
           {transactions.length > 0 && (
-            <span>Found {transactions.length} transactions for address {formatHex(address)}</span>
+            <span>Found {memoizedData.transactions.length} transactions for address {formatHex(address)}</span>
           )}
         </CardDescription>
       </CardHeader>
@@ -315,9 +410,9 @@ export function DetailedTransactionHistory({ address }: DetailedTransactionHisto
                 </>
               )}
             </Button>
-            {transactions.length > 0 && (
+            {memoizedData.transactions.length > 0 && (
               <span className="text-sm text-muted-foreground">
-                Showing {formattedTransactions.length} of {transactions.length} transactions
+                Showing {memoizedData.formattedTransactions.length} of {memoizedData.transactions.length} transactions
               </span>
             )}
           </div>
@@ -427,7 +522,7 @@ export function DetailedTransactionHistory({ address }: DetailedTransactionHisto
                                 Block #{tx.blockHeight}
                               </div>
                             )}
-                            {tx.events.some(e => e.name.includes('transfer_event')) && (
+                            {tx.events.some((e: TransactionEvent) => e.name.includes('transfer_event')) && (
                               <Badge variant="outline" className="bg-primary/10">
                                 Transfer
                               </Badge>

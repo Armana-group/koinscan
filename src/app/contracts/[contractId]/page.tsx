@@ -370,7 +370,7 @@ export default function ContractPage({
           }
         }));
         // Optional toast to indicate fallback behavior
-        toast.info("No balance found, showing zero", { duration: 3000 });
+        toast.custom("No balance found, showing zero", { duration: 3000 });
       } else {
         // Standard error handling for non-balance methods
         setMethodStates(prev => ({

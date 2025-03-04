@@ -42,6 +42,7 @@ export function WalletButton() {
   const [kondorAccounts, setKondorAccounts] = useState<KondorAccount[]>([]);
 
   // Fetch Kondor accounts
+  /*
   useEffect(() => {
     const fetchKondorAccounts = async () => {
       if (walletName === "kondor") {
@@ -66,6 +67,7 @@ export function WalletButton() {
       window.removeEventListener("kondor_accountsChanged", handleAccountsChanged);
     };
   }, [walletName]);
+  */
 
   const handleWalletAction = async (action: WalletName | "disconnect" | "forget") => {
     try {

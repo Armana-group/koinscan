@@ -99,12 +99,11 @@ export function DetailedTransactionHistory({
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
-  const [totalTransactions, setTotalTransactions] = useState(0);
+  const [totalTransactionCount, setTotalTransactionCount] = useState<number | null>(null);
   const [balance, setBalance] = useState<string | null>(null);
   const [selectedFilter, setSelectedFilter] = useState<string>('all');
   
   // Constants
-  const ITEMS_PER_PAGE = 10;
   const [limit, setLimit] = useState<number>(10);
   const [ascending, setAscending] = useState<boolean>(false); // Default to descending order (newest first)
   
@@ -144,7 +143,7 @@ export function DetailedTransactionHistory({
       setError(null);
 
       try {
-        console.log(`Fetching transactions for ${address || "all accounts"}, page ${pageNumber}, items per page: ${ITEMS_PER_PAGE}, ascending: ${ascending}`);
+        console.log(`Fetching transactions for ${address || "all accounts"}, page ${pageNumber}, items per page: ${limit}, ascending: ${ascending}`);
         
         // Get the sequence number from the last transaction of the previous page if available
         let sequenceNumberParam: string | undefined = undefined;
@@ -166,9 +165,13 @@ export function DetailedTransactionHistory({
           }
         }
 
+        // Make sure we're using the current limit value
+        const currentLimit = limit;
+        console.log(`Making API request with limit=${currentLimit}`);
+        
         const response = await getDetailedAccountHistory(
           address || "",
-          ITEMS_PER_PAGE,
+          currentLimit,
           ascending,
           true, // irreversible
           sequenceNumberParam
@@ -176,8 +179,22 @@ export function DetailedTransactionHistory({
 
         console.log(`Received ${response.length} transactions for page ${pageNumber}`);
         
+        // If this is the first page and we're in descending order (newest first),
+        // use the seq_num of the first transaction to determine total count
+        if (pageNumber === 1 && !ascending && response.length > 0 && response[0].seq_num) {
+          const firstTxSeqNum = parseInt(response[0].seq_num, 10);
+          if (!isNaN(firstTxSeqNum)) {
+            console.log(`First transaction has seq_num ${firstTxSeqNum}, using as total count`);
+            setTotalTransactionCount(firstTxSeqNum);
+          }
+        }
+        
         // Format the transactions for display
         const formattedTransactions = await formatDetailedTransactions(response);
+        
+        // Enrich the transactions with timestamps
+        const enrichedTransactions = await enrichTransactionsWithTimestamps(formattedTransactions);
+        console.log('Enriched transactions with timestamps:', enrichedTransactions);
         
         // Only update the state if we're still on the same page
         // to avoid issues with rapid page changes
@@ -189,7 +206,7 @@ export function DetailedTransactionHistory({
               ...prev,
               [pageNumber]: {
                 transactions: response,
-                formattedTransactions,
+                formattedTransactions: enrichedTransactions,
               },
             };
           }
@@ -197,11 +214,10 @@ export function DetailedTransactionHistory({
         });
 
         // Update hasMore flag
-        setHasMore(response.length === ITEMS_PER_PAGE);
+        setHasMore(response.length === limit);
         
         setTransactions(response);
-        setFormattedTransactions(formattedTransactions);
-        setTotalTransactions(prev => prev + response.length);
+        setFormattedTransactions(enrichedTransactions);
         
         setLoading(false);
         return response; // Return the response to allow promise chaining
@@ -212,7 +228,7 @@ export function DetailedTransactionHistory({
         throw err; // Re-throw to allow promise chaining
       }
     },
-    [address, ITEMS_PER_PAGE, ascending]
+    [address, limit, ascending]
   );
 
   // Fetch token balance when address changes
@@ -228,9 +244,6 @@ export function DetailedTransactionHistory({
       fetchingRef.current = true;
       // Reset pagination when address, limit, or ascending changes
       setPage(1);
-      setPaginationHistory({});
-      setHasMore(true);
-      setTotalTransactions(0);
       fetchTransactions(1).finally(() => {
         fetchingRef.current = false;
       });
@@ -351,7 +364,40 @@ export function DetailedTransactionHistory({
 
   // Update the limit handler
   const handleLimitChange = (newLimit: number) => {
-    setLimit(newLimit);
+    // Only take action if the limit actually changed
+    if (newLimit !== limit) {
+      console.log(`Changing transactions per page from ${limit} to ${newLimit}`);
+      
+      // Update the limit state
+      setLimit(newLimit);
+      
+      // Reset all pagination and transaction state
+      setPage(1);
+      setPaginationHistory({});
+      setTransactions([]);
+      setFormattedTransactions([]);
+      setHasMore(true);
+      
+      // Reset loading state to show loading indicator
+      setLoading(true);
+      
+      // Ensure a fresh fetch - need small timeout to ensure state updates first
+      setTimeout(() => {
+        // Ensure we're not already fetching
+        fetchingRef.current = false;
+        
+        // Fetch transactions with new limit
+        if (address) {
+          console.log(`Fetching first page with new limit: ${newLimit}`);
+          fetchTransactions(1).catch(err => {
+            console.error('Error fetching transactions with new limit:', err);
+            setLoading(false);
+          });
+        } else {
+          setLoading(false);
+        }
+      }, 0);
+    }
   };
 
   // Handle filter change
@@ -361,7 +407,7 @@ export function DetailedTransactionHistory({
     setPaginationHistory({});
     setTransactions([]);
     setFormattedTransactions([]);
-    setTotalTransactions(0);
+    setHasMore(true);
     
     // Fetch transactions with selected filter
     fetchTransactions(1);
@@ -385,7 +431,12 @@ export function DetailedTransactionHistory({
         </div>
         <CardDescription>
           {transactions.length > 0 && (
-            <span>Found {memoizedData.transactions.length} transactions for address {formatHex(address)}</span>
+            <span>
+              {totalTransactionCount 
+                ? `Found ${transactions.length} of ${totalTransactionCount} transactions for address ${formatHex(address)}`
+                : `Found ${transactions.length} transactions for address ${formatHex(address)}`
+              }
+            </span>
           )}
         </CardDescription>
       </CardHeader>
@@ -409,37 +460,6 @@ export function DetailedTransactionHistory({
                   Newest First
                 </>
               )}
-            </Button>
-            {memoizedData.transactions.length > 0 && (
-              <span className="text-sm text-muted-foreground">
-                Showing {memoizedData.formattedTransactions.length} of {memoizedData.transactions.length} transactions
-              </span>
-            )}
-          </div>
-          <div className="flex items-center space-x-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setLimit(5)}
-              className={limit === 5 ? "bg-primary text-primary-foreground" : ""}
-            >
-              5
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setLimit(10)}
-              className={limit === 10 ? "bg-primary text-primary-foreground" : ""}
-            >
-              10
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setLimit(20)}
-              className={limit === 20 ? "bg-primary text-primary-foreground" : ""}
-            >
-              20
             </Button>
           </div>
         </div>
@@ -491,12 +511,19 @@ export function DetailedTransactionHistory({
                   </div>
                   
                   <p className="text-sm text-muted-foreground">
-                    Showing {formattedTransactions.length} of {totalTransactions}+ transactions with {formattedTransactions.filter(tx => tx.totalValueTransferred && parseFloat(tx.totalValueTransferred) > 0).length} transfers
+                    {totalTransactionCount 
+                      ? `Showing ${formattedTransactions.length} of ${totalTransactionCount} transactions${formattedTransactions.filter(tx => tx.totalValueTransferred && parseFloat(tx.totalValueTransferred) > 0).length > 0 
+                          ? ` with ${formattedTransactions.filter(tx => tx.totalValueTransferred && parseFloat(tx.totalValueTransferred) > 0).length} transfers` 
+                          : ''}`
+                      : `Showing ${formattedTransactions.length} transactions${formattedTransactions.filter(tx => tx.totalValueTransferred && parseFloat(tx.totalValueTransferred) > 0).length > 0 
+                          ? ` with ${formattedTransactions.filter(tx => tx.totalValueTransferred && parseFloat(tx.totalValueTransferred) > 0).length} transfers` 
+                          : ''}`
+                    }
                   </p>
                 </div>
 
                 <Accordion type="single" collapsible className="w-full">
-                  {formattedTransactions.map((tx, index) => (
+                  {formattedTransactions.slice(0, limit).map((tx, index) => (
                     <AccordionItem key={tx.id} value={tx.id}>
                       <AccordionTrigger className="hover:bg-muted/50 px-4 py-2 rounded-md">
                         <div className="flex w-full justify-between items-center">
@@ -691,7 +718,7 @@ export function DetailedTransactionHistory({
         <CardFooter className="flex justify-between">
           <div className="flex items-center space-x-2">
             <span className="text-sm text-muted-foreground">
-              Page {page} · {limit} per page · {totalTransactions}+ total transactions
+              Page {page} · {limit} per page · {totalTransactionCount ? totalTransactionCount : formattedTransactions.length} total transactions
             </span>
           </div>
           <div className="flex items-center space-x-2">

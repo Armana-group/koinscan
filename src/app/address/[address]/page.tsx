@@ -5,6 +5,7 @@ import { Suspense, useState, useEffect } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
+import { Navbar } from "@/components/Navbar";
 
 interface AddressPageProps {
   params: {
@@ -38,26 +39,29 @@ export default function AddressPage({ params }: AddressPageProps) {
   }, []);
 
   return (
-    <div className="container mx-auto py-8 px-4">
-      <h1 className="text-3xl font-bold mb-2">Address Details</h1>
-      <h2 className="text-xl font-medium text-muted-foreground mb-8 break-all">
-        {address}
-      </h2>
-      
-      {error ? (
-        <Alert variant="destructive" className="mb-6">
-          <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Error</AlertTitle>
-          <AlertDescription>
-            An error occurred while loading transaction history: {error.message}
-          </AlertDescription>
-        </Alert>
-      ) : (
-        <Suspense fallback={<AddressPageSkeleton />}>
-          <DetailedTransactionHistory address={address} />
-        </Suspense>
-      )}
-    </div>
+    <>
+      <Navbar />
+      <div className="container mx-auto py-8 px-4">
+        <h1 className="text-3xl font-bold mb-2">Address Details</h1>
+        <h2 className="text-xl font-medium text-muted-foreground mb-8 break-all">
+          {address}
+        </h2>
+        
+        {error ? (
+          <Alert variant="destructive" className="mb-6">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Error</AlertTitle>
+            <AlertDescription>
+              An error occurred while loading transaction history: {error.message}
+            </AlertDescription>
+          </Alert>
+        ) : (
+          <Suspense fallback={<AddressPageSkeleton />}>
+            <DetailedTransactionHistory address={address} />
+          </Suspense>
+        )}
+      </div>
+    </>
   );
 }
 

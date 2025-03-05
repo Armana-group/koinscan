@@ -26,6 +26,7 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { Clock, Hash, ArrowRight, ExternalLink } from "lucide-react";
+import { Navbar } from '@/components/Navbar';
 
 interface TransactionPageProps {
   params: {
@@ -99,6 +100,7 @@ export default function TransactionPage({ params }: TransactionPageProps) {
   if (error) {
     return (
       <div className="container mx-auto py-8 px-4">
+        <Navbar />
         <h1 className="text-3xl font-bold mb-8">Transaction Details</h1>
         <Card className="mb-6">
           <CardHeader>
@@ -113,6 +115,7 @@ export default function TransactionPage({ params }: TransactionPageProps) {
   if (!transaction) {
     return (
       <div className="container mx-auto py-8 px-4">
+        <Navbar />
         <h1 className="text-3xl font-bold mb-8">Transaction Details</h1>
         <Card className="mb-6">
           <CardHeader>
@@ -130,6 +133,7 @@ export default function TransactionPage({ params }: TransactionPageProps) {
 
   return (
     <div className="container mx-auto py-8 px-4">
+      <Navbar />
       <h1 className="text-3xl font-bold mb-2">Transaction Details</h1>
       <h2 className="text-xl font-medium text-muted-foreground mb-8 break-all">
         {txid}
@@ -342,6 +346,7 @@ export default function TransactionPage({ params }: TransactionPageProps) {
 function TransactionSkeleton() {
   return (
     <div className="container mx-auto py-8 px-4">
+      <Navbar />
       <Skeleton className="h-10 w-72 mb-2" />
       <Skeleton className="h-6 w-full max-w-2xl mb-8" />
       

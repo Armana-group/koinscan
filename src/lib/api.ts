@@ -350,6 +350,57 @@ export async function getBlockInfo(blockId: string): Promise<any> {
 }
 
 /**
+ * Fetches information about the head (latest) block on the blockchain
+ * @returns Head block information including ID, height, and timestamp
+ */
+export async function getHeadBlockInfo(): Promise<any> {
+  try {
+    const url = `https://api.koinos.io/v1/chain/head_info`;
+    
+    const response = await fetch(url);
+    
+    if (!response.ok) {
+      throw new Error(`API request failed with status ${response.status}`);
+    }
+    
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Error fetching head block info:', error);
+    return null;
+  }
+}
+
+// Temporary export to help debug
+export const headBlockInfo = getHeadBlockInfo;
+
+/**
+ * Fetches detailed block information by block height
+ * @param height The height of the block to fetch
+ * @returns Detailed block information including transactions and events
+ */
+export async function getBlockByHeight(height: string): Promise<any> {
+  try {
+    const url = `https://api.koinos.io/v1/block/${height}?return_block=true&return_receipt=true&decode_operations=true&decode_events=true`;
+    
+    const response = await fetch(url);
+    
+    if (!response.ok) {
+      throw new Error(`API request failed with status ${response.status}`);
+    }
+    
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Error fetching block by height:', error);
+    return null;
+  }
+}
+
+// Temporary export to help debug
+export const blockByHeight = getBlockByHeight;
+
+/**
  * Enriches transaction data with timestamp information from direct transaction API
  * @param transactions Array of formatted transactions
  * @returns Promise resolving to transactions with timestamp information

@@ -223,9 +223,12 @@ export function DetailedTransactionHistory({
         return response; // Return the response to allow promise chaining
       } catch (err) {
         console.error('Error fetching transactions:', err);
-        setError('Failed to fetch transactions');
+        // Don't set error for empty wallets - instead we'll just show a friendly message
+        // when transactions.length === 0
+        setTransactions([]);
+        setFormattedTransactions([]);
         setLoading(false);
-        throw err; // Re-throw to allow promise chaining
+        return []; // Return empty array to allow promise chaining
       }
     },
     [address, limit, ascending]
@@ -416,79 +419,77 @@ export function DetailedTransactionHistory({
   if (!address) return null;
 
   return (
-    <Card className="w-full shadow-lg">
-      <CardHeader className="pb-2 sm:pb-6">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-          <CardTitle className="text-base sm:text-xl">Transaction History</CardTitle>
-          {loadingBalance ? (
-            <Skeleton className="h-6 w-32" />
-          ) : (
-            <div className="text-right">
-              <div className="text-xs sm:text-sm text-muted-foreground">Balance</div>
-              <div className="text-lg sm:text-xl font-bold">{tokenBalance} {tokenSymbol}</div>
+    <Card>
+      <CardHeader className="space-y-2">
+        <div className="flex justify-between items-start">
+          <div>
+            <CardTitle>Transaction History</CardTitle>
+            {address && tokenBalance && (
+              <CardDescription className="flex items-center mt-1">
+                <Coins className="h-4 w-4 mr-1" />
+                Balance: {tokenBalance} {tokenSymbol}
+              </CardDescription>
+            )}
+            {!loading && transactions.length === 0 && !error && (
+              <CardDescription>
+                This wallet hasn&apos;t made any transactions yet
+              </CardDescription>
+            )}
+          </div>
+          {/* Only show sort button if we have transactions or are loading */}
+          {(transactions.length > 0 || loading) && (
+            <div className="flex items-center">
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-xs"
+                onClick={() => setAscending(!ascending)}
+              >
+                {ascending ? (
+                  <>
+                    <ChevronUp className="h-4 w-4 mr-2" />
+                    Oldest First
+                  </>
+                ) : (
+                  <>
+                    <ChevronDown className="h-4 w-4 mr-2" />
+                    Newest First
+                  </>
+                )}
+              </Button>
             </div>
           )}
         </div>
-        <CardDescription>
-          {transactions.length > 0 && (
-            <span className="text-xs sm:text-sm">
-              {totalTransactionCount 
-                ? `Found ${transactions.length} of ${totalTransactionCount} transactions for address ${formatHex(address)}`
-                : `Found ${transactions.length} transactions for address ${formatHex(address)}`
-              }
-            </span>
-          )}
-        </CardDescription>
-      </CardHeader>
 
-      <CardContent>
-        <div className="flex justify-between mb-4">
+        {/* Hide limit selector if there are no transactions */}
+        {(!loading && transactions.length > 0) && (
           <div className="flex items-center space-x-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setAscending(!ascending)}
+            <Label htmlFor="limit">Transactions per page:</Label>
+            <Select
+              value={limit.toString()}
+              onValueChange={(value: string) => handleLimitChange(parseInt(value))}
             >
-              {ascending ? (
-                <>
-                  <ChevronUp className="h-4 w-4 mr-2" />
-                  Oldest First
-                </>
-              ) : (
-                <>
-                  <ChevronDown className="h-4 w-4 mr-2" />
-                  Newest First
-                </>
-              )}
-            </Button>
-          </div>
-        </div>
-
-        {/* Add limit selector */}
-        <div className="flex items-center space-x-2 mb-4">
-          <Label htmlFor="limit">Transactions per page:</Label>
-          <Select
-            value={limit.toString()}
-            onValueChange={(value: string) => handleLimitChange(parseInt(value))}
-          >
-            <SelectTrigger id="limit" className="w-[180px]">
-              <SelectValue placeholder="Select limit" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="10">10</SelectItem>
-              <SelectItem value="25">25</SelectItem>
-              <SelectItem value="50">50</SelectItem>
-              <SelectItem value="100">100</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        {error && (
-          <div className="bg-destructive/10 text-destructive p-3 rounded-md mb-4">
-            {error}
+              <SelectTrigger id="limit" className="w-[180px]">
+                <SelectValue placeholder="Select limit" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="10">10</SelectItem>
+                <SelectItem value="25">25</SelectItem>
+                <SelectItem value="50">50</SelectItem>
+                <SelectItem value="100">100</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         )}
 
+        {error && (
+          <div className="bg-destructive/10 text-destructive p-3 rounded-md mb-0">
+            {error}
+          </div>
+        )}
+      </CardHeader>
+
+      <CardContent>
         {loading ? (
           <div className="space-y-3">
             {[...Array(5)].map((_, i) => (
@@ -498,8 +499,19 @@ export function DetailedTransactionHistory({
         ) : (
           <>
             {transactions.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                No transactions found for this address
+              <div className="text-center py-8">
+                <div className="mb-4">
+                  <Coins className="h-12 w-12 mx-auto text-muted-foreground/60" />
+                </div>
+                <h3 className="text-lg font-medium mb-2">No transactions found</h3>
+                <p className="text-muted-foreground max-w-md mx-auto mb-6">
+                  This wallet address has not yet participated in any transactions on the blockchain. When transactions occur, they will appear here automatically.
+                </p>
+                <div className="flex justify-center">
+                  <Button variant="outline" size="sm" onClick={() => fetchTransactions(1)}>
+                    Refresh
+                  </Button>
+                </div>
               </div>
             ) : (
               <>
@@ -559,9 +571,7 @@ export function DetailedTransactionHistory({
                               <div className="font-medium">ID:</div>
                               <div className="font-mono break-all">
                                 <a 
-                                  href={`https://koinosblocks.com/tx/${tx.id}`} 
-                                  target="_blank" 
-                                  rel="noopener noreferrer"
+                                  href={`/tx/${tx.id}`} 
                                   className="text-primary hover:underline flex items-center"
                                 >
                                   {tx.id}
@@ -571,9 +581,7 @@ export function DetailedTransactionHistory({
                               <div className="font-medium">Payer:</div>
                               <div className="font-mono">
                                 <a 
-                                  href={`https://koinosblocks.com/address/${tx.payer}`} 
-                                  target="_blank" 
-                                  rel="noopener noreferrer"
+                                  href={`/address/${tx.payer}`} 
                                   className="text-primary hover:underline flex items-center"
                                 >
                                   {tx.payer}
@@ -587,9 +595,7 @@ export function DetailedTransactionHistory({
                                   <div className="font-medium">Block Height:</div>
                                   <div className="font-mono">
                                     <a 
-                                      href={`https://koinosblocks.com/block/${tx.blockId}`} 
-                                      target="_blank" 
-                                      rel="noopener noreferrer"
+                                      href={`/blocks/${tx.blockId}`} 
                                       className="text-primary hover:underline flex items-center"
                                     >
                                       {tx.blockHeight}
@@ -631,9 +637,7 @@ export function DetailedTransactionHistory({
                                         <TableCell className="font-mono">
                                           {op.contract ? (
                                             <a 
-                                              href={`https://koinosblocks.com/address/${op.contract}`} 
-                                              target="_blank" 
-                                              rel="noopener noreferrer"
+                                              href={`/address/${op.contract}`} 
                                               className="text-primary hover:underline flex items-center"
                                             >
                                               {shortenAddress(op.contract)}
@@ -677,9 +681,7 @@ export function DetailedTransactionHistory({
                                         <TableCell>{event.name}</TableCell>
                                         <TableCell className="font-mono">
                                           <a 
-                                            href={`https://koinosblocks.com/address/${event.source}`} 
-                                            target="_blank" 
-                                            rel="noopener noreferrer"
+                                            href={`/address/${event.source}`} 
                                             className="text-primary hover:underline flex items-center"
                                           >
                                             {shortenAddress(event.source)}

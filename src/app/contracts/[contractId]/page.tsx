@@ -338,11 +338,10 @@ export default function ContractPage({
             <div>
               see confirmation in{" "}
               <a
-                target="_blank"
-                href={`${BLOCK_EXPLORER}/tx/${transaction!.id!}`}
+                href={`/tx/${transaction!.id!}`}
                 className="text-primary hover:underline"
               >
-                koinosblocks
+                view transaction
               </a>
             </div>
           </div>,

@@ -1,7 +1,8 @@
 export const CONTRACT_ID = "1FaSvLjQJsCJKq5ybmGsMMQs8RQYyVv8ju";
 // export const RPC_NODE = "https://api.koinos.io";
 export const RPC_NODE = "https://api.koinosblocks.com";
-export const BLOCK_EXPLORER = "https://koinosblocks.com";
+// Use our own explorer instead of external service
+export const BLOCK_EXPLORER = "";  // Empty string means relative URLs
 export const NETWORK_NAME = "mainnet";
 export const NICKNAMES_CONTRACT_ID = "1KD9Es7LBBjA1FY3ViCgQJ7e6WH1ipKbhz";
 export const GOVERNANCE_CONTRACT_ID = "19qj51eTbSFJYU7ZagudkpxPgNSzPMfdPX";

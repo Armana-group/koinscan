@@ -5,6 +5,7 @@ import {
   connectWallet,
   disconnectWallet,
   getWalletSigner,
+  KONDOR_ACCOUNTS_KEY,
 } from "../koinos/wallets";
 import kondorLogo from "./images/kondor-logo.png";
 import walletConnectLogo from "./images/wallet-connect-logo.png";
@@ -37,52 +38,30 @@ function shortAddress(address: string): string {
 }
 
 export function WalletButton() {
-  const { signer, setSigner, savedAddress, forgetAddress } = useWallet();
+  const { signer, setSigner, savedAddress, savedWalletType, forgetAddress, isReconnecting, kondorAccounts } = useWallet();
   const addr = (signer as ExtendedSigner)?.getAddress();
   const walletName = (signer as ExtendedSigner)?.name;
-  const [kondorAccounts, setKondorAccounts] = useState<KondorAccount[]>([]);
   const router = useRouter();
 
-  // Fetch Kondor accounts function (extracted from the commented useEffect)
+  // Add function to fetch Kondor accounts manually when needed
   const fetchKondorAccounts = async () => {
     if (walletName === "kondor") {
       try {
         const accounts = await kondor.getAccounts();
-        setKondorAccounts(accounts || []);
+        if (accounts && accounts.length > 0) {
+          // Store accounts in localStorage
+          localStorage.setItem(KONDOR_ACCOUNTS_KEY, JSON.stringify(accounts));
+          // Refresh the page to update the UI with the new accounts
+          window.location.reload();
+        } else {
+          toast.error("No accounts found in Kondor");
+        }
       } catch (error) {
         console.error("Failed to fetch Kondor accounts:", error);
         toast.error("Failed to fetch accounts");
       }
     }
   };
-
-  // Fetch Kondor accounts
-  /*
-  useEffect(() => {
-    const fetchKondorAccounts = async () => {
-      if (walletName === "kondor") {
-        try {
-          const accounts = await kondor.getAccounts();
-          setKondorAccounts(accounts || []);
-        } catch (error) {
-          console.error("Failed to fetch Kondor accounts:", error);
-        }
-      }
-    };
-
-    fetchKondorAccounts();
-
-    // Listen for account changes
-    const handleAccountsChanged = () => {
-      fetchKondorAccounts();
-    };
-
-    window.addEventListener("kondor_accountsChanged", handleAccountsChanged);
-    return () => {
-      window.removeEventListener("kondor_accountsChanged", handleAccountsChanged);
-    };
-  }, [walletName]);
-  */
 
   const handleWalletAction = async (action: WalletName | "disconnect" | "forget") => {
     try {
@@ -126,8 +105,8 @@ export function WalletButton() {
     }
   };
 
-  // Show connected state if we have a signer or a saved address
-  const isConnected = !!addr;
+  // Show connected state if we have a signer
+  const isConnected = !!signer;
   const displayAddress = addr || savedAddress;
 
   return (
@@ -146,6 +125,10 @@ export function WalletButton() {
                       walletName === "kondor"
                         ? kondorLogo
                         : walletName === "walletConnect"
+                        ? walletConnectLogo
+                        : savedWalletType === "kondor"
+                        ? kondorLogo
+                        : savedWalletType === "walletConnect"
                         ? walletConnectLogo
                         : kondorLogo
                     }
@@ -229,7 +212,9 @@ export function WalletButton() {
                 <div className="flex items-center gap-2">
                   <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-amber-500'}`}></div>
                   <span className="text-xs font-medium text-muted-foreground">
-                    {isConnected ? 'Wallet Connected' : 'Remembered Address'}
+                    {isConnected 
+                      ? 'Wallet Connected' 
+                      : 'Remembered Address'}
                   </span>
                 </div>
                 <div className="text-sm font-medium">
@@ -258,69 +243,11 @@ export function WalletButton() {
               </div>
             </div>
             
-            {/* New "View My Transactions" button */}
-            <DropdownMenuItem 
-              onClick={() => router.push(`/address/${displayAddress}`)}
-              className="flex items-center px-4 py-3 my-1 rounded-lg cursor-pointer focus:bg-muted/80 hover:bg-muted/80"
-            >
-              <div className="flex items-center gap-3 text-sm font-medium">
-                <svg 
-                  xmlns="http://www.w3.org/2000/svg" 
-                  viewBox="0 0 24 24" 
-                  fill="none" 
-                  stroke="currentColor" 
-                  strokeWidth="2" 
-                  strokeLinecap="round" 
-                  strokeLinejoin="round" 
-                  className="w-5 h-5"
-                >
-                  <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
-                </svg>
-                View My Transactions
-              </div>
-            </DropdownMenuItem>
-            
-            {/* New "Search With My Address" button */}
-            <DropdownMenuItem 
-              onClick={() => {
-                // Navigate to home page
-                router.push('/');
-                // Use setTimeout to ensure navigation completes before trying to access DOM elements
-                setTimeout(() => {
-                  // Find the search input and set its value to the user's address
-                  const searchInput = document.querySelector('input[placeholder*="Search by address"]') as HTMLInputElement;
-                  if (searchInput) {
-                    searchInput.value = displayAddress;
-                    searchInput.focus();
-                    // Dispatch an input event to trigger any listeners
-                    searchInput.dispatchEvent(new Event('input', { bubbles: true }));
-                  }
-                }, 100);
-              }}
-              className="flex items-center px-4 py-3 my-1 rounded-lg cursor-pointer focus:bg-muted/80 hover:bg-muted/80"
-            >
-              <div className="flex items-center gap-3 text-sm font-medium">
-                <svg 
-                  xmlns="http://www.w3.org/2000/svg" 
-                  viewBox="0 0 24 24" 
-                  fill="none" 
-                  stroke="currentColor" 
-                  strokeWidth="2" 
-                  strokeLinecap="round" 
-                  strokeLinejoin="round" 
-                  className="w-5 h-5"
-                >
-                  <circle cx="11" cy="11" r="8"></circle>
-                  <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-                </svg>
-                Search With My Address
-              </div>
-            </DropdownMenuItem>
-            
-            {/* Add Manage Accounts button when connected to Kondor */}
-            {isConnected && walletName === "kondor" && kondorAccounts.length === 0 && (
+            {/* Action Buttons */}
+            <div className="space-y-1 mb-3">
+              {/* View My Transactions button */}
               <DropdownMenuItem 
-                onClick={fetchKondorAccounts}
+                onClick={() => router.push(`/address/${displayAddress}`)}
                 className="flex items-center px-4 py-3 my-1 rounded-lg cursor-pointer focus:bg-muted/80 hover:bg-muted/80"
               >
                 <div className="flex items-center gap-3 text-sm font-medium">
@@ -334,30 +261,91 @@ export function WalletButton() {
                     strokeLinejoin="round" 
                     className="w-5 h-5"
                   >
-                    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-                    <circle cx="9" cy="7" r="4" />
-                    <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
-                    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                    <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
                   </svg>
-                  Add Accounts
+                  View My Transactions
                 </div>
               </DropdownMenuItem>
-            )}
+              
+              {/* Search With My Address button */}
+              <DropdownMenuItem 
+                onClick={() => {
+                  // Navigate to home page
+                  router.push('/');
+                  // Use setTimeout to ensure navigation completes before trying to access DOM elements
+                  setTimeout(() => {
+                    // Find the search input and set its value to the user's address
+                    const searchInput = document.querySelector('input[placeholder*="Search by address"]') as HTMLInputElement;
+                    if (searchInput) {
+                      searchInput.value = displayAddress;
+                      searchInput.focus();
+                      // Dispatch an input event to trigger any listeners
+                      searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+                    }
+                  }, 100);
+                }}
+                className="flex items-center px-4 py-3 my-1 rounded-lg cursor-pointer focus:bg-muted/80 hover:bg-muted/80"
+              >
+                <div className="flex items-center gap-3 text-sm font-medium">
+                  <svg 
+                    xmlns="http://www.w3.org/2000/svg" 
+                    viewBox="0 0 24 24" 
+                    fill="none" 
+                    stroke="currentColor" 
+                    strokeWidth="2" 
+                    strokeLinecap="round" 
+                    strokeLinejoin="round" 
+                    className="w-5 h-5"
+                  >
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                  </svg>
+                  Search With My Address
+                </div>
+              </DropdownMenuItem>
+              
+              {/* Add Accounts button */}
+              {isConnected && walletName === "kondor" && (
+                <DropdownMenuItem 
+                  onClick={fetchKondorAccounts}
+                  className="flex items-center px-4 py-3 my-1 rounded-lg cursor-pointer focus:bg-muted/80 hover:bg-muted/80"
+                >
+                  <div className="flex items-center gap-3 text-sm font-medium">
+                    <svg 
+                      xmlns="http://www.w3.org/2000/svg" 
+                      viewBox="0 0 24 24" 
+                      fill="none" 
+                      stroke="currentColor" 
+                      strokeWidth="2" 
+                      strokeLinecap="round" 
+                      strokeLinejoin="round" 
+                      className="w-5 h-5"
+                    >
+                      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                      <circle cx="9" cy="7" r="4" />
+                      <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+                      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                    </svg>
+                    Add Accounts
+                  </div>
+                </DropdownMenuItem>
+              )}
+            </div>
             
-            {/* Show Kondor accounts if actively connected with Kondor */}
-            {isConnected && walletName === "kondor" && kondorAccounts.length > 0 && (
-              <>
-                <div className="px-3 py-2 text-xs font-medium text-muted-foreground">
+            {/* Kondor Accounts */}
+            {kondorAccounts && kondorAccounts.length > 0 && walletName === "kondor" && (
+              <div className="mb-3">
+                <div className="px-3 py-2 text-sm font-medium text-muted-foreground">
                   Switch Account
                 </div>
-                {kondorAccounts.map((account) => (
+                {kondorAccounts.map((account, i) => (
                   <DropdownMenuItem
                     key={account.address}
                     onClick={() => switchKondorAccount(account)}
-                    className="flex items-center justify-between px-4 py-3 my-1 rounded-lg cursor-pointer focus:bg-muted/80 hover:bg-muted/80"
+                    className="flex items-center justify-between px-4 py-2 my-1 rounded-lg cursor-pointer focus:bg-muted/80 hover:bg-muted/80"
                   >
-                    <div className="flex items-center gap-3">
-                      <div className="w-6 h-6 p-1 rounded-full bg-violet-100 dark:bg-violet-950/50">
+                    <div className="flex items-center gap-2 text-sm">
+                      <div className="w-5 h-5 p-1 rounded-full bg-violet-100 dark:bg-violet-950/50">
                         <Image
                           src={kondorLogo}
                           alt="kondor"
@@ -367,23 +355,17 @@ export function WalletButton() {
                         />
                       </div>
                       <div className="flex flex-col">
-                        <span className="text-sm font-medium">
-                          {account.name || shortAddress(account.address)}
-                        </span>
-                        {account.name && (
-                          <span className="text-xs text-muted-foreground">
-                            {shortAddress(account.address)}
-                          </span>
-                        )}
+                        <span className="font-medium">{account.name || `Account ${i+1}`}</span>
+                        <span className="text-xs text-muted-foreground">{shortAddress(account.address)}</span>
                       </div>
                     </div>
                     {account.address === addr && (
-                      <Check className="w-4 h-4 text-green-500" />
+                      <Check className="w-4 h-4 text-primary" />
                     )}
                   </DropdownMenuItem>
                 ))}
                 <DropdownMenuSeparator className="my-2" />
-              </>
+              </div>
             )}
             
             {/* Connect/Disconnect Options */}

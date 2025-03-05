@@ -14,6 +14,7 @@ const navs: NavItem[] = [
   { name: "Explorer", href: "/" },
   { name: "Blocks", href: "/blocks" },
   { name: "Transactions", href: "/transactions" },
+  { name: "Transaction History", href: "/transaction-history" },
   { name: "Tokens", href: "/tokens" },
   { name: "Contracts", href: "/contracts" },
 ];

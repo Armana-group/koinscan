@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef } from "react";
+import { useRef, useState, Suspense } from "react";
 import { Search } from "lucide-react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -8,15 +8,45 @@ import { Input } from "@/components/ui/input";
 import { Navbar } from "@/components/Navbar";
 import { AuroraText } from "@/components/magicui/aurora-text";
 import { motion } from "framer-motion";
+import dynamic from 'next/dynamic';
+import type { TransactionHistory as TransactionHistoryType } from '@/components/TransactionHistory';
+
+// Dynamically import the TransactionHistory component
+const TransactionHistory = dynamic(
+  () => import('@/components/TransactionHistory').then(mod => mod.TransactionHistory),
+  { 
+    ssr: false,
+    loading: () => (
+      <div className="w-full p-8 rounded-lg border border-border">
+        <div className="h-8 w-32 bg-muted rounded-md animate-pulse mb-4" />
+        <div className="space-y-3">
+          {[...Array(5)].map((_, i) => (
+            <div key={i} className="h-12 bg-muted rounded-md animate-pulse" />
+          ))}
+        </div>
+      </div>
+    )
+  }
+);
 
 export default function Home() {
   const inputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
+  const [searchAddress, setSearchAddress] = useState<string>("");
 
   // Handle search submit
   const handleSearch = () => {
     if (inputRef.current?.value.trim()) {
-      router.push(`/contracts/${inputRef.current.value.trim()}`);
+      const value = inputRef.current.value.trim();
+      
+      // Check if this is a Koinos address (simple validation)
+      if (value.length >= 30) {
+        // Likely an address, set it for transaction history
+        setSearchAddress(value);
+      } else if (value.length > 0) {
+        // Only navigate to contract details if it's not an address
+        router.push(`/contracts/${value}`);
+      }
     }
   };
 
@@ -51,7 +81,7 @@ export default function Home() {
         <div className="container mx-auto px-4">
           <div className="flex min-h-[calc(100vh-4rem)] flex-col items-center">
             <motion.div 
-              className="max-w-3xl w-full space-y-12 text-center pt-[15vh]"
+              className="max-w-5xl w-full space-y-12 text-center pt-10"
               variants={containerVariants}
               initial="hidden"
               animate="visible"
@@ -84,6 +114,31 @@ export default function Home() {
                   />
                   <button type="submit" className="hidden">Search</button>
                 </form>
+              </motion.div>
+
+              {/* Transaction History Section */}
+              <motion.div 
+                className="w-full" 
+                variants={itemVariants}
+                initial={{ opacity: 0, y: 30 }}
+                animate={{ 
+                  opacity: 1, 
+                  y: 0,
+                  transition: { delay: 0.3, duration: 0.5 }
+                }}
+              >
+                <Suspense fallback={
+                  <div className="w-full p-8 rounded-lg border border-border">
+                    <div className="h-8 w-32 bg-muted rounded-md animate-pulse mb-4" />
+                    <div className="space-y-3">
+                      {[...Array(5)].map((_, i) => (
+                        <div key={i} className="h-12 bg-muted rounded-md animate-pulse" />
+                      ))}
+                    </div>
+                  </div>
+                }>
+                  <TransactionHistory initialAddress={searchAddress} />
+                </Suspense>
               </motion.div>
             </motion.div>
           </div>

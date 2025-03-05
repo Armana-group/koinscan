@@ -21,6 +21,7 @@ import { useWallet } from "@/contexts/WalletContext";
 import { useEffect, useState } from "react";
 import * as kondor from "kondor-js";
 import { Check, ChevronDown } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 interface ExtendedSigner extends SignerInterface {
   name?: "kondor" | "walletConnect";
@@ -40,6 +41,7 @@ export function WalletButton() {
   const addr = (signer as ExtendedSigner)?.getAddress();
   const walletName = (signer as ExtendedSigner)?.name;
   const [kondorAccounts, setKondorAccounts] = useState<KondorAccount[]>([]);
+  const router = useRouter();
 
   // Fetch Kondor accounts function (extracted from the commented useEffect)
   const fetchKondorAccounts = async () => {
@@ -255,6 +257,65 @@ export function WalletButton() {
                 </div>
               </div>
             </div>
+            
+            {/* New "View My Transactions" button */}
+            <DropdownMenuItem 
+              onClick={() => router.push(`/address/${displayAddress}`)}
+              className="flex items-center px-4 py-3 my-1 rounded-lg cursor-pointer focus:bg-muted/80 hover:bg-muted/80"
+            >
+              <div className="flex items-center gap-3 text-sm font-medium">
+                <svg 
+                  xmlns="http://www.w3.org/2000/svg" 
+                  viewBox="0 0 24 24" 
+                  fill="none" 
+                  stroke="currentColor" 
+                  strokeWidth="2" 
+                  strokeLinecap="round" 
+                  strokeLinejoin="round" 
+                  className="w-5 h-5"
+                >
+                  <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+                </svg>
+                View My Transactions
+              </div>
+            </DropdownMenuItem>
+            
+            {/* New "Search With My Address" button */}
+            <DropdownMenuItem 
+              onClick={() => {
+                // Navigate to home page
+                router.push('/');
+                // Use setTimeout to ensure navigation completes before trying to access DOM elements
+                setTimeout(() => {
+                  // Find the search input and set its value to the user's address
+                  const searchInput = document.querySelector('input[placeholder*="Search by address"]') as HTMLInputElement;
+                  if (searchInput) {
+                    searchInput.value = displayAddress;
+                    searchInput.focus();
+                    // Dispatch an input event to trigger any listeners
+                    searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+                  }
+                }, 100);
+              }}
+              className="flex items-center px-4 py-3 my-1 rounded-lg cursor-pointer focus:bg-muted/80 hover:bg-muted/80"
+            >
+              <div className="flex items-center gap-3 text-sm font-medium">
+                <svg 
+                  xmlns="http://www.w3.org/2000/svg" 
+                  viewBox="0 0 24 24" 
+                  fill="none" 
+                  stroke="currentColor" 
+                  strokeWidth="2" 
+                  strokeLinecap="round" 
+                  strokeLinejoin="round" 
+                  className="w-5 h-5"
+                >
+                  <circle cx="11" cy="11" r="8"></circle>
+                  <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                </svg>
+                Search With My Address
+              </div>
+            </DropdownMenuItem>
             
             {/* Add Manage Accounts button when connected to Kondor */}
             {isConnected && walletName === "kondor" && kondorAccounts.length === 0 && (

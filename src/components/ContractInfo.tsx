@@ -190,7 +190,7 @@ export const ContractInfo = (props: {
                       className="h-9 w-9 rounded-xl hover:bg-muted transition-colors"
                       asChild
                     >
-                      <a href={`${BLOCK_EXPLORER}/address/${props.address}`} target="_blank" rel="noopener noreferrer">
+                      <a href={`/address/${props.address}`}>
                         <ExternalLink className="w-4 h-4 text-foreground" />
                       </a>
                     </Button>

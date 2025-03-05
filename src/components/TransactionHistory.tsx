@@ -156,9 +156,7 @@ export function TransactionHistory({ initialAddress }: TransactionHistoryProps) 
                           <div className="flex items-center">
                             {shortenAddress(tx.id)}
                             <a 
-                              href={`https://koinosblocks.com/tx/${tx.id}`} 
-                              target="_blank" 
-                              rel="noopener noreferrer"
+                              href={`/tx/${tx.id}`}
                               className="ml-2 text-primary hover:text-primary/80"
                             >
                               <ExternalLink size={14} />

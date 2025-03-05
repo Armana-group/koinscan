@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, ReactNode } from "react";
 import { getTransactionDetails } from "@/lib/api";
 import { 
   Card,
@@ -25,14 +25,36 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { Clock, Hash, ArrowRight, ExternalLink } from "lucide-react";
+import { Clock, Hash, ArrowRight, ExternalLink, User, Coins, FileText } from "lucide-react";
 import { Navbar } from '@/components/Navbar';
+import { JsonDisplay } from '@/components/JsonDisplay';
 
 interface TransactionPageProps {
   params: {
     txid: string;
   };
 }
+
+// Helper function to get human-readable date
+const formatDate = (timestamp: string | number): string => {
+  if (!timestamp) return 'Unknown';
+  const date = new Date(parseInt(String(timestamp)) * 1000);
+  return date.toLocaleString();
+};
+
+// Helper function to format address with ellipsis
+const formatAddress = (address: string): string => {
+  if (!address) return 'Unknown';
+  if (address.length <= 16) return address;
+  return `${address.substring(0, 8)}...${address.substring(address.length - 8)}`;
+};
+
+// Helper function to format amount
+const formatAmount = (amount: string | number, decimals = 8): string => {
+  if (!amount) return '0';
+  const value = parseInt(String(amount)) / Math.pow(10, decimals);
+  return value.toLocaleString(undefined, { maximumFractionDigits: decimals });
+};
 
 export default function TransactionPage({ params }: TransactionPageProps) {
   const { txid } = params;
@@ -47,37 +69,22 @@ export default function TransactionPage({ params }: TransactionPageProps) {
         setError(null);
         
         const data = await getTransactionDetails(txid);
-        if (data) {
-          setTransaction(data);
-        } else {
-          setError("Transaction not found");
-        }
-      } catch (err: any) {
-        console.error("Error fetching transaction:", err);
-        setError(err.message || "Failed to load transaction details");
+        setTransaction(data);
+      } catch (e: any) {
+        setError(e.message || 'Failed to fetch transaction details');
       } finally {
         setLoading(false);
       }
     }
 
-    if (txid) {
-      fetchTransaction();
-    }
+    fetchTransaction();
   }, [txid]);
 
-  const formatDate = (timestamp: string) => {
-    if (!timestamp) return 'Unknown';
-    try {
-      const date = new Date(parseInt(timestamp));
-      return date.toLocaleString();
-    } catch (e) {
-      return 'Invalid date';
-    }
-  };
-
-  const shortenAddress = (address: string) => {
-    if (!address) return '';
-    return `${address.substring(0, 6)}...${address.substring(address.length - 4)}`;
+  // Simplified address shortener for the UI
+  const shortenAddress = (address: string): string => {
+    if (!address) return 'Unknown';
+    if (address.length <= 12) return address;
+    return `${address.slice(0, 6)}...${address.slice(-6)}`;
   };
 
   const formatValue = (value: string) => {
@@ -94,7 +101,17 @@ export default function TransactionPage({ params }: TransactionPageProps) {
   };
 
   if (loading) {
-    return <TransactionSkeleton />;
+    return (
+      <div className="container mx-auto py-8 px-4">
+        <Navbar />
+        <h1 className="text-3xl font-bold mb-8">Transaction Details</h1>
+        <div className="space-y-6">
+          <Skeleton className="h-64 w-full" />
+          <Skeleton className="h-64 w-full" />
+          <Skeleton className="h-32 w-full" />
+        </div>
+      </div>
+    );
   }
 
   if (error) {
@@ -130,6 +147,30 @@ export default function TransactionPage({ params }: TransactionPageProps) {
   const hasReceipt = transaction.receipt;
   const events = hasReceipt ? transaction.receipt.events || [] : [];
   const operations = transaction.transaction?.operations || [];
+  
+  // Detect if this is a token transfer transaction
+  const isTransfer = operations.some((op: any) => {
+    if (!op.call_contract) return false;
+    return op.call_contract.entry_point === 'transfer';
+  });
+  
+  // Extract transfer details if this is a transfer
+  let transferInfo = null;
+  if (isTransfer) {
+    const transferOp = operations.find((op: any) => 
+      op.call_contract && op.call_contract.entry_point === 'transfer'
+    );
+    
+    if (transferOp) {
+      const args = transferOp.call_contract.args;
+      transferInfo = {
+        tokenContract: transferOp.call_contract.contract_id,
+        from: args.from,
+        to: args.to,
+        amount: args.value,
+      };
+    }
+  }
 
   return (
     <div className="container mx-auto py-8 px-4">
@@ -140,69 +181,151 @@ export default function TransactionPage({ params }: TransactionPageProps) {
       </h2>
       
       <div className="grid gap-6">
-        {/* Transaction Overview */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Overview</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-4">
-              <div className="flex flex-col sm:flex-row justify-between">
-                <div className="flex items-center gap-2">
-                  <Hash className="w-4 h-4 text-muted-foreground" />
-                  <span className="font-medium">Transaction ID:</span>
+        {/* User-friendly Summary Card - Only for transfers */}
+        {isTransfer && transferInfo && (
+          <Card className="border-2 border-primary/20">
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center gap-2">
+                <Coins className="h-5 w-5 text-primary" />
+                Token Transfer
+              </CardTitle>
+              <CardDescription>
+                Transaction completed {transaction.transaction?.timestamp ? formatDate(transaction.transaction.timestamp) : 'recently'}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
+                <div className="flex flex-col items-center justify-center p-4 bg-muted/50 rounded-lg">
+                  <div className="text-sm text-muted-foreground mb-1">From</div>
+                  <User className="h-6 w-6 text-muted-foreground mb-2" />
+                  <div className="font-medium text-center">{formatAddress(transferInfo.from)}</div>
+                </div>
+                
+                <div className="flex flex-col items-center justify-center p-4 bg-primary/10 rounded-lg">
+                  <div className="text-sm text-muted-foreground mb-1">Amount</div>
+                  <div className="text-2xl font-bold text-center">{formatAmount(transferInfo.amount)}</div>
+                  <div className="text-sm text-muted-foreground mt-1">{transferInfo.tokenContract}</div>
+                </div>
+                
+                <div className="flex flex-col items-center justify-center p-4 bg-muted/50 rounded-lg">
+                  <div className="text-sm text-muted-foreground mb-1">To</div>
+                  <User className="h-6 w-6 text-muted-foreground mb-2" />
+                  <div className="font-medium text-center">{formatAddress(transferInfo.to)}</div>
+                </div>
+              </div>
+              
+              <div className="mt-4 pt-4 border-t flex justify-between items-center">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <FileText className="h-4 w-4" />
+                  <span>See technical details below</span>
+                </div>
+                <Badge variant="outline" className="text-xs">
+                  Status: {hasReceipt ? 'Confirmed' : 'Pending'}
+                </Badge>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+        
+        {/* Transaction Overview - Now collapsible */}
+        <Accordion type="single" collapsible defaultValue="overview">
+          <AccordionItem value="overview">
+            <AccordionTrigger className="py-4">
+              <CardTitle className="text-left">Technical Overview</CardTitle>
+            </AccordionTrigger>
+            <AccordionContent>
+              <div className="grid grid-cols-[auto_1fr] gap-y-4 gap-x-8">
+                <div className="font-medium flex items-center">
+                  <Hash className="w-4 h-4 text-muted-foreground mr-2" />
+                  Transaction ID:
                 </div>
                 <div className="break-all">
                   {transaction.transaction?.id || txid}
                 </div>
-              </div>
-              
-              <div className="flex flex-col sm:flex-row justify-between">
-                <div className="flex items-center gap-2">
-                  <Clock className="w-4 h-4 text-muted-foreground" />
-                  <span className="font-medium">Timestamp:</span>
+                
+                <div className="font-medium flex items-center">
+                  <Clock className="w-4 h-4 text-muted-foreground mr-2" />
+                  Timestamp:
                 </div>
                 <div>
-                  {transaction.block_time ? formatDate(transaction.block_time) : 'Pending'}
+                  {transaction.transaction?.timestamp ? formatDate(transaction.transaction.timestamp) : 'Pending'}
                 </div>
-              </div>
-              
-              <div className="flex flex-col sm:flex-row justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="font-medium">Payer:</span>
-                </div>
+                
+                <div className="font-medium">Payer:</div>
                 <div className="break-all">
                   {transaction.transaction?.header?.payer || 'Unknown'}
                 </div>
-              </div>
-              
-              {hasReceipt && (
-                <div className="flex flex-col sm:flex-row justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium">RC Used:</span>
-                  </div>
-                  <div>
-                    {transaction.receipt.rc_used || '0'}
-                  </div>
+                
+                <div className="font-medium">RC Limit:</div>
+                <div>
+                  {transaction.transaction?.header?.rc_limit || '-'}
                 </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+                
+                <div className="font-medium">Nonce:</div>
+                <div className="font-mono text-xs break-all">
+                  {transaction.transaction?.header?.nonce || '-'}
+                </div>
+                
+                <div className="font-medium">Chain ID:</div>
+                <div className="font-mono text-xs break-all">
+                  {transaction.transaction?.header?.chain_id || '-'}
+                </div>
+                
+                <div className="font-medium">Signatures:</div>
+                <div className="font-mono text-xs break-all">
+                  {transaction.transaction?.signatures?.join(', ') || '-'}
+                </div>
+                
+                <div className="font-medium">RC Used:</div>
+                <div>
+                  {transaction.receipt?.rc_used || '-'}
+                </div>
+                
+                <div className="font-medium">Disk Storage Used:</div>
+                <div>
+                  {transaction.receipt?.disk_storage_used || '-'}
+                </div>
+                
+                <div className="font-medium">Network Bandwidth Used:</div>
+                <div>
+                  {transaction.receipt?.network_bandwidth_used || '-'}
+                </div>
+                
+                <div className="font-medium">Compute Bandwidth Used:</div>
+                <div>
+                  {transaction.receipt?.compute_bandwidth_used || '-'}
+                </div>
+                
+                <div className="font-medium">Containing Blocks:</div>
+                <div className="flex flex-col">
+                  {transaction.containing_blocks?.length > 0 
+                    ? transaction.containing_blocks.map((blockId: string) => (
+                        <a key={blockId} href={`/blocks/${blockId}`} className="text-primary hover:underline mb-1">
+                          {blockId}
+                        </a>
+                      ))
+                    : '-'
+                  }
+                </div>
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
         
         {/* Operations */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Operations ({operations.length})</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {operations.length === 0 ? (
-              <div className="text-center py-4 text-muted-foreground">No operations found</div>
-            ) : (
-              <Accordion type="single" collapsible className="w-full">
+        {operations.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Operations ({operations.length})</CardTitle>
+              <CardDescription>
+                Actions executed as part of this transaction
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Accordion type="multiple">
                 {operations.map((op: any, index: number) => {
-                  const isContractCall = op.call_contract;
-                  const isUploadContract = op.upload_contract;
+                  const isContractCall = op.call_contract !== undefined;
+                  const isUploadContract = op.upload_contract !== undefined;
                   
                   let title = 'Unknown Operation';
                   if (isContractCall) {
@@ -234,9 +357,9 @@ export default function TransactionPage({ params }: TransactionPageProps) {
                             </div>
                             <div>
                               <span className="font-medium">Arguments:</span>
-                              <pre className="bg-muted p-2 rounded mt-2 overflow-auto">
-                                {JSON.stringify(op.call_contract.args, null, 2)}
-                              </pre>
+                              <div className="mt-2">
+                                <JsonDisplay data={op.call_contract.args} />
+                              </div>
                             </div>
                           </div>
                         )}
@@ -251,36 +374,40 @@ export default function TransactionPage({ params }: TransactionPageProps) {
                         )}
                         
                         {!isContractCall && !isUploadContract && (
-                          <pre className="bg-muted p-2 rounded overflow-auto">
-                            {JSON.stringify(op, null, 2)}
-                          </pre>
+                          <div>
+                            <span className="font-medium">Operation Data:</span>
+                            <div className="mt-2">
+                              <JsonDisplay data={op} />
+                            </div>
+                          </div>
                         )}
                       </AccordionContent>
                     </AccordionItem>
                   );
                 })}
               </Accordion>
-            )}
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        )}
         
         {/* Events */}
-        {hasReceipt && events.length > 0 && (
+        {events.length > 0 && (
           <Card>
             <CardHeader>
               <CardTitle>Events ({events.length})</CardTitle>
+              <CardDescription>
+                Events emitted during transaction execution
+              </CardDescription>
             </CardHeader>
             <CardContent>
-              <Accordion type="single" collapsible className="w-full">
+              <Accordion type="multiple">
                 {events.map((event: any, index: number) => {
-                  const isTransferEvent = event.name === 'token.transfer_event';
-                  
                   return (
                     <AccordionItem key={index} value={`event-${index}`}>
                       <AccordionTrigger className="hover:no-underline">
                         <div className="flex items-center gap-2">
-                          <Badge variant={isTransferEvent ? "default" : "secondary"}>
-                            {isTransferEvent ? "Transfer" : event.name?.split('.')?.pop() || 'Event'}
+                          <Badge variant="outline">
+                            {event.source}
                           </Badge>
                           <span>{event.name || 'Unknown Event'}</span>
                         </div>
@@ -291,44 +418,16 @@ export default function TransactionPage({ params }: TransactionPageProps) {
                             <span className="font-medium">Source:</span>
                             <span className="break-all">{event.source}</span>
                           </div>
-                          
-                          {isTransferEvent && event.data && (
-                            <div className="mt-4 p-3 border rounded-md bg-muted">
-                              <div className="flex items-center justify-between">
-                                <div className="text-sm">{shortenAddress(event.data.from)}</div>
-                                <ArrowRight className="w-4 h-4 mx-2" />
-                                <div className="text-sm">{shortenAddress(event.data.to)}</div>
-                              </div>
-                              <div className="text-center mt-2 font-bold">
-                                {formatValue(event.data.value)} KOIN
-                              </div>
+                          <div className="flex justify-between items-center">
+                            <span className="font-medium">Name:</span>
+                            <span>{event.name}</span>
+                          </div>
+                          <div>
+                            <span className="font-medium">Data:</span>
+                            <div className="mt-2">
+                              <JsonDisplay data={event.data || {}} />
                             </div>
-                          )}
-                          
-                          {(!isTransferEvent || !event.data) && (
-                            <div>
-                              <span className="font-medium">Data:</span>
-                              <pre className="bg-muted p-2 rounded mt-2 overflow-auto">
-                                {JSON.stringify(event.data || {}, null, 2)}
-                              </pre>
-                            </div>
-                          )}
-                          
-                          {event.impacted && event.impacted.length > 0 && (
-                            <div>
-                              <span className="font-medium">Impacted Addresses:</span>
-                              <div className="mt-2 space-y-1">
-                                {event.impacted.map((address: string, i: number) => (
-                                  <div key={i} className="flex items-center justify-between">
-                                    <span className="break-all">{address}</span>
-                                    <a href={`/address/${address}`} className="text-primary flex items-center">
-                                      <ExternalLink className="w-3 h-3 ml-1" />
-                                    </a>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
+                          </div>
                         </div>
                       </AccordionContent>
                     </AccordionItem>
@@ -338,6 +437,54 @@ export default function TransactionPage({ params }: TransactionPageProps) {
             </CardContent>
           </Card>
         )}
+        
+        {/* Network & Compute Info */}
+        <Accordion type="single" collapsible>
+          <AccordionItem value="resource-usage">
+            <AccordionTrigger className="py-4">
+              <CardTitle className="text-left">Resource Usage</CardTitle>
+            </AccordionTrigger>
+            <AccordionContent>
+              <div className="grid gap-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <h3 className="font-medium">Network Bandwidth Used:</h3>
+                    <div className="font-mono">{hasReceipt ? transaction.receipt.network_bandwidth_used : '-'}</div>
+                  </div>
+                  <div className="space-y-2">
+                    <h3 className="font-medium">Compute Bandwidth Used:</h3>
+                    <div className="font-mono">{hasReceipt ? transaction.receipt.compute_bandwidth_used : '-'}</div>
+                  </div>
+                </div>
+                {hasReceipt && transaction.receipt.containing_blocks && (
+                  <div className="space-y-2">
+                    <h3 className="font-medium">Containing Blocks:</h3>
+                    <div className="font-mono break-all">
+                      {Array.isArray(transaction.receipt.containing_blocks) 
+                        ? transaction.receipt.containing_blocks.join('\n') 
+                        : String(transaction.receipt.containing_blocks)}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
+        
+        {/* Raw Transaction Data */}
+        <Accordion type="single" collapsible>
+          <AccordionItem value="raw-data">
+            <AccordionTrigger className="py-4">
+              <CardTitle className="text-left">Debug: Raw Transaction Data</CardTitle>
+            </AccordionTrigger>
+            <AccordionContent>
+              <CardDescription className="mb-4">
+                Complete data returned from the API for debugging purposes
+              </CardDescription>
+              <JsonDisplay data={transaction} />
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
       </div>
     </div>
   );

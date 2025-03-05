@@ -41,9 +41,9 @@ export default function AddressPage({ params }: AddressPageProps) {
   return (
     <>
       <Navbar />
-      <div className="container mx-auto py-8 px-4">
-        <h1 className="text-3xl font-bold mb-2">Address Details</h1>
-        <h2 className="text-xl font-medium text-muted-foreground mb-8 break-all">
+      <div className="container mx-auto py-4 px-4">
+        <h1 className="text-2xl sm:text-3xl font-bold mb-2">Address Details</h1>
+        <h2 className="text-sm sm:text-base md:text-xl font-medium text-muted-foreground mb-4 sm:mb-8 break-all">
           {address}
         </h2>
         

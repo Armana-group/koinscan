@@ -18,6 +18,10 @@ const walletConnectKoinos = new WebWalletConnectKoinos(
 let isKondorConnecting = false;
 let kondorConnectionPromise: Promise<void> | null = null;
 
+// Add new storage key for accounts
+export const KONDOR_ACCOUNTS_KEY = "koinos-explorer-kondor-accounts";
+export const WALLET_CONNECT_SESSION_KEY = "koinos-explorer-wc-session";
+
 async function ensureKondorConnection() {
   // If already connecting, wait for the existing connection attempt
   if (isKondorConnecting && kondorConnectionPromise) {
@@ -50,29 +54,69 @@ async function ensureKondorConnection() {
   return kondorConnectionPromise;
 }
 
-export async function connectWallet(walletName: WalletName) {
+// Add a function to request Kondor accounts
+async function requestKondorAccounts() {
+  // First check if Kondor is already connected
+  let accounts = await kondor.getAccounts();
+  
+  // If no accounts, request connection once
+  if (!accounts || accounts.length === 0) {
+    await ensureKondorConnection();
+    accounts = await kondor.getAccounts();
+  }
+  
+  return accounts;
+}
+
+// Store Kondor accounts in localStorage
+export async function storeKondorAccounts() {
+  try {
+    const accounts = await kondor.getAccounts();
+    if (accounts && accounts.length > 0) {
+      localStorage.setItem(KONDOR_ACCOUNTS_KEY, JSON.stringify(accounts));
+      return accounts;
+    }
+  } catch (error) {
+    console.error("Failed to store Kondor accounts:", error);
+  }
+  return null;
+}
+
+// Get stored Kondor accounts
+export function getStoredKondorAccounts() {
+  try {
+    const accountsJson = localStorage.getItem(KONDOR_ACCOUNTS_KEY);
+    if (accountsJson) {
+      const accounts = JSON.parse(accountsJson);
+      return accounts;
+    }
+  } catch (error) {
+    console.error("Failed to parse stored Kondor accounts:", error);
+  }
+  return null;
+}
+
+// Update connectWallet function to store accounts
+export async function connectWallet(walletName: WalletName): Promise<string> {
   switch (walletName) {
     case "kondor": {
+      isKondorConnecting = true;
       try {
-        // First check if Kondor is already connected
-        let accounts = await kondor.getAccounts();
-        
-        // If no accounts, request connection once
+        const accounts = await requestKondorAccounts();
         if (!accounts || accounts.length === 0) {
-          await ensureKondorConnection();
-          accounts = await kondor.getAccounts();
+          throw new Error("Please connect at least one account in Kondor");
         }
         
-        // Verify we have accounts after connection
-        if (!accounts || accounts.length === 0) {
-          throw new Error("No accounts selected in Kondor");
-        }
-
-        return accounts[0].address;
-      } catch (error) {
+        // Store accounts in localStorage
+        localStorage.setItem(KONDOR_ACCOUNTS_KEY, JSON.stringify(accounts));
+        
         isKondorConnecting = false;
         kondorConnectionPromise = null;
-        throw new Error("Failed to connect to Kondor");
+        return accounts[0].address;
+      } catch (e) {
+        isKondorConnecting = false;
+        kondorConnectionPromise = null;
+        throw e;
       }
     }
     case "walletConnect": {
@@ -88,6 +132,13 @@ export async function connectWallet(walletName: WalletName) {
           Methods.WaitForTransaction,
         ],
       );
+      
+      // Store wallet connect info
+      localStorage.setItem(WALLET_CONNECT_SESSION_KEY, JSON.stringify({
+        connected: true,
+        address: address
+      }));
+      
       return address;
     }
     default: {
@@ -96,15 +147,18 @@ export async function connectWallet(walletName: WalletName) {
   }
 }
 
-export async function disconnectWallet(walletName: WalletName) {
+// Update disconnect function to clear stored accounts
+export async function disconnectWallet(walletName: WalletName): Promise<void> {
   switch (walletName) {
     case "kondor": {
       isKondorConnecting = false;
       kondorConnectionPromise = null;
+      localStorage.removeItem(KONDOR_ACCOUNTS_KEY);
       return;
     }
     case "walletConnect": {
       await walletConnectKoinos.disconnect();
+      localStorage.removeItem(WALLET_CONNECT_SESSION_KEY);
       return;
     }
     default: {

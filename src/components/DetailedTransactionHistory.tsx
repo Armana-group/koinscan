@@ -417,21 +417,21 @@ export function DetailedTransactionHistory({
 
   return (
     <Card className="w-full shadow-lg">
-      <CardHeader>
-        <div className="flex justify-between items-center">
-          <CardTitle>Transaction History</CardTitle>
+      <CardHeader className="pb-2 sm:pb-6">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+          <CardTitle className="text-base sm:text-xl">Transaction History</CardTitle>
           {loadingBalance ? (
             <Skeleton className="h-6 w-32" />
           ) : (
             <div className="text-right">
-              <div className="text-sm text-muted-foreground">Balance</div>
-              <div className="text-xl font-bold">{tokenBalance} {tokenSymbol}</div>
+              <div className="text-xs sm:text-sm text-muted-foreground">Balance</div>
+              <div className="text-lg sm:text-xl font-bold">{tokenBalance} {tokenSymbol}</div>
             </div>
           )}
         </div>
         <CardDescription>
           {transactions.length > 0 && (
-            <span>
+            <span className="text-xs sm:text-sm">
               {totalTransactionCount 
                 ? `Found ${transactions.length} of ${totalTransactionCount} transactions for address ${formatHex(address)}`
                 : `Found ${transactions.length} transactions for address ${formatHex(address)}`
@@ -525,38 +525,29 @@ export function DetailedTransactionHistory({
                 <Accordion type="single" collapsible className="w-full">
                   {formattedTransactions.slice(0, limit).map((tx, index) => (
                     <AccordionItem key={tx.id} value={tx.id}>
-                      <AccordionTrigger className="hover:bg-muted/50 px-4 py-2 rounded-md">
-                        <div className="flex w-full justify-between items-center">
-                          <div className="font-mono text-sm flex items-center">
-                            <Hash className="h-3 w-3 mr-1 text-muted-foreground" />
+                      <AccordionTrigger className="hover:bg-muted/50 px-2 sm:px-4 py-2 rounded-md">
+                        <div className="flex w-full flex-col sm:flex-row justify-between items-start sm:items-center gap-1 sm:gap-0">
+                          <div className="font-mono text-xs sm:text-sm flex items-center truncate max-w-[120px] sm:max-w-none">
+                            <Hash className="h-3 w-3 mr-1 text-muted-foreground hidden sm:inline" />
                             {formatHex(tx.id)}
                           </div>
-                          <div className="flex items-center space-x-4">
+                          <div className="flex flex-wrap items-center gap-2 text-xs">
                             {tx.totalValueTransferred !== '0' && (
-                              <Badge variant="secondary" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100">
+                              <Badge variant="secondary" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100 text-xs">
                                 {formatValue(tx.totalValueTransferred)} {tx.tokenSymbol}
                               </Badge>
                             )}
                             {tx.timestamp && (
-                              <div className="flex items-center text-sm text-muted-foreground">
+                              <div className="flex items-center text-xs text-muted-foreground">
                                 <Clock className="h-3 w-3 mr-1" />
                                 {formatDate(tx.timestamp)}
                               </div>
                             )}
-                            {tx.blockHeight && (
-                              <div className="flex items-center text-sm text-muted-foreground">
-                                <Layers className="h-3 w-3 mr-1" />
-                                Block #{tx.blockHeight}
-                              </div>
-                            )}
                             {tx.events.some((e: TransactionEvent) => e.name.includes('transfer_event')) && (
-                              <Badge variant="outline" className="bg-primary/10">
+                              <Badge variant="outline" className="bg-primary/10 text-xs">
                                 Transfer
                               </Badge>
                             )}
-                            <span className="text-sm text-muted-foreground">
-                              {tx.events.length} events
-                            </span>
                           </div>
                         </div>
                       </AccordionTrigger>
@@ -564,7 +555,7 @@ export function DetailedTransactionHistory({
                         <div className="p-4 space-y-4">
                           <div>
                             <h4 className="text-sm font-medium mb-2">Transaction Details</h4>
-                            <div className="grid grid-cols-2 gap-2 text-sm">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs sm:text-sm">
                               <div className="font-medium">ID:</div>
                               <div className="font-mono break-all">
                                 <a 
@@ -621,86 +612,90 @@ export function DetailedTransactionHistory({
                           {tx.operations.length > 0 && (
                             <div>
                               <h4 className="text-sm font-medium mb-2">Operations</h4>
-                              <Table>
-                                <TableHeader>
-                                  <TableRow>
-                                    <TableHead>Type</TableHead>
-                                    <TableHead>Contract</TableHead>
-                                    <TableHead>Method</TableHead>
-                                    <TableHead>Arguments</TableHead>
-                                  </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                  {tx.operations.map((op: FormattedOperation, opIndex: number) => (
-                                    <TableRow key={opIndex}>
-                                      <TableCell>
-                                        {op.type}
-                                      </TableCell>
-                                      <TableCell className="font-mono">
-                                        {op.contract ? (
-                                          <a 
-                                            href={`https://koinosblocks.com/address/${op.contract}`} 
-                                            target="_blank" 
-                                            rel="noopener noreferrer"
-                                            className="text-primary hover:underline flex items-center"
-                                          >
-                                            {shortenAddress(op.contract)}
-                                            <ExternalLink size={12} className="ml-1" />
-                                          </a>
-                                        ) : '-'}
-                                      </TableCell>
-                                      <TableCell>
-                                        {op.method || '-'}
-                                      </TableCell>
-                                      <TableCell className="max-w-xs truncate">
-                                        {op.args ? (
-                                          <pre className="text-xs overflow-auto max-h-20">
-                                            {JSON.stringify(op.args, null, 2)}
-                                          </pre>
-                                        ) : '-'}
-                                      </TableCell>
+                              <div className="overflow-x-auto">
+                                <Table>
+                                  <TableHeader>
+                                    <TableRow>
+                                      <TableHead className="text-xs">Type</TableHead>
+                                      <TableHead className="text-xs">Contract</TableHead>
+                                      <TableHead className="text-xs">Method</TableHead>
+                                      <TableHead className="text-xs">Arguments</TableHead>
                                     </TableRow>
-                                  ))}
-                                </TableBody>
-                              </Table>
+                                  </TableHeader>
+                                  <TableBody>
+                                    {tx.operations.map((op: FormattedOperation, opIndex: number) => (
+                                      <TableRow key={opIndex}>
+                                        <TableCell>
+                                          {op.type}
+                                        </TableCell>
+                                        <TableCell className="font-mono">
+                                          {op.contract ? (
+                                            <a 
+                                              href={`https://koinosblocks.com/address/${op.contract}`} 
+                                              target="_blank" 
+                                              rel="noopener noreferrer"
+                                              className="text-primary hover:underline flex items-center"
+                                            >
+                                              {shortenAddress(op.contract)}
+                                              <ExternalLink size={12} className="ml-1" />
+                                            </a>
+                                          ) : '-'}
+                                        </TableCell>
+                                        <TableCell>
+                                          {op.method || '-'}
+                                        </TableCell>
+                                        <TableCell className="max-w-xs truncate">
+                                          {op.args ? (
+                                            <pre className="text-xs overflow-auto max-h-20">
+                                              {JSON.stringify(op.args, null, 2)}
+                                            </pre>
+                                          ) : '-'}
+                                        </TableCell>
+                                      </TableRow>
+                                    ))}
+                                  </TableBody>
+                                </Table>
+                              </div>
                             </div>
                           )}
 
                           {tx.events.length > 0 && (
                             <div>
                               <h4 className="text-sm font-medium mb-2">Events</h4>
-                              <Table>
-                                <TableHeader>
-                                  <TableRow>
-                                    <TableHead>Name</TableHead>
-                                    <TableHead>Source</TableHead>
-                                    <TableHead>Data</TableHead>
-                                  </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                  {tx.events.map((event: TransactionEvent, eventIndex: number) => (
-                                    <TableRow key={eventIndex}>
-                                      <TableCell>{event.name}</TableCell>
-                                      <TableCell className="font-mono">
-                                        <a 
-                                          href={`https://koinosblocks.com/address/${event.source}`} 
-                                          target="_blank" 
-                                          rel="noopener noreferrer"
-                                          className="text-primary hover:underline flex items-center"
-                                        >
-                                          {shortenAddress(event.source)}
-                                          <ExternalLink size={12} className="ml-1" />
-                                        </a>
-                                      </TableCell>
-                                      <TableCell className="max-w-xs truncate">
-                                        <pre className="text-xs overflow-auto max-h-20">
-                                          {JSON.stringify(event.data, null, 2)}
-                                        </pre>
-                                      </TableCell>
+                              <div className="overflow-x-auto">
+                                <Table>
+                                  <TableHeader>
+                                    <TableRow>
+                                      <TableHead className="text-xs">Name</TableHead>
+                                      <TableHead className="text-xs">Source</TableHead>
+                                      <TableHead className="text-xs">Data</TableHead>
                                     </TableRow>
-                                  ))}
-                                </TableBody>
-                              </Table>
+                                  </TableHeader>
+                                  <TableBody>
+                                    {tx.events.map((event: TransactionEvent, eventIndex: number) => (
+                                      <TableRow key={eventIndex}>
+                                        <TableCell>{event.name}</TableCell>
+                                        <TableCell className="font-mono">
+                                          <a 
+                                            href={`https://koinosblocks.com/address/${event.source}`} 
+                                            target="_blank" 
+                                            rel="noopener noreferrer"
+                                            className="text-primary hover:underline flex items-center"
+                                          >
+                                            {shortenAddress(event.source)}
+                                            <ExternalLink size={12} className="ml-1" />
+                                          </a>
+                                        </TableCell>
+                                        <TableCell className="max-w-xs truncate">
+                                          <pre className="text-xs overflow-auto max-h-20">
+                                            {JSON.stringify(event.data, null, 2)}
+                                          </pre>
+                                        </TableCell>
+                                      </TableRow>
+                                    ))}
+                                  </TableBody>
+                                </Table>
+                              </div>
                             </div>
                           )}
                         </div>
@@ -715,10 +710,10 @@ export function DetailedTransactionHistory({
       </CardContent>
 
       {transactions.length > 0 && (
-        <CardFooter className="flex justify-between">
-          <div className="flex items-center space-x-2">
-            <span className="text-sm text-muted-foreground">
-              Page {page} · {limit} per page · {totalTransactionCount ? totalTransactionCount : formattedTransactions.length} total transactions
+        <CardFooter className="flex flex-col sm:flex-row justify-between gap-3">
+          <div className="flex items-center space-x-2 hidden sm:flex">
+            <span className="text-xs sm:text-sm text-muted-foreground">
+              Page {page} · {limit} per page · {totalTransactionCount ? totalTransactionCount : formattedTransactions.length} total
             </span>
           </div>
           <div className="flex items-center space-x-2">
@@ -730,17 +725,48 @@ export function DetailedTransactionHistory({
               }}
               disabled={page === 1 || loading}
             >
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Previous
+              <ArrowLeft className="h-3 w-3 mr-1 sm:mr-2" />
+              Prev
             </Button>
+            <span className="text-xs text-muted-foreground sm:hidden">
+              Page {page}
+            </span>
             <Button
               variant="outline"
               size="sm"
+              className="text-xs"
               onClick={() => setPage(page + 1)}
               disabled={!hasMore || loading}
             >
               Next
-              <ArrowRight className="h-4 w-4 ml-2" />
+              <ArrowRight className="h-3 w-3 ml-1 sm:ml-2" />
+            </Button>
+          </div>
+          <div className="flex items-center space-x-2 w-full sm:w-auto justify-between sm:justify-end">
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-xs"
+              onClick={() => {
+                if (page > 1) setPage(page - 1);
+              }}
+              disabled={page === 1 || loading}
+            >
+              <ArrowLeft className="h-3 w-3 mr-1 sm:mr-2" />
+              Prev
+            </Button>
+            <span className="text-xs text-muted-foreground sm:hidden">
+              Page {page}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-xs"
+              onClick={() => setPage(page + 1)}
+              disabled={!hasMore || loading}
+            >
+              Next
+              <ArrowRight className="h-3 w-3 ml-1 sm:ml-2" />
             </Button>
           </div>
         </CardFooter>

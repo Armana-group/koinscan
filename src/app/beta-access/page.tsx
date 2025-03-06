@@ -10,6 +10,7 @@ import { ALLOWED_WALLETS } from "@/config/beta-access";
 import { Logo } from "@/components/Logo";
 import { hasWalletAccess, saveBetaAccess } from "@/lib/beta-access";
 import { WalletButton } from "@/components/WalletButton";
+import { AuroraText } from "@/components/magicui/aurora-text";
 
 export default function BetaAccess() {
   const router = useRouter();
@@ -83,6 +84,15 @@ export default function BetaAccess() {
         
         <main className="flex-1 flex items-center justify-center px-4 py-12 -mt-24">
           <div className="w-full max-w-2xl">
+            <div className="text-center mb-8">
+              <h1 className="text-5xl font-bold tracking-tight text-foreground">
+                <AuroraText>Explore the Koinos blockchain</AuroraText>
+              </h1>
+              <p className="text-xl text-muted-foreground mt-2">
+                Search for transactions, blocks, accounts, and smart contracts
+              </p>
+            </div>
+
             <Card className="border-2">
               <CardHeader className="text-center">
                 <CardTitle className="text-3xl">Early Access Beta</CardTitle>

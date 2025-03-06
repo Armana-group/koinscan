@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { toast } from 'react-hot-toast';
 import { getAddressHistory, formatTransactions } from '@/lib/api';
 import { 
@@ -46,15 +46,7 @@ export function TransactionHistory({ initialAddress }: TransactionHistoryProps) 
   const [limit, setLimit] = useState<number>(10);
   const [page, setPage] = useState<number>(1);
 
-  // Fetch transactions when initialAddress changes
-  useEffect(() => {
-    if (initialAddress) {
-      console.log('Initial address updated:', initialAddress);
-      fetchTransactions(initialAddress);
-    }
-  }, [initialAddress, limit, page]);
-
-  const fetchTransactions = async (address: string) => {
+  const fetchTransactions = useCallback(async (address: string) => {
     setLoading(true);
     setError(null);
     try {
@@ -77,7 +69,15 @@ export function TransactionHistory({ initialAddress }: TransactionHistoryProps) 
     } finally {
       setLoading(false);
     }
-  };
+  }, [limit]);
+
+  // Fetch transactions when initialAddress changes
+  useEffect(() => {
+    if (initialAddress) {
+      console.log('Initial address updated:', initialAddress);
+      fetchTransactions(initialAddress);
+    }
+  }, [initialAddress, fetchTransactions]);
 
   const formatDate = (timestamp: string) => {
     if (timestamp === 'Unknown') return 'Unknown';

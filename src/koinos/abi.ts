@@ -1,4 +1,4 @@
-export default {
+const tokenAbi = {
   methods: {
     name: {
       entry_point: 0x82a3537f,
@@ -283,3 +283,5 @@ export default {
     },
   },
 };
+
+export default tokenAbi;

@@ -438,7 +438,7 @@ export const KoinosForm = (props: KoinosFormProps) => {
     if (!serializer && props.onChange) {
       props.onChange({});
     }
-  }, [serializer, props.onChange]);
+  }, [serializer, props.onChange, props]);
 
   const fields = useMemo(() => {
     if (!serializer) {

@@ -5,6 +5,7 @@ import * as toast from "@/lib/toast";
 import { useEffect, useState } from "react";
 import { Contract, Provider, utils } from "koilib";
 import { BLOCK_EXPLORER, RPC_NODE } from "@/koinos/constants";
+import Image from "next/image";
 
 export const ContractInfo = (props: {
   nickname: string;
@@ -159,10 +160,12 @@ export const ContractInfo = (props: {
           <div className="flex-shrink-0">
             <div className="relative w-12 h-12 md:w-12 md:h-12 rounded-full overflow-hidden bg-gradient-to-br from-blue-500/5 to-purple-500/5">
               <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 to-purple-500/10 backdrop-blur-xl" />
-              <img 
+              <Image 
                 src={props.image} 
                 alt={props.nickname || "Contract"} 
-                className="w-full h-full object-cover relative z-10"
+                className="relative z-10 object-cover"
+                fill
+                sizes="(max-width: 768px) 12px, 12px"
               />
             </div>
           </div>

@@ -23,6 +23,7 @@ import { useEffect, useState } from "react";
 import * as kondor from "kondor-js";
 import { Check, ChevronDown } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { saveBetaAccess, clearBetaAccess } from "@/lib/beta-access";
 
 interface ExtendedSigner extends SignerInterface {
   name?: "kondor" | "walletConnect";
@@ -70,6 +71,8 @@ export function WalletButton() {
           await disconnectWallet(walletName);
         }
         setSigner(undefined);
+        // Clear beta access when disconnecting
+        clearBetaAccess();
         return;
       }
 
@@ -79,6 +82,7 @@ export function WalletButton() {
         }
         setSigner(undefined);
         forgetAddress();
+        // clearBetaAccess is already called in forgetAddress()
         toast.success("Address forgotten");
         return;
       }
@@ -88,6 +92,9 @@ export function WalletButton() {
       const signer = getWalletSigner(wName, address);
       (signer as ExtendedSigner).name = wName;
       setSigner(signer as ExtendedSigner);
+      
+      // Update beta access with the new wallet
+      saveBetaAccess(address);
     } catch (error) {
       toast.error((error as Error).message);
       console.error(error);

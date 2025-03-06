@@ -15,7 +15,7 @@ export const ProjectDescription = () => {
         <ul>
           <li>
             <span>Dynamic Interface Generation:</span> Automatically creates a
-            user-friendly interface from a smart contract's ABI.
+            user-friendly interface from a smart contract&apos;s ABI.
           </li>
           <li>
             <span>Function Execution:</span> Supports both read (querying data

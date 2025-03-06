@@ -12,6 +12,7 @@ import {
   KONDOR_ACCOUNTS_KEY,
   WALLET_CONNECT_SESSION_KEY
 } from "@/koinos/wallets";
+import { saveBetaAccess, clearBetaAccess } from "@/lib/beta-access";
 
 // Local storage keys
 const ADDRESS_STORAGE_KEY = "koinos-explorer-address";
@@ -63,6 +64,9 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         setSigner(newSigner as ExtendedSigner);
         setSavedAddress(account.address);
         setSavedWalletType("kondor");
+        
+        // Also update beta access with this wallet
+        saveBetaAccess(account.address);
         return;
       }
       
@@ -78,6 +82,9 @@ export function WalletProvider({ children }: { children: ReactNode }) {
             setSigner(newSigner as ExtendedSigner);
             setSavedAddress(wcSession.address);
             setSavedWalletType("walletConnect");
+            
+            // Also update beta access with this wallet
+            saveBetaAccess(wcSession.address);
             return;
           }
         } catch (error) {
@@ -91,6 +98,9 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       
       if (storedAddress) {
         setSavedAddress(storedAddress);
+        
+        // If we have a stored address, try to update beta access
+        saveBetaAccess(storedAddress);
       }
       
       if (storedWalletType) {
@@ -110,6 +120,9 @@ export function WalletProvider({ children }: { children: ReactNode }) {
           setSigner(undefined);
           localStorage.removeItem(KONDOR_ACCOUNTS_KEY);
           setKondorAccounts([]);
+          
+          // Clear beta access when disconnecting
+          clearBetaAccess();
           return;
         }
         
@@ -121,6 +134,9 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         const newSigner = getWalletSigner("kondor", accounts[0].address);
         (newSigner as ExtendedSigner).name = "kondor";
         setSigner(newSigner as ExtendedSigner);
+        
+        // Update beta access with the new wallet
+        saveBetaAccess(accounts[0].address);
       } catch (error) {
         console.error("Error handling account change", error);
       }
@@ -147,6 +163,9 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       setSavedAddress(null);
       setSavedWalletType(null);
       setKondorAccounts([]);
+      
+      // Also clear beta access
+      clearBetaAccess();
     }
   };
 
@@ -165,6 +184,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   );
 }
 
+// This is the hook that components will use to access the wallet context
 export function useWallet() {
   const context = useContext(WalletContext);
   if (context === undefined) {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { Search } from "lucide-react";
+import { Search, ArrowUp } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence, stagger } from "framer-motion";
@@ -150,30 +150,26 @@ export default function ContractsPage() {
             
             {/* Search and filter */}
             <div className="flex flex-col md:flex-row gap-4">
-              <form onSubmit={handleSearchSubmit} className="flex-grow flex">
-                <div className="relative flex-grow">
-                  <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
-                    <Search className="h-5 w-5 text-muted-foreground" />
-                  </div>
-                  <Input
-                    type="text"
-                    placeholder="Search by name, description, or contract address"
-                    className="pl-12 bg-background pr-24"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    ref={searchInputRef}
-                  />
-                  <div className="absolute inset-y-0 right-0 flex items-center">
-                    <Button 
-                      type="submit" 
-                      variant="ghost" 
-                      className="h-full px-4 rounded-l-none"
-                      disabled={!searchQuery.trim()}
-                    >
-                      Search
-                    </Button>
-                  </div>
+              <form onSubmit={handleSearchSubmit} className="flex-grow relative">
+                <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
+                  <Search className="h-5 w-5 text-muted-foreground" />
                 </div>
+                <Input
+                  type="text"
+                  placeholder="Search by name, description, or contract address"
+                  className="pl-12 pr-14 h-14 text-lg bg-background border-2 border-border/50 rounded-2xl shadow-[0_0_0_1px_rgba(0,0,0,0.02)] hover:border-border focus:border-foreground/30 focus:ring-2 focus:ring-foreground/10 transition-all"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  ref={searchInputRef}
+                />
+                <button 
+                  type="submit" 
+                  className="absolute right-4 top-1/2 transform -translate-y-1/2 bg-muted h-9 w-9 rounded-full flex items-center justify-center hover:bg-accent transition-colors"
+                  aria-label="Search"
+                  disabled={!searchQuery.trim()}
+                >
+                  <ArrowUp className="h-5 w-5 text-muted-foreground" />
+                </button>
               </form>
               
               {/* Category filter */}
@@ -198,13 +194,6 @@ export default function ContractsPage() {
               </div>
             </div>
             
-            {/* Search instructions */}
-            <div className="text-sm text-muted-foreground bg-muted/50 p-4 rounded-lg">
-              <p>
-                <strong>Tip:</strong> Enter a contract address and click Search (or press Enter) to explore any 
-                contract on the blockchain, even if it&apos;s not in the list below.
-              </p>
-            </div>
             
             {/* Contract cards with animation */}
             <motion.div 
@@ -231,7 +220,7 @@ export default function ContractsPage() {
                       <Card className="h-full flex flex-col">
                         <CardHeader>
                           <div className="flex justify-between items-start">
-                            <CardTitle>{contract.name}</CardTitle>
+                            <CardTitle className="text-2xl">{contract.name}</CardTitle>
                             <div className="flex flex-wrap gap-1 justify-end">
                               {contract.categories.map((category) => (
                                 <motion.div 
@@ -253,7 +242,7 @@ export default function ContractsPage() {
                           </div>
                         </CardContent>
                         <CardFooter>
-                          <Button variant="outline" className="w-full">View Contract</Button>
+                          <Button variant="outline" className="">View Contract</Button>
                         </CardFooter>
                       </Card>
                     </Link>

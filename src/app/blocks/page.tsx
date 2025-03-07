@@ -27,8 +27,9 @@ import {
 } from "@/components/ui/accordion";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { formatDistanceToNow } from "date-fns";
-import { Clock, Hash, Layers, Cpu, ArrowDown, ChevronLeft, ChevronRight, ExternalLink } from "lucide-react";
+import { Clock, Hash, Layers, Cpu, ArrowDown, ChevronLeft, ChevronRight, ExternalLink, Search, ArrowUp } from "lucide-react";
 import Link from "next/link";
 
 export default function BlocksPage() {
@@ -37,6 +38,9 @@ export default function BlocksPage() {
   const [blockDetail, setBlockDetail] = useState<any>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [searchValue, setSearchValue] = useState<string>("");
+  const [isSearching, setIsSearching] = useState<boolean>(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
 
   useEffect(() => {
     async function fetchHeadBlock() {
@@ -78,6 +82,38 @@ export default function BlocksPage() {
     return `${address.slice(0, 6)}...${address.slice(-4)}`;
   }
 
+  function handleSearch(e: React.FormEvent) {
+    e.preventDefault();
+    
+    if (!searchValue.trim()) return;
+    
+    const value = searchValue.trim();
+    setIsSearching(true);
+    setSearchError(null);
+    
+    try {
+      // Check if the input is a valid block height (number)
+      if (/^\d+$/.test(value)) {
+        router.push(`/blocks/${value}`);
+        return;
+      }
+      
+      // Check if the input could be a block hash/ID (likely a hex string)
+      if (/^[0-9a-fA-F]{64}$/.test(value)) {
+        router.push(`/blocks/${value}`);
+        return;
+      }
+      
+      // If not recognized format, show error
+      setSearchError("Please enter a valid block height (number) or block hash");
+      setTimeout(() => setSearchError(null), 3000);
+    } catch (err) {
+      setSearchError("Error processing search. Please try again.");
+    } finally {
+      setIsSearching(false);
+    }
+  }
+
   return (
     <>
       <Navbar />
@@ -89,6 +125,45 @@ export default function BlocksPage() {
               <span>Blocks</span>
             </div>
           </h1>
+
+          <Card className="overflow-hidden">
+            <CardContent className="p-6">
+              <form onSubmit={handleSearch} className="relative">
+                <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
+                  <Search className="h-5 w-5 text-muted-foreground" />
+                </div>
+                <Input
+                  type="text"
+                  value={searchValue}
+                  onChange={(e) => setSearchValue(e.target.value)}
+                  placeholder="Search by block height or block hash"
+                  className="pl-12 pr-14 h-14 text-lg bg-background border-2 border-border/50 rounded-2xl shadow-[0_0_0_1px_rgba(0,0,0,0.02)] hover:border-border focus:border-foreground/30 focus:ring-2 focus:ring-foreground/10 transition-all"
+                  disabled={isSearching}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      handleSearch(e);
+                    }
+                  }}
+                />
+                {isSearching ? (
+                  <div className="absolute right-4 top-1/2 transform -translate-y-1/2">
+                    <div className="h-5 w-5 border-t-2 border-r-2 border-primary rounded-full animate-spin"></div>
+                  </div>
+                ) : (
+                  <button 
+                    type="submit" 
+                    className="absolute right-4 top-1/2 transform -translate-y-1/2 bg-muted h-9 w-9 rounded-full flex items-center justify-center hover:bg-accent transition-colors"
+                    aria-label="Search"
+                    disabled={!searchValue.trim()}
+                  >
+                    <ArrowUp className="h-5 w-5 text-muted-foreground" />
+                  </button>
+                )}
+              </form>
+              {searchError && <p className="mt-2 text-sm text-red-500">{searchError}</p>}
+            </CardContent>
+          </Card>
 
           {loading ? (
             <div className="space-y-4">

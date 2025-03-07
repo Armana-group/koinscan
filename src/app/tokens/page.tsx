@@ -5,7 +5,7 @@ import { Navbar } from "@/components/Navbar";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Search, ArrowUpDown, ChevronDown, Filter } from "lucide-react";
+import { Search, ArrowUpDown, ChevronDown, Filter, ArrowUp } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { motion } from "framer-motion";
@@ -233,16 +233,25 @@ export default function TokensPage() {
           <div className="flex flex-col md:flex-row gap-4">
             {/* Search Box */}
             <div className="relative flex-grow">
-              <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
+              <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
                 <Search className="h-5 w-5 text-muted-foreground" />
               </div>
               <Input
                 type="text"
                 placeholder="Search by token name, symbol, or address"
-                className="pl-10"
+                className="pl-12 pr-14 h-14 text-lg bg-background border-2 border-border/50 rounded-2xl shadow-[0_0_0_1px_rgba(0,0,0,0.02)] hover:border-border focus:border-foreground/30 focus:ring-2 focus:ring-foreground/10 transition-all"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
+              <button
+                type="button"
+                className="absolute right-4 top-1/2 transform -translate-y-1/2 bg-muted h-9 w-9 rounded-full flex items-center justify-center hover:bg-accent transition-colors"
+                aria-label="Search"
+                disabled={!searchQuery.trim()}
+                onClick={() => setSearchQuery(searchQuery.trim())}
+              >
+                <ArrowUp className="h-5 w-5 text-muted-foreground" />
+              </button>
             </div>
             
             {/* Sort Dropdown */}

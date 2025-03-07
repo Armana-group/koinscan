@@ -26,7 +26,9 @@ export const WHITELISTED_WALLETS: string[] = [
   
   // ⬆️ ADD YOUR WALLET ADDRESS ABOVE FOR TESTING ⬆️
   "12mutMcqqWavhfri2yXWSv77oh7PVY2WSS",
-  "18fjEQn9bJQnB75BX97WXghMeVKHNJ6mmg"
+  "18fjEQn9bJQnB75BX97WXghMeVKHNJ6mmg",
+  "@jga",
+  "jga"
 ];
 
 // Optional: Add some test wallets for your team during development

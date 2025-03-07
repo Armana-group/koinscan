@@ -12,8 +12,20 @@ const poppins = Poppins({
 });
 
 export const metadata: Metadata = {
-  title: "Koinos Block Explorer",
+  title: "KoinScan - Koinos Block Explorer",
   description: "Explore the Koinos blockchain - transactions, blocks, accounts, and smart contracts",
+  icons: {
+    icon: [
+      { url: '/koinscan-logo.png', sizes: '32x32', type: 'image/png' },
+      { url: '/koinscan-logo.svg', type: 'image/svg+xml' }
+    ],
+    apple: {
+      url: '/koinscan-logo.png',
+      sizes: '180x180',
+      type: 'image/png',
+    },
+    shortcut: '/koinscan-logo.png',
+  }
 };
 
 export default function RootLayout({

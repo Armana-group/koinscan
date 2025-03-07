@@ -39,5 +39,16 @@ export const DEV_WALLETS: string[] = [
 // Combined list of all allowed wallets
 export const ALLOWED_WALLETS = [...WHITELISTED_WALLETS, ...DEV_WALLETS];
 
+// Function to get nickname for a wallet if available
+export function getNicknameForWallet(walletAddress: string): string | null {
+  // Check if the wallet address starts with '@' or doesn't look like a blockchain address
+  if (walletAddress.startsWith('@') || !walletAddress.match(/^[0-9a-zA-Z]{10,}/)) {
+    return walletAddress;
+  }
+  
+  // For regular wallet addresses, return null (no nickname)
+  return null;
+}
+
 // Local storage key for storing beta access state
 export const BETA_ACCESS_KEY = "koinos-explorer-beta-access"; 

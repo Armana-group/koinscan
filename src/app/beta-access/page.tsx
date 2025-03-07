@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { useWallet } from "@/contexts/WalletContext";
 import * as toast from "@/lib/toast";
-import { ALLOWED_WALLETS } from "@/config/beta-access";
+import { ALLOWED_WALLETS, getNicknameForWallet } from "@/config/beta-access";
 import { Logo } from "@/components/Logo";
 import { hasWalletAccess, saveBetaAccess } from "@/lib/beta-access";
 import { WalletButton } from "@/components/WalletButton";
@@ -75,7 +75,7 @@ export default function BetaAccess() {
   return (
     <>
       <div className="flex min-h-screen flex-col bg-background">
-        <header className="bg-background/80 backdrop-blur-sm border-b">
+        <header className="bg-background/80 backdrop-blur-sm">
           <div className="container mx-auto flex h-16 items-center justify-between px-4">
             <Logo />
             <WalletButton />
@@ -112,6 +112,11 @@ export default function BetaAccess() {
                     <div className="bg-muted p-4 rounded-md break-all max-w-md mb-4">
                       <p className="text-sm text-muted-foreground mb-1">Connected Wallet:</p>
                       <p className="font-mono">{walletAddress}</p>
+                      {getNicknameForWallet(walletAddress) && (
+                        <p className="text-sm text-muted-foreground mt-1">
+                          <span className="font-medium">{getNicknameForWallet(walletAddress)}</span>
+                        </p>
+                      )}
                     </div>
                   ) : (
                     <p className="text-muted-foreground text-center mb-4">

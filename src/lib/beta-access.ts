@@ -1,8 +1,9 @@
-import { BETA_ACCESS_KEY, ALLOWED_WALLETS } from "@/config/beta-access";
+import { BETA_ACCESS_KEY, ALLOWED_WALLETS, getNicknameForWallet } from "@/config/beta-access";
 
 interface BetaAccessState {
   hasAccess: boolean;
   walletAddress: string;
+  nickname?: string | null;
 }
 
 /**
@@ -22,9 +23,12 @@ export function saveBetaAccess(walletAddress: string): void {
   const isAllowed = hasWalletAccess(walletAddress);
   
   if (isAllowed) {
+    const nickname = getNicknameForWallet(walletAddress);
+    
     const accessState: BetaAccessState = {
       hasAccess: true,
-      walletAddress
+      walletAddress,
+      nickname
     };
     
     // Save to localStorage (for client-side checks)
@@ -51,6 +55,12 @@ export function getSavedBetaAccess(): BetaAccessState | null {
     if (accessState.hasAccess && 
         accessState.walletAddress && 
         ALLOWED_WALLETS.includes(accessState.walletAddress)) {
+      
+      // If nickname wasn't saved before, check if it exists now
+      if (!accessState.nickname) {
+        accessState.nickname = getNicknameForWallet(accessState.walletAddress);
+      }
+      
       return accessState;
     }
   } catch (error) {

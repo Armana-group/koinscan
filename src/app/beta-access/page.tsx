@@ -93,11 +93,11 @@ export default function BetaAccess() {
               </p>
             </div>
 
-            <Card className="border-2">
+            <Card className="border-none">
               <CardHeader className="text-center">
-                <CardTitle className="text-3xl">Early Access Beta</CardTitle>
+                <CardTitle className="text-3xl">Early Access</CardTitle>
                 <CardDescription className="text-center">
-                  This application is currently in beta and available by invitation only
+                  This application is currently in closed beta and available by invitation only
                 </CardDescription>
               </CardHeader>
               
@@ -134,18 +134,10 @@ export default function BetaAccess() {
                     </Button>
                   )}
                 </div>
-                
-                <div className="bg-muted p-5 rounded-md mx-auto">
-                  <h3 className="font-semibold mb-2 text-center">Don&apos;t have access?</h3>
-                  <p className="text-sm text-muted-foreground text-center">
-                    If you&apos;d like to request access to the beta, please reach out through our official channels.
-                    We&apos;ll be opening up to more users as we continue development.
-                  </p>
-                </div>
               </CardContent>
               
               <CardFooter className="justify-center text-sm text-muted-foreground">
-                <p>Public release coming soon</p>
+                <p>Public beta coming soon</p>
               </CardFooter>
             </Card>
           </div>

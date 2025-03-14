@@ -103,6 +103,7 @@ interface FormattedTransaction {
   signatures: string[];
   totalValueTransferred: string;
   tokenSymbol: string;
+  tokenTransfers?: Record<string, string>;
   tags: string[];
   primaryTag?: string;
 }
@@ -467,13 +468,27 @@ export function DetailedTransactionHistory({
     }
   };
 
-  const formatValue = (value: string) => {
+  const formatValue = (value: string, tokenSymbol: string = 'KOIN') => {
     try {
-      // Format the value as a number with commas
+      // Get token decimals from the API module
+      const TOKEN_DECIMALS: Record<string, number> = {
+        'KOIN': 8,
+        'VHP': 8,
+        'VAPOR': 8,
+        // Add more token decimals as needed
+      };
+      
+      const decimals = TOKEN_DECIMALS[tokenSymbol] || 8;
+      
+      // Format the value as a number with appropriate decimals
       const numValue = BigInt(value);
-      // Convert to a more readable format (e.g., if this is in the smallest unit like satoshis)
-      // Assuming 8 decimal places for tokens like KOIN
-      const formatted = (Number(numValue) / 100000000).toLocaleString(undefined, {
+      const divisor = BigInt(10 ** decimals);
+      const majorUnits = Number(numValue / divisor);
+      const minorUnits = Number(numValue % divisor) / Number(divisor);
+      const num = majorUnits + minorUnits;
+      
+      // Format with commas and appropriate decimal places
+      const formatted = num.toLocaleString(undefined, {
         minimumFractionDigits: 0,
         maximumFractionDigits: 8
       });
@@ -1178,25 +1193,14 @@ export function DetailedTransactionHistory({
                                   <div className="p-4 space-y-4">
                                     <div>
                                       <h4 className="text-sm font-medium mb-2">Transaction Details</h4>
-                                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs sm:text-sm">
-                                        <div className="font-medium">ID:</div>
-                                        <div className="font-mono">
+                                      <div className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-2 text-sm">
+                                        <div className="font-medium">Transaction ID:</div>
+                                        <div className="font-mono break-all">
                                           <a 
-                                            href={`/tx/${tx.id}`} 
-                                            className="text-primary hover:underline flex items-center"
+                                            href={`/tx/${tx.id}`}
+                                            className="text-primary hover:underline"
                                           >
                                             {tx.id}
-                                            <ExternalLink size={12} className="ml-1" />
-                                          </a>
-                                        </div>
-                                        <div className="font-medium">Payer:</div>
-                                        <div className="font-mono">
-                                          <a 
-                                            href={`/address/${tx.payer}`} 
-                                            className="text-primary hover:underline flex items-center"
-                                          >
-                                            {shortenAddress(tx.payer)}
-                                            <ExternalLink size={12} className="ml-1" />
                                           </a>
                                         </div>
                                         <div className="font-medium">Block Height:</div>
@@ -1207,14 +1211,29 @@ export function DetailedTransactionHistory({
                                         <div className="font-mono">
                                           {tx.blockId}
                                         </div>
-                                        <div className="font-medium">Total Value Transferred:</div>
-                                        <div className="font-mono">
-                                          {formatValue(tx.totalValueTransferred)}
-                                        </div>
-                                        <div className="font-medium">Token Symbol:</div>
-                                        <div className="font-mono">
-                                          {tx.tokenSymbol}
-                                        </div>
+                                        
+                                        {/* Display token transfers if available */}
+                                        {tx.tokenTransfers && Object.keys(tx.tokenTransfers).length > 0 ? (
+                                          <>
+                                            <div className="font-medium">Token Transfers:</div>
+                                            <div className="font-mono">
+                                              {Object.entries(tx.tokenTransfers as Record<string, string>).map(([token, amount], index) => (
+                                                <div key={token} className={index > 0 ? 'mt-1' : ''}>
+                                                  {formatValue(amount, token)} {token}
+                                                </div>
+                                              ))}
+                                            </div>
+                                          </>
+                                        ) : (
+                                          <>
+                                            {/* For backward compatibility, display total value if no tokenTransfers */}
+                                            <div className="font-medium">Value:</div>
+                                            <div className="font-mono">
+                                              {formatValue(tx.totalValueTransferred, tx.tokenSymbol)} {tx.tokenSymbol}
+                                            </div>
+                                          </>
+                                        )}
+                                        
                                         <div className="font-medium">RC Used:</div>
                                         <div className="font-mono">
                                           {tx.rc_used}

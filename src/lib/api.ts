@@ -279,6 +279,14 @@ const methodCategories: Record<string, MethodCategory> = {
   // Add more method categories as needed
 };
 
+// Known token contracts mapping
+const TOKEN_CONTRACTS: Record<string, string> = {
+  '15DJN4a8SgrbGhhGksSBASiSYjGnMU8dGL': 'KOIN',
+  '1FaSvLjQJsCJKq5ybmGsMMQs8RQYyVv8ju': 'VHP',
+  '19WbXUYoAVngjfvjnU1KvCUzfyHHE9C97v': 'VAPOR',
+  // Add more token contracts as needed
+};
+
 /**
  * Analyzes a transaction and assigns appropriate tags
  * @param tx The formatted transaction to analyze
@@ -462,9 +470,9 @@ export function generateUserFriendlyInfo(tx: any): UserFriendlyTransactionInfo {
       return {
         actionType: userIsRecipient ? 'received' : 'sent',
         description: userIsRecipient 
-          ? `Received ${formatValue(value)} ${tx.tokenSymbol}` 
-          : `Sent ${formatValue(value)} ${tx.tokenSymbol}`,
-        amount: formatValue(value),
+          ? `Received ${formatValue(value, tx.tokenSymbol)} ${tx.tokenSymbol}` 
+          : `Sent ${formatValue(value, tx.tokenSymbol)} ${tx.tokenSymbol}`,
+        amount: formatValue(value, tx.tokenSymbol),
         tokenSymbol: tx.tokenSymbol,
         counterparty: shortenAddress(counterparty),
         isPositive: userIsRecipient
@@ -483,8 +491,8 @@ export function generateUserFriendlyInfo(tx: any): UserFriendlyTransactionInfo {
       if (to && value) {
         return {
           actionType: 'minted',
-          description: `Minted ${formatValue(value)} ${tx.tokenSymbol}`,
-          amount: formatValue(value),
+          description: `Minted ${formatValue(value, tx.tokenSymbol)} ${tx.tokenSymbol}`,
+          amount: formatValue(value, tx.tokenSymbol),
           tokenSymbol: tx.tokenSymbol,
           counterparty: shortenAddress(to),
           isPositive: true
@@ -504,8 +512,8 @@ export function generateUserFriendlyInfo(tx: any): UserFriendlyTransactionInfo {
       if (from && value) {
         return {
           actionType: 'burned',
-          description: `Burned ${formatValue(value)} ${tx.tokenSymbol}`,
-          amount: formatValue(value),
+          description: `Burned ${formatValue(value, tx.tokenSymbol)} ${tx.tokenSymbol}`,
+          amount: formatValue(value, tx.tokenSymbol),
           tokenSymbol: tx.tokenSymbol,
           counterparty: shortenAddress(from),
           isPositive: false
@@ -604,40 +612,77 @@ export function formatDetailedTransactions(transactions: DetailedTransaction[], 
     let tokenSymbol = 'KOIN';
     let totalValueTransferred = '0';
     
+    // Track transfers for multiple tokens
+    const tokenTransfers: Record<string, string> = {};
+    
     if (tx.trx.receipt && tx.trx.receipt.events) {
       const transferEvents = tx.trx.receipt.events.filter(event => event.name.includes('transfer_event'));
       
+      // Process each transfer event
       if (transferEvents.length > 0) {
-        // Get the first transfer event (most relevant)
-        const transferEvent = transferEvents[0];
-        
-        // Extract token info
-        if (transferEvent.source) {
-          const tokenContracts: Record<string, string> = {
-            '15DJN4a8SgrbGhhGksSBASiSYjGnMU8dGL': 'KOIN',
-            '1FaSvLjQJsCJKq5ybmGsMMQs8RQYyVv8ju': 'VHP',
-            // Add more token contracts as needed
-          };
-          
-          if (tokenContracts[transferEvent.source]) {
-            tokenSymbol = tokenContracts[transferEvent.source];
-          }
-        }
-        
-        // Sum up total value transferred
-        let total = BigInt(0);
-        
         transferEvents.forEach(event => {
-          if (event.data && event.data.value) {
+          if (event.source && event.data && event.data.value) {
             try {
-              total += BigInt(event.data.value);
+              // Identify the token
+              let eventTokenSymbol = 'Unknown';
+              if (TOKEN_CONTRACTS[event.source]) {
+                eventTokenSymbol = TOKEN_CONTRACTS[event.source];
+              }
+              
+              // Add to the token's total
+              const value = BigInt(event.data.value);
+              if (tokenTransfers[eventTokenSymbol]) {
+                // Convert existing value to BigInt, add the new value, and store back as string
+                const currentTotal = BigInt(tokenTransfers[eventTokenSymbol]);
+                tokenTransfers[eventTokenSymbol] = (currentTotal + value).toString();
+              } else {
+                tokenTransfers[eventTokenSymbol] = value.toString();
+              }
+              
+              // For backward compatibility, keep track of the first token for single-token display
+              if (transferEvents.indexOf(event) === 0) {
+                tokenSymbol = eventTokenSymbol;
+                totalValueTransferred = value.toString();
+              }
             } catch (err) {
-              console.error('Error summing transfer values:', err);
+              console.error('Error processing transfer event:', err);
             }
           }
         });
-        
-        totalValueTransferred = total.toString();
+      }
+      
+      // Also check for mint events
+      const mintEvents = tx.trx.receipt.events.filter(event => event.name.includes('mint_event'));
+      if (mintEvents.length > 0) {
+        mintEvents.forEach(event => {
+          if (event.source && event.data && event.data.value) {
+            try {
+              // Identify the token
+              let eventTokenSymbol = 'Unknown';
+              if (TOKEN_CONTRACTS[event.source]) {
+                eventTokenSymbol = TOKEN_CONTRACTS[event.source];
+              }
+              
+              // Add to the token's total
+              const value = BigInt(event.data.value);
+              if (tokenTransfers[eventTokenSymbol]) {
+                // Convert existing value to BigInt, add the new value, and store back as string
+                const currentTotal = BigInt(tokenTransfers[eventTokenSymbol]);
+                tokenTransfers[eventTokenSymbol] = (currentTotal + value).toString();
+              } else {
+                tokenTransfers[eventTokenSymbol] = value.toString();
+              }
+              
+              // If no transfer events, use the first mint event for display
+              if (transferEvents.length === 0 && mintEvents.indexOf(event) === 0) {
+                tokenSymbol = eventTokenSymbol;
+                totalValueTransferred = value.toString();
+              }
+            } catch (err) {
+              console.error('Error processing mint event:', err);
+            }
+          }
+        });
       }
     }
     
@@ -651,6 +696,7 @@ export function formatDetailedTransactions(transactions: DetailedTransaction[], 
       signatures: tx.trx.transaction.signatures,
       totalValueTransferred,
       tokenSymbol,
+      tokenTransfers, // Add the multi-token transfer information
       tags: [] as string[],  // Explicitly type as string array
       primaryTag: undefined as string | undefined,
       associatedAddress: userAddress || tx.trx.transaction.header.payer
@@ -901,20 +947,43 @@ export async function getTokenBalance(address: string, tokenSymbol: string = 'ko
   }
 }
 
+// Known token decimals
+const TOKEN_DECIMALS: Record<string, number> = {
+  'KOIN': 8,
+  'VHP': 8,
+  'VAPOR': 8,
+  // Add more token decimals as needed
+};
+
 // Helper function to format values in a user-friendly way
-function formatValue(value: string): string {
+function formatValue(value: string, tokenSymbol: string = 'KOIN'): string {
   if (!value) return '0';
   
-  // Convert to number
-  const num = parseFloat(value);
+  // Get the appropriate decimal places for this token
+  const decimals = TOKEN_DECIMALS[tokenSymbol] || 8;
   
-  // Format based on size
-  if (num === 0) return '0';
-  if (num < 0.000001) return '< 0.000001';
-  if (num < 1) return num.toFixed(6);
-  if (num < 1000) return num.toFixed(4);
-  if (num < 1000000) return `${(num / 1000).toFixed(2)}K`;
-  return `${(num / 1000000).toFixed(2)}M`;
+  try {
+    // Convert from smallest unit to token unit using correct decimals
+    // For example, for KOIN with 8 decimals, divide by 10^8
+    const rawNum = BigInt(value);
+    const divisor = BigInt(10 ** decimals);
+    
+    // Use floating point for display formatting
+    const majorUnits = Number(rawNum / divisor);
+    const minorUnits = Number(rawNum % divisor) / Number(divisor);
+    const num = majorUnits + minorUnits;
+    
+    // Format based on size
+    if (num === 0) return '0';
+    if (num < 0.000001) return '< 0.000001';
+    if (num < 1) return num.toFixed(6);
+    if (num < 1000) return num.toFixed(4);
+    if (num < 1000000) return `${(num / 1000).toFixed(2)}K`;
+    return `${(num / 1000000).toFixed(2)}M`;
+  } catch (err) {
+    console.error('Error formatting token value:', err);
+    return value;
+  }
 }
 
 // Helper function to shorten addresses

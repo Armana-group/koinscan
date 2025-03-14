@@ -1,6 +1,7 @@
 "use client";
 
 import { DetailedTransactionHistory } from "@/components/DetailedTransactionHistory";
+import { WalletBalances } from "@/components/WalletBalances";
 import { Suspense, useState, useEffect } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -46,6 +47,13 @@ export default function AddressPage({ params }: AddressPageProps) {
         <h2 className="text-sm sm:text-base md:text-xl font-medium text-muted-foreground mb-4 sm:mb-8 break-all">
           {address}
         </h2>
+        
+        {/* Wallet Balances */}
+        <div className="mb-6">
+          <Suspense fallback={<Skeleton className="h-36 w-full mb-6" />}>
+            <WalletBalances address={address} />
+          </Suspense>
+        </div>
         
         {error ? (
           <Alert variant="destructive" className="mb-6">

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import toast from 'react-hot-toast';
 import { 
   getDetailedAccountHistory, 
@@ -8,7 +8,9 @@ import {
   enrichTransactionsWithTimestamps,
   DetailedTransaction,
   TransactionEvent,
-  getTokenBalance
+  getTokenBalance,
+  shortenAddress,
+  TransactionAction
 } from '@/lib/api';
 import { 
   Card,
@@ -49,7 +51,13 @@ import {
   Filter,
   AlertCircle,
   ArrowRightLeft,
-  BadgeIcon
+  BadgeIcon,
+  Component,
+  FileUpIcon,
+  FileUp,
+  VoteIcon,
+  BarChart4,
+  Minus
 } from "lucide-react";
 import {
   Accordion,
@@ -72,6 +80,7 @@ import {
   AlertTitle,
   AlertDescription
 } from "@/components/ui/alert";
+import { formatTokenAmount, getTokenBySymbol } from '@/lib/tokens';
 
 type PaginationHistoryItem = {
   transactions: DetailedTransaction[];
@@ -106,6 +115,7 @@ interface FormattedTransaction {
   tokenTransfers?: Record<string, string>;
   tags: string[];
   primaryTag?: string;
+  actions?: TransactionAction[];
 }
 
 // Custom styles to remove all borders
@@ -444,19 +454,6 @@ export function DetailedTransactionHistory({
     }
   }, [address]);
 
-  const shortenAddress = (address: string) => {
-    if (!address) return '';
-    return `${address.substring(0, 6)}...${address.substring(address.length - 4)}`;
-  };
-
-  const formatHex = (hex: string) => {
-    if (!hex) return '';
-    if (hex.startsWith('0x')) {
-      return shortenAddress(hex);
-    }
-    return shortenAddress(hex);
-  };
-
   const formatDate = (timestamp: string) => {
     if (!timestamp) return 'Unknown';
     try {
@@ -470,30 +467,14 @@ export function DetailedTransactionHistory({
 
   const formatValue = (value: string, tokenSymbol: string = 'KOIN') => {
     try {
-      // Get token decimals from the API module
-      const TOKEN_DECIMALS: Record<string, number> = {
-        'KOIN': 8,
-        'VHP': 8,
-        'VAPOR': 8,
-        // Add more token decimals as needed
-      };
+      // For simplicity, we'll use a default decimals of 8
+      // This is synchronous and won't cause issues with React rendering
+      const decimals = 8;
       
-      const decimals = TOKEN_DECIMALS[tokenSymbol] || 8;
-      
-      // Format the value as a number with appropriate decimals
-      const numValue = BigInt(value);
-      const divisor = BigInt(10 ** decimals);
-      const majorUnits = Number(numValue / divisor);
-      const minorUnits = Number(numValue % divisor) / Number(divisor);
-      const num = majorUnits + minorUnits;
-      
-      // Format with commas and appropriate decimal places
-      const formatted = num.toLocaleString(undefined, {
-        minimumFractionDigits: 0,
-        maximumFractionDigits: 8
-      });
-      return formatted;
+      // Use our token service formatting function
+      return formatTokenAmount(value, decimals);
     } catch (e) {
+      console.error('Error formatting value:', e);
       return value;
     }
   };
@@ -823,6 +804,217 @@ export function DetailedTransactionHistory({
     return formatDate(timestamp);
   };
 
+  // Update TransactionRow component to use the new model
+  const TransactionRow: React.FC<{ 
+    tx: FormattedTransaction;
+    isExpanded: boolean;
+    toggleExpand: () => void; 
+  }> = ({ tx, isExpanded, toggleExpand }) => {
+    // Extract transaction actions from the transaction if available
+    const actions = tx.actions || [];
+    
+    // Use the first action as the primary one for display
+    const primaryAction = actions[0] || {
+      type: 'other',
+      description: 'Transaction'
+    };
+    
+    // Determine icon and color based on action type
+    let ActionIcon = ArrowRight;
+    let bgColorClass = "bg-muted";
+    let textColorClass = "text-muted-foreground";
+    
+    switch(primaryAction.type) {
+      case 'token_transfer':
+        if (primaryAction.tokenTransfers?.[0]?.isPositive) {
+          ActionIcon = ArrowDownLeft;
+          bgColorClass = "bg-green-100 dark:bg-green-900";
+          textColorClass = "text-green-800 dark:text-green-200";
+        } else {
+          ActionIcon = ArrowUpRight;
+          bgColorClass = "bg-blue-100 dark:bg-blue-900";
+          textColorClass = "text-blue-800 dark:text-blue-200";
+        }
+        break;
+      case 'token_mint':
+        ActionIcon = Plus;
+        bgColorClass = "bg-green-100 dark:bg-green-900";
+        textColorClass = "text-green-800 dark:text-green-200";
+        break;
+      case 'token_burn':
+        ActionIcon = Flame;
+        bgColorClass = "bg-red-100 dark:bg-red-900";
+        textColorClass = "text-red-800 dark:text-red-200";
+        break;
+      case 'contract_interaction':
+        ActionIcon = Component;
+        bgColorClass = "bg-purple-100 dark:bg-purple-900";
+        textColorClass = "text-purple-800 dark:text-purple-200";
+        break;
+      case 'contract_upload':
+        ActionIcon = FileUpIcon;
+        bgColorClass = "bg-amber-100 dark:bg-amber-900";
+        textColorClass = "text-amber-800 dark:text-amber-200";
+        break;
+      case 'governance':
+        ActionIcon = BarChart4;
+        bgColorClass = "bg-indigo-100 dark:bg-indigo-900";
+        textColorClass = "text-indigo-800 dark:text-indigo-200";
+        break;
+      default:
+        ActionIcon = ArrowRight;
+        break;
+    }
+    
+    // Format transaction date
+    const txDate = tx.timestamp ? formatDate(tx.timestamp) : '...';
+    
+    // Format transaction info for display
+    const txInfo = primaryAction.description || 'Transaction';
+    
+    // Determine if there are multiple token transfers
+    const hasMultipleTokenTransfers = actions.reduce((count, action) => {
+      return count + (action.tokenTransfers?.length || 0);
+    }, 0) > 1;
+    
+    return (
+      <div className={`border rounded-lg mb-3 overflow-hidden ${isExpanded ? 'border-primary' : ''}`}>
+        {/* Transaction summary row - clickable to expand */}
+        <div 
+          className="p-4 flex items-center justify-between cursor-pointer hover:bg-muted/50 transition-colors"
+          onClick={toggleExpand}
+        >
+          {/* Icon and type */}
+          <div className="flex items-center space-x-3">
+            <div className={`w-10 h-10 rounded-full flex items-center justify-center ${bgColorClass}`}>
+              <ActionIcon className={`h-5 w-5 ${textColorClass}`} />
+            </div>
+            <div>
+              <div className="font-medium">{txInfo}</div>
+              <div className="text-xs text-muted-foreground">
+                {tx.id ? shortenAddress(tx.id) : '...'}
+              </div>
+            </div>
+          </div>
+          
+          {/* Date and expand indicator */}
+          <div className="flex items-center space-x-3">
+            <div className="text-right">
+              <div className="text-sm">{txDate}</div>
+              {hasMultipleTokenTransfers && (
+                <div className="text-xs text-muted-foreground">Multiple token transfers</div>
+              )}
+            </div>
+            <div className="text-muted-foreground">
+              {isExpanded ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
+            </div>
+          </div>
+        </div>
+        
+        {/* Expanded details */}
+        {isExpanded && (
+          <div className="p-4 border-t bg-muted/20">
+            <div className="grid gap-6">
+              <div>
+                <h4 className="text-sm font-medium mb-2">Transaction Details</h4>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                  <div className="font-medium">Transaction ID:</div>
+                  <div className="font-mono break-all">
+                    {tx.id}
+                  </div>
+                  <div className="font-medium">Payer:</div>
+                  <div className="font-mono">
+                    {tx.payer}
+                  </div>
+                  <div className="font-medium">Block:</div>
+                  <div className="font-mono">
+                    {tx.blockId ? shortenAddress(tx.blockId) : 'Pending'}
+                  </div>
+                  <div className="font-medium">Timestamp:</div>
+                  <div className="font-mono">
+                    {txDate}
+                  </div>
+                  
+                  {/* Show token transfers if present */}
+                  {actions.map((action, actionIndex) => (
+                    action.tokenTransfers && action.tokenTransfers.length > 0 && (
+                      <React.Fragment key={`action-${actionIndex}`}>
+                        <div className="font-medium col-span-2 mt-2 pt-2 border-t">
+                          {action.type === 'token_transfer' ? 'Token Transfer' : 
+                           action.type === 'token_mint' ? 'Token Mint' : 
+                           action.type === 'token_burn' ? 'Token Burn' : 'Token Action'}:
+                        </div>
+                        {action.tokenTransfers.map((transfer, transferIndex) => (
+                          <React.Fragment key={`transfer-${actionIndex}-${transferIndex}`}>
+                            <div className="font-medium">Token:</div>
+                            <div className="font-mono">
+                              {transfer.token.symbol}
+                            </div>
+                            <div className="font-medium">Amount:</div>
+                            <div className="font-mono">
+                              {transfer.formattedAmount}
+                            </div>
+                            <div className="font-medium">From:</div>
+                            <div className="font-mono">
+                              {shortenAddress(transfer.from)}
+                            </div>
+                            <div className="font-medium">To:</div>
+                            <div className="font-mono">
+                              {shortenAddress(transfer.to)}
+                            </div>
+                          </React.Fragment>
+                        ))}
+                      </React.Fragment>
+                    )
+                  ))}
+                  
+                  <div className="font-medium">RC Used:</div>
+                  <div className="font-mono">
+                    {tx.rc_used}
+                  </div>
+                  <div className="font-medium">Signature Count:</div>
+                  <div className="font-mono">
+                    {tx.signatures.length}
+                  </div>
+                </div>
+              </div>
+              <div>
+                <h4 className="text-sm font-medium mb-2">Transaction Events</h4>
+                <div className="space-y-2">
+                  {tx.events.map((event: TransactionEvent, index: number) => (
+                    <div key={index} className="flex justify-between items-center">
+                      <div className="font-mono text-xs text-muted-foreground">
+                        {renderEventSummary(event)}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {tx.timestamp ? formatDate(tx.timestamp) : '...'}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <h4 className="text-sm font-medium mb-2">Operations</h4>
+                <div className="space-y-2">
+                  {tx.operations.map((operation: any, index: number) => (
+                    <div key={index} className="flex justify-between items-center">
+                      <div className="font-mono text-xs text-muted-foreground">
+                        {renderOperationSummary(operation)}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {tx.timestamp ? formatDate(tx.timestamp) : '...'}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   if (!address) return null;
 
   return (
@@ -1134,151 +1326,17 @@ export function DetailedTransactionHistory({
                             </div>
                           </div>
                         ) : (
-                          filteredTransactions.map((tx, index) => {
-                            const { userFriendlyInfo } = tx;
-                            const colorClasses = getTransactionColorClasses(userFriendlyInfo?.actionType || 'other');
-                            
-                            return (
-                              <AccordionItem 
-                                key={index} 
-                                value={`item-${index}`} 
-                                className={`overflow-hidden rounded-lg hover:bg-muted/20 border-none ${colorClasses}`}
-                                style={noBorderStyles}
-                              >
-                                <AccordionTrigger className="px-4 py-3 hover:no-underline hover:bg-muted/20 gap-2">
-                                  <div className="flex flex-col sm:flex-row justify-between items-start w-full text-left">
-                                    <div className="flex items-start">
-                                      <div className="mr-3 pt-1">
-                                        {getTransactionIcon(userFriendlyInfo?.actionType || 'other')}
-                                      </div>
-                                      <div>
-                                        <div className="flex items-center gap-1">
-                                          <div className="text-base font-medium">
-                                            {userFriendlyInfo?.description || renderOperationSummary(tx.operations[0])}
-                                          </div>
-                                          {userFriendlyInfo?.dappName && (
-                                            <Badge variant="secondary" className="ml-2 text-xs border-none" style={noBorderStyles}>
-                                              {userFriendlyInfo.dappName}
-                                            </Badge>
-                                          )}
-                                        </div>
-                                        <div className="flex gap-2 items-center mt-1">
-                                          <span className="text-xs text-muted-foreground">
-                                            {tx.timestamp ? formatRelativeTime(tx.timestamp) : '...'}
-                                          </span>
-                                          <span className="text-xs font-mono text-muted-foreground/70">
-                                            {tx.id.substring(0, 6)}...{tx.id.substring(tx.id.length - 4)}
-                                          </span>
-                                        </div>
-                                      </div>
-                                    </div>
-                                    <div className="flex items-center space-x-2 mt-2 sm:mt-0">
-                                      {tx.primaryTag && (!userFriendlyInfo || userFriendlyInfo.actionType === 'other') && (
-                                        <Badge variant="secondary" className="capitalize border-none" style={noBorderStyles}>
-                                          {tx.primaryTag}
-                                        </Badge>
-                                      )}
-                                      
-                                      {tx.totalValueTransferred !== '0' && 
-                                        (!tx.primaryTag || !tx.primaryTag.toLowerCase().includes('transfer')) && 
-                                        (!userFriendlyInfo || !userFriendlyInfo.description.toLowerCase().includes('transfer')) && (
-                                        <Badge className="bg-green-500/10 text-green-600 border-none dark:text-green-400" style={noBorderStyles}>
-                                          Transfer
-                                        </Badge>
-                                      )}
-                                    </div>
-                                  </div>
-                                </AccordionTrigger>
-                                <AccordionContent className="bg-muted/5 border-none" style={noBorderStyles}>
-                                  <div className="p-4 space-y-4">
-                                    <div>
-                                      <h4 className="text-sm font-medium mb-2">Transaction Details</h4>
-                                      <div className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-2 text-sm">
-                                        <div className="font-medium">Transaction ID:</div>
-                                        <div className="font-mono break-all">
-                                          <a 
-                                            href={`/tx/${tx.id}`}
-                                            className="text-primary hover:underline"
-                                          >
-                                            {tx.id}
-                                          </a>
-                                        </div>
-                                        <div className="font-medium">Block Height:</div>
-                                        <div className="font-mono">
-                                          {tx.blockHeight}
-                                        </div>
-                                        <div className="font-medium">Block ID:</div>
-                                        <div className="font-mono">
-                                          {tx.blockId}
-                                        </div>
-                                        
-                                        {/* Display token transfers if available */}
-                                        {tx.tokenTransfers && Object.keys(tx.tokenTransfers).length > 0 ? (
-                                          <>
-                                            <div className="font-medium">Token Transfers:</div>
-                                            <div className="font-mono">
-                                              {Object.entries(tx.tokenTransfers as Record<string, string>).map(([token, amount], index) => (
-                                                <div key={token} className={index > 0 ? 'mt-1' : ''}>
-                                                  {formatValue(amount, token)} {token}
-                                                </div>
-                                              ))}
-                                            </div>
-                                          </>
-                                        ) : (
-                                          <>
-                                            {/* For backward compatibility, display total value if no tokenTransfers */}
-                                            <div className="font-medium">Value:</div>
-                                            <div className="font-mono">
-                                              {formatValue(tx.totalValueTransferred, tx.tokenSymbol)} {tx.tokenSymbol}
-                                            </div>
-                                          </>
-                                        )}
-                                        
-                                        <div className="font-medium">RC Used:</div>
-                                        <div className="font-mono">
-                                          {tx.rc_used}
-                                        </div>
-                                        <div className="font-medium">Signature Count:</div>
-                                        <div className="font-mono">
-                                          {tx.signatures.length}
-                                        </div>
-                                      </div>
-                                    </div>
-                                    <div>
-                                      <h4 className="text-sm font-medium mb-2">Transaction Events</h4>
-                                      <div className="space-y-2">
-                                        {tx.events.map((event: TransactionEvent, index: number) => (
-                                          <div key={index} className="flex justify-between items-center">
-                                            <div className="font-mono text-xs text-muted-foreground">
-                                              {renderEventSummary(event)}
-                                            </div>
-                                            <div className="text-xs text-muted-foreground">
-                                              {tx.timestamp ? formatDate(tx.timestamp) : '...'}
-                                            </div>
-                                          </div>
-                                        ))}
-                                      </div>
-                                    </div>
-                                    <div>
-                                      <h4 className="text-sm font-medium mb-2">Operations</h4>
-                                      <div className="space-y-2">
-                                        {tx.operations.map((operation: FormattedOperation, index: number) => (
-                                          <div key={index} className="flex justify-between items-center">
-                                            <div className="font-mono text-xs text-muted-foreground">
-                                              {renderOperationSummary(operation)}
-                                            </div>
-                                            <div className="text-xs text-muted-foreground">
-                                              {tx.timestamp ? formatDate(tx.timestamp) : '...'}
-                                            </div>
-                                          </div>
-                                        ))}
-                                      </div>
-                                    </div>
-                                  </div>
-                                </AccordionContent>
-                              </AccordionItem>
-                            );
-                          })
+                          filteredTransactions.map((tx, index) => (
+                            <TransactionRow
+                              key={index}
+                              tx={tx}
+                              isExpanded={expandedRows[tx.id] || false}
+                              toggleExpand={() => setExpandedRows(prev => ({
+                                ...prev,
+                                [tx.id]: !prev[tx.id]
+                              }))}
+                            />
+                          ))
                         )}
                       </>
                     )}

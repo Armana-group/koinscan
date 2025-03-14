@@ -1,4 +1,5 @@
 import { Provider, Transaction, utils } from 'koilib';
+import { getTokenByAddress, formatTokenAmount, getTokenBySymbol } from '@/lib/tokens';
 
 // Initialize the Koinos provider
 const provider = new Provider(['https://api.koinos.io']);
@@ -94,6 +95,27 @@ export interface DetailedTransaction {
   };
 }
 
+export interface TransactionAction {
+  type: 'token_transfer' | 'token_mint' | 'token_burn' | 'contract_interaction' | 'system_call' | 'contract_upload' | 'governance' | 'other';
+  description: string;
+  dappName?: string;
+  tokenTransfers?: Array<{
+    token: {
+      symbol: string;
+      address: string;
+      decimals: string | number;
+      name?: string;
+      logoURI?: string;
+    };
+    amount: string;
+    formattedAmount: string;
+    from: string;
+    to: string;
+    isPositive?: boolean;
+  }>;
+  metadata?: Record<string, any>;
+}
+
 export async function getAddressHistory(
   address: string,
   limit: number = 10,
@@ -146,6 +168,232 @@ export async function getAddressHistory(
   }
 }
 
+/**
+ * Process transaction and extract meaningful actions
+ * @param tx The transaction to process
+ * @param userAddress Optional user address to determine direction of transfers
+ * @returns Array of transaction actions
+ */
+export function extractTransactionActions(tx: any, userAddress?: string): TransactionAction[] {
+  const actions: TransactionAction[] = [];
+  const tokenTransfers = new Map<string, any[]>();
+  
+  // First pass: collect all token transfers grouped by token
+  for (const event of tx.events || []) {
+    const eventName = event.name?.toLowerCase() || '';
+    const eventData = event.data || {};
+    
+    // Process transfer events
+    if (eventName.includes('transfer_event') || eventName.includes('transfer.')) {
+      const { from, to, value } = eventData;
+      
+      if (from && to && value) {
+        // Identify the token
+        const tokenAddress = event.source;
+        const tokenSymbol = getTokenSymbolSync(tokenAddress);
+        const decimals = '8'; // Default decimals
+        
+        // Create or update token transfer entry
+        if (!tokenTransfers.has(tokenAddress)) {
+          tokenTransfers.set(tokenAddress, []);
+        }
+        
+        tokenTransfers.get(tokenAddress)?.push({
+          from,
+          to, 
+          value,
+          decimals,
+          symbol: tokenSymbol,
+          address: tokenAddress
+        });
+      }
+    }
+  }
+  
+  // Second pass: create token transfer actions
+  if (tokenTransfers.size > 0) {
+    // Use Array.from to convert the Map entries to an array for iteration
+    Array.from(tokenTransfers.entries()).forEach(([tokenAddress, transfers]) => {
+      transfers.forEach(transfer => {
+        const { from, to, value, decimals, symbol } = transfer;
+        const isOutgoing = userAddress && from.toLowerCase() === userAddress.toLowerCase();
+        const isIncoming = userAddress && to.toLowerCase() === userAddress.toLowerCase();
+        
+        // Only add relevant transfers if user address is provided
+        if (userAddress && !isOutgoing && !isIncoming) {
+          return;
+        }
+        
+        const formattedAmount = formatTokenAmount(value, parseInt(decimals.toString()));
+        
+        actions.push({
+          type: 'token_transfer',
+          description: isIncoming 
+            ? `Received ${formattedAmount} ${symbol}`
+            : `Sent ${formattedAmount} ${symbol}`,
+          tokenTransfers: [{
+            token: {
+              symbol,
+              address: tokenAddress,
+              decimals
+            },
+            amount: value,
+            formattedAmount,
+            from,
+            to,
+            isPositive: isIncoming || false
+          }]
+        });
+      });
+    });
+  }
+  
+  // Handle mint events
+  const mintEvents = tx.events?.filter((event: any) => 
+    event.name?.toLowerCase().includes('mint_event') || event.name?.toLowerCase().includes('mint.')
+  ) || [];
+  
+  for (const mint of mintEvents) {
+    const eventData = mint.data || {};
+    const { to, value } = eventData;
+    
+    if (to && value) {
+      // Identify the token
+      const tokenAddress = mint.source;
+      const tokenSymbol = getTokenSymbolSync(tokenAddress);
+      const decimals = '8'; // Default decimals
+      
+      const formattedAmount = formatTokenAmount(value, parseInt(decimals));
+      
+      actions.push({
+        type: 'token_mint',
+        description: `Minted ${formattedAmount} ${tokenSymbol}`,
+        tokenTransfers: [{
+          token: {
+            symbol: tokenSymbol,
+            address: tokenAddress,
+            decimals
+          },
+          amount: value,
+          formattedAmount,
+          from: '0x0000000000000000000000000000000000000000',
+          to,
+          isPositive: true
+        }]
+      });
+    }
+  }
+  
+  // Handle burn events
+  const burnEvents = tx.events?.filter((event: any) => 
+    event.name?.toLowerCase().includes('burn_event') || event.name?.toLowerCase().includes('burn.')
+  ) || [];
+  
+  for (const burn of burnEvents) {
+    const eventData = burn.data || {};
+    const { from, value } = eventData;
+    
+    if (from && value) {
+      // Identify the token
+      const tokenAddress = burn.source;
+      const tokenSymbol = getTokenSymbolSync(tokenAddress);
+      const decimals = '8'; // Default decimals
+      
+      const formattedAmount = formatTokenAmount(value, parseInt(decimals));
+      
+      actions.push({
+        type: 'token_burn',
+        description: `Burned ${formattedAmount} ${tokenSymbol}`,
+        tokenTransfers: [{
+          token: {
+            symbol: tokenSymbol,
+            address: tokenAddress,
+            decimals
+          },
+          amount: value,
+          formattedAmount,
+          from,
+          to: '0x0000000000000000000000000000000000000000',
+          isPositive: false
+        }]
+      });
+    }
+  }
+  
+  // Handle contract uploads
+  if (tx.operations?.some((op: any) => op.type === 'Upload Contract')) {
+    actions.push({
+      type: 'contract_upload',
+      description: 'Contract Uploaded'
+    });
+  }
+  
+  // Handle governance actions
+  const governanceEvents = tx.events?.filter((event: any) => 
+    event.name?.toLowerCase().includes('governance.') || 
+    event.name?.toLowerCase().includes('vote.') || 
+    event.name?.toLowerCase().includes('proposal.')
+  ) || [];
+  
+  if (governanceEvents.length > 0) {
+    actions.push({
+      type: 'governance',
+      description: 'Governance Action',
+      metadata: {
+        events: governanceEvents
+      }
+    });
+  }
+  
+  // Handle specific dApp interactions by checking for known contracts
+  const dappInteractions = tx.operations?.filter((op: any) => 
+    op.type === 'Contract Call' && op.contract
+  ) || [];
+  
+  for (const dappOp of dappInteractions) {
+    // Check for known dApps
+    const knownDapps: Record<string, string> = {
+      '1D6NoQ_p1p8iXt5nB7Yb7XwGTcsdZ2a4': 'FlowState Game',
+      '1MAbK9xPBTqEGxhEHRHMmGGBHcnANGcnR': 'Koinos Swap',
+      // Add more known dApps here
+    };
+    
+    let dappName = '';
+    let methodName = dappOp.method?.toString() || 'Unknown Method';
+    
+    // Try to find a match for the contract
+    for (const [dappAddress, name] of Object.entries(knownDapps)) {
+      if (dappOp.contract?.includes(dappAddress)) {
+        dappName = name;
+        break;
+      }
+    }
+    
+    if (dappName) {
+      actions.push({
+        type: 'contract_interaction',
+        description: `${dappName}: ${methodName}`,
+        dappName,
+        metadata: {
+          contract: dappOp.contract,
+          method: methodName,
+          args: dappOp.args
+        }
+      });
+    }
+  }
+  
+  // If no actions were identified, add a generic one
+  if (actions.length === 0) {
+    actions.push({
+      type: 'other',
+      description: 'Transaction'
+    });
+  }
+  
+  return actions;
+}
+
 export function formatTransactions(transactions: BlockchainTransaction[]): FormattedTransaction[] {
   return transactions.map(tx => {
     const formattedOperations = tx.operations?.map((op: any) => {
@@ -182,9 +430,13 @@ export function formatTransactions(transactions: BlockchainTransaction[]): Forma
       return formattedOp;
     }) || [];
 
+    // Extract actions using the new approach
+    const actions = extractTransactionActions(tx);
+
     return {
       ...tx,
-      formattedOperations
+      formattedOperations,
+      actions
     };
   });
 }
@@ -277,14 +529,6 @@ const methodCategories: Record<string, MethodCategory> = {
   'getVote': { name: 'Get Vote', tags: ['governance', 'query', 'read-only'] },
   'getPendingProposals': { name: 'Get Pending Proposals', tags: ['governance', 'query', 'read-only'] },
   // Add more method categories as needed
-};
-
-// Known token contracts mapping
-const TOKEN_CONTRACTS: Record<string, string> = {
-  '15DJN4a8SgrbGhhGksSBASiSYjGnMU8dGL': 'KOIN',
-  '1FaSvLjQJsCJKq5ybmGsMMQs8RQYyVv8ju': 'VHP',
-  '19WbXUYoAVngjfvjnU1KvCUzfyHHE9C97v': 'VAPOR',
-  // Add more token contracts as needed
 };
 
 /**
@@ -470,9 +714,9 @@ export function generateUserFriendlyInfo(tx: any): UserFriendlyTransactionInfo {
       return {
         actionType: userIsRecipient ? 'received' : 'sent',
         description: userIsRecipient 
-          ? `Received ${formatValue(value, tx.tokenSymbol)} ${tx.tokenSymbol}` 
-          : `Sent ${formatValue(value, tx.tokenSymbol)} ${tx.tokenSymbol}`,
-        amount: formatValue(value, tx.tokenSymbol),
+          ? `Received ${formatTokenAmount(value, parseInt(tx.tokenDecimals))} ${tx.tokenSymbol}` 
+          : `Sent ${formatTokenAmount(value, parseInt(tx.tokenDecimals))} ${tx.tokenSymbol}`,
+        amount: formatTokenAmount(value, parseInt(tx.tokenDecimals)),
         tokenSymbol: tx.tokenSymbol,
         counterparty: shortenAddress(counterparty),
         isPositive: userIsRecipient
@@ -491,8 +735,8 @@ export function generateUserFriendlyInfo(tx: any): UserFriendlyTransactionInfo {
       if (to && value) {
         return {
           actionType: 'minted',
-          description: `Minted ${formatValue(value, tx.tokenSymbol)} ${tx.tokenSymbol}`,
-          amount: formatValue(value, tx.tokenSymbol),
+          description: `Minted ${formatTokenAmount(value, parseInt(tx.tokenDecimals))} ${tx.tokenSymbol}`,
+          amount: formatTokenAmount(value, parseInt(tx.tokenDecimals)),
           tokenSymbol: tx.tokenSymbol,
           counterparty: shortenAddress(to),
           isPositive: true
@@ -512,8 +756,8 @@ export function generateUserFriendlyInfo(tx: any): UserFriendlyTransactionInfo {
       if (from && value) {
         return {
           actionType: 'burned',
-          description: `Burned ${formatValue(value, tx.tokenSymbol)} ${tx.tokenSymbol}`,
-          amount: formatValue(value, tx.tokenSymbol),
+          description: `Burned ${formatTokenAmount(value, parseInt(tx.tokenDecimals))} ${tx.tokenSymbol}`,
+          amount: formatTokenAmount(value, parseInt(tx.tokenDecimals)),
           tokenSymbol: tx.tokenSymbol,
           counterparty: shortenAddress(from),
           isPositive: false
@@ -625,9 +869,7 @@ export function formatDetailedTransactions(transactions: DetailedTransaction[], 
             try {
               // Identify the token
               let eventTokenSymbol = 'Unknown';
-              if (TOKEN_CONTRACTS[event.source]) {
-                eventTokenSymbol = TOKEN_CONTRACTS[event.source];
-              }
+              eventTokenSymbol = getTokenSymbolSync(event.source);
               
               // Add to the token's total
               const value = BigInt(event.data.value);
@@ -659,9 +901,7 @@ export function formatDetailedTransactions(transactions: DetailedTransaction[], 
             try {
               // Identify the token
               let eventTokenSymbol = 'Unknown';
-              if (TOKEN_CONTRACTS[event.source]) {
-                eventTokenSymbol = TOKEN_CONTRACTS[event.source];
-              }
+              eventTokenSymbol = getTokenSymbolSync(event.source);
               
               // Add to the token's total
               const value = BigInt(event.data.value);
@@ -926,12 +1166,12 @@ export async function enrichTransactionsWithTimestamps(transactions: any[]): Pro
 /**
  * Fetches the token balance for a specific account and token
  * @param address The account address to fetch the balance for
- * @param tokenSymbol The token symbol (e.g., 'koin')
+ * @param tokenContract The token contract address
  * @returns Promise resolving to the token balance as a string
  */
-export async function getTokenBalance(address: string, tokenSymbol: string = 'koin'): Promise<string> {
+export async function getTokenBalance(address: string, tokenContract: string): Promise<string> {
   try {
-    const url = `https://api.koinos.io/v1/account/${address}/balance/${tokenSymbol.toLowerCase()}`;
+    const url = `https://api.koinos.io/v1/account/${address}/balance/${tokenContract.toLowerCase()}`;
     
     const response = await fetch(url);
     
@@ -942,53 +1182,30 @@ export async function getTokenBalance(address: string, tokenSymbol: string = 'ko
     const data = await response.json();
     return data.value || '0';
   } catch (error) {
-    console.error(`Error fetching ${tokenSymbol} balance:`, error);
+    console.error(`Error fetching token balance:`, error);
     return '0';
   }
 }
 
-// Known token decimals
-const TOKEN_DECIMALS: Record<string, number> = {
-  'KOIN': 8,
-  'VHP': 8,
-  'VAPOR': 8,
-  // Add more token decimals as needed
-};
-
-// Helper function to format values in a user-friendly way
-function formatValue(value: string, tokenSymbol: string = 'KOIN'): string {
-  if (!value) return '0';
-  
-  // Get the appropriate decimal places for this token
-  const decimals = TOKEN_DECIMALS[tokenSymbol] || 8;
-  
-  try {
-    // Convert from smallest unit to token unit using correct decimals
-    // For example, for KOIN with 8 decimals, divide by 10^8
-    const rawNum = BigInt(value);
-    const divisor = BigInt(10 ** decimals);
-    
-    // Use floating point for display formatting
-    const majorUnits = Number(rawNum / divisor);
-    const minorUnits = Number(rawNum % divisor) / Number(divisor);
-    const num = majorUnits + minorUnits;
-    
-    // Format based on size
-    if (num === 0) return '0';
-    if (num < 0.000001) return '< 0.000001';
-    if (num < 1) return num.toFixed(6);
-    if (num < 1000) return num.toFixed(4);
-    if (num < 1000000) return `${(num / 1000).toFixed(2)}K`;
-    return `${(num / 1000000).toFixed(2)}M`;
-  } catch (err) {
-    console.error('Error formatting token value:', err);
-    return value;
-  }
-}
-
-// Helper function to shorten addresses
-function shortenAddress(address: string): string {
+/**
+ * Helper function to shorten addresses
+ */
+export function shortenAddress(address: string): string {
   if (!address) return '';
   if (address.length < 16) return address;
   return `${address.substring(0, 6)}...${address.substring(address.length - 4)}`;
+}
+
+// Need to create a synchronous function alternative for token lookups in non-async contexts
+function getTokenSymbolSync(address: string): string {
+  // This is a synchronous version that uses a simplified mapping for common tokens
+  // It's used when we can't easily use async/await in the current context
+  const commonTokens: Record<string, string> = {
+    '15DJN4a8SgrbGhhGksSBASiSYjGnMU8dGL': 'KOIN',
+    '1FaSvLjQJsCJKq5ybmGsMMQs8RQYyVv8ju': 'VHP',
+    '19WbXUYoAVngjfvjnU1KvCUzfyHHE9C97v': 'VAPOR',
+    '1PanaPdEDXfHpHcyxLumRsHN7SxuTSvboJ': 'PANA',
+  };
+  
+  return commonTokens[address] || 'Unknown';
 } 

@@ -37,57 +37,74 @@ export const JsonDisplay = ({ data }: JsonDisplayProps) => {
     return "text-stone-300";
   };
 
+  // Traditional JSON rendering matching KoinosBlocks style
   const renderExpandedJson = (obj: unknown, level = 0): JSX.Element => {
-    const indent = "  ".repeat(level);
+    // Use two spaces for indentation
+    const indent = " ".repeat(level);
     
     if (Array.isArray(obj)) {
-      if (obj.length === 0) return <span>[<span className="text-stone-500">]</span></span>;
+      if (obj.length === 0) return <span>[]</span>;
       
       return (
-        <div className="flex flex-col">
+        <span>
           <span>[</span>
-          {obj.map((item, index) => (
-            <div key={index} className="flex flex-wrap">
-              <span className="whitespace-pre">{indent}  </span>
-              {renderExpandedJson(item, level + 1)}
-              {index < obj.length - 1 && <span className="text-stone-500">,</span>}
-            </div>
-          ))}
-          <div>
-            <span className="whitespace-pre">{indent}</span>
-            <span>]</span>
+          <div className="ml-2">
+            {obj.map((item, index) => (
+              <div key={index} className="flex">
+                <span className="whitespace-pre">{indent}</span>
+                <span className="flex-1">
+                  {renderExpandedJson(item, 0)}
+                  {index < obj.length - 1 && <span className="text-white">,</span>}
+                </span>
+              </div>
+            ))}
           </div>
-        </div>
+          <span className="whitespace-pre">{indent}</span>
+          <span>]</span>
+        </span>
       );
     }
 
     if (obj && typeof obj === "object") {
       const entries = Object.entries(obj);
-      if (entries.length === 0) return <span>{"{"}<span className="text-stone-500">{"}"}</span></span>;
+      if (entries.length === 0) return <span>{"{}"}</span>;
       
       return (
-        <div className="flex flex-col">
+        <span>
           <span>{"{"}</span>
-          {entries.map(([key, value], index) => (
-            <div key={key} className="flex flex-wrap">
-              <span className="whitespace-pre">{indent}  </span>
-              <span className={getKeyClass()}>&quot;{key}&quot;</span>
-              <span className="text-stone-400">: </span>
-              {renderExpandedJson(value, level + 1)}
-              {index < entries.length - 1 && <span className="text-stone-500">,</span>}
-            </div>
-          ))}
-          <div>
-            <span className="whitespace-pre">{indent}</span>
-            <span>{"}"}</span>
+          <div className="ml-2">
+            {entries.map(([key, value], index) => (
+              <div key={key} className="flex">
+                <span className="whitespace-pre">{indent}</span>
+                <span className={getKeyClass()}>&quot;{key}&quot;</span>
+                <span className="text-stone-400">: </span>
+                <span className="flex-1">
+                  {renderExpandedJson(value, 0)}
+                  {index < entries.length - 1 && <span className="text-white">,</span>}
+                </span>
+              </div>
+            ))}
           </div>
-        </div>
+          <span className="whitespace-pre">{indent}</span>
+          <span>{"}"}</span>
+        </span>
       );
     }
 
     if (typeof obj === "string") {
       // Break long strings with a CSS class for better readability
-      return <span className={`${getValueClass(obj)} break-all`}>&quot;{obj}&quot;</span>;
+      // Max length for strings before they're broken into multiple lines
+      const maxInlineLength = 80;
+      
+      if (obj.length > maxInlineLength) {
+        return (
+          <span className={`${getValueClass(obj)} break-all`}>
+            &quot;{obj}&quot;
+          </span>
+        );
+      }
+      
+      return <span className={getValueClass(obj)}>&quot;{obj}&quot;</span>;
     }
 
     return <span className={getValueClass(obj)}>{JSON.stringify(obj)}</span>;
@@ -145,6 +162,7 @@ export const JsonDisplay = ({ data }: JsonDisplayProps) => {
       {expanded ? (
         <div className="overflow-x-auto p-4 text-sm">
           <pre
+            className="font-mono"
             style={{
               maxWidth: "100%",
               wordWrap: "break-word",

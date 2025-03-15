@@ -28,7 +28,8 @@ export const WHITELISTED_WALLETS: string[] = [
   "12mutMcqqWavhfri2yXWSv77oh7PVY2WSS",
   "18fjEQn9bJQnB75BX97WXghMeVKHNJ6mmg",
   "@jga",
-  "jga"
+  "jga",
+  "1AQjQSbD2oHUNTi7FSvVywUQpWbNbjS8pD"
 ];
 
 // Optional: Add some test wallets for your team during development

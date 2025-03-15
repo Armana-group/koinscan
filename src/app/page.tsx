@@ -11,8 +11,9 @@ import { motion } from "framer-motion";
 import dynamic from 'next/dynamic';
 import type { TransactionHistory as TransactionHistoryType } from '@/components/TransactionHistory';
 import { Contract, Provider } from 'koilib';
-import { RPC_NODE } from "@/koinos/constants"; 
+import { RPC_NODE, NICKNAMES_CONTRACT_ID } from "@/koinos/constants"; 
 import * as toast from "@/lib/toast";
+import { resolveNickname } from "@/koinos/utils";
 
 // Dynamically import the TransactionHistory component
 const TransactionHistory = dynamic(
@@ -174,10 +175,48 @@ export default function Home() {
     setIsSearching(true);
     
     try {
-      // If it looks like a transaction ID (64 char hex string)
-      if (/^[0-9a-fA-F]{64}$/.test(value)) {
+      // Check for transaction ID (Koinos format with 0x1220 prefix or standard 64-char hex)
+      if (/^0x1220[0-9a-fA-F]{64}$/.test(value) || /^[0-9a-fA-F]{64}$/.test(value) || /^0x[0-9a-fA-F]{64}$/.test(value)) {
         console.log(`[handleSearch] Detected as transaction ID`);
         router.push(`/tx/${value}`);
+        return;
+      }
+      
+      // Check for nickname (@handle format)
+      if (value.startsWith('@')) {
+        console.log(`[handleSearch] Detected as nickname: ${value}`);
+        try {
+          // First resolve the nickname to an address
+          const address = await resolveNickname(value);
+          
+          if (!address) {
+            toast.error(`Nickname ${value} not found.`);
+            return;
+          }
+          
+          // Then check if it's a contract or a regular address
+          console.log(`[handleSearch] Resolved nickname to address: ${address}`);
+          const isToken = await isTokenContract(address);
+          
+          if (isToken) {
+            console.log(`[handleSearch] Address is a contract, redirecting to contract page: ${address}`);
+            router.push(`/contracts/${address}`);
+          } else {
+            console.log(`[handleSearch] Address is a wallet, redirecting to address page: ${address}`);
+            router.push(`/address/${address}`);
+          }
+          return;
+        } catch (error) {
+          console.error(`[handleSearch] Error processing nickname:`, error);
+          toast.error(`Error resolving nickname ${value}.`);
+          return;
+        }
+      }
+      
+      // Check for block number (numeric input)
+      if (/^\d+$/.test(value)) {
+        console.log(`[handleSearch] Detected as block number: ${value}`);
+        router.push(`/blocks/${value}`);
         return;
       }
       
@@ -288,7 +327,7 @@ export default function Home() {
                   </div>
                   <Input
                     type="text"
-                    placeholder="Search by address, transaction hash, block, or token"
+                    placeholder="Search by address, transaction ID (0x1220...), block number, or @nickname"
                     className="pl-12 pr-14 h-14 text-lg bg-background border-2 border-border/50 rounded-2xl shadow-[0_0_0_1px_rgba(0,0,0,0.02)] hover:border-border focus:border-foreground/30 focus:ring-2 focus:ring-foreground/10 transition-all"
                     ref={inputRef}
                     disabled={isSearching}

@@ -5,6 +5,7 @@ import * as toast from "@/lib/toast";
 import { useEffect, useState } from "react";
 import { Contract, Provider, utils } from "koilib";
 import { BLOCK_EXPLORER, RPC_NODE } from "@/koinos/constants";
+import { getTokenImageUrl } from "@/koinos/utils";
 import Image from "next/image";
 
 export const ContractInfo = (props: {
@@ -158,14 +159,15 @@ export const ContractInfo = (props: {
         <div className="flex flex-col md:flex-row gap-8">
           {/* Image Section */}
           <div className="flex-shrink-0">
-            <div className="relative w-12 h-12 md:w-12 md:h-12 rounded-full overflow-hidden bg-gradient-to-br from-blue-500/5 to-purple-500/5">
+            <div className="relative w-16 h-16 md:w-16 md:h-16 rounded-full overflow-hidden bg-gradient-to-br from-blue-500/5 to-purple-500/5">
               <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 to-purple-500/10 backdrop-blur-xl" />
               <Image 
-                src={props.image} 
+                src={getTokenImageUrl(props.address, props.nickname)} 
                 alt={props.nickname || "Contract"} 
-                className="relative z-10 object-cover"
+                className="relative z-10 object-contain"
                 fill
-                sizes="(max-width: 768px) 12px, 12px"
+                sizes="(max-width: 768px) 64px, 64px"
+                priority
               />
             </div>
           </div>

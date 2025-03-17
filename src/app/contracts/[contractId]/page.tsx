@@ -24,6 +24,7 @@ import { Navbar } from "@/components/Navbar";
 import { useWallet } from "@/contexts/WalletContext";
 import { cn } from "@/lib/utils";
 import { abiGovernance } from "@/koinos/abis";
+import { getTokenImageUrl } from "@/koinos/utils";
 
 export default function ContractPage({
   params,
@@ -115,8 +116,16 @@ export default function ContractPage({
             });
             if (result && result.value) {
               const metadata = JSON.parse(result.value);
-              image = metadata.image;
-              description = metadata.bio;
+              // Use our token image utility, falling back to metadata.image if provided
+              image = getTokenImageUrl(contractId, nickname);
+              if (metadata.image) {
+                // If metadata has an image and it's a full URL, use it as a secondary option
+                if (metadata.image.startsWith('http')) {
+                  // We'll try this URL only if our main image fails to load
+                  console.log(`Using metadata image as backup: ${metadata.image}`);
+                }
+              }
+              description = metadata.bio || '';
             }
           } catch (error) {
             console.warn("Failed to fetch metadata:", error);

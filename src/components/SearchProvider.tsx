@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import * as toast from "@/lib/toast";
+import { resolveNickname as koinosResolveNickname } from "@/koinos/utils";
 
 // Define known token addresses (this would ideally be moved to a constant file)
 const KNOWN_TOKEN_ADDRESSES = [
@@ -75,13 +76,18 @@ export function SearchProvider({ children }: { children: ReactNode }) {
     return false;
   }
 
-  // Function to resolve a nickname to an address (simplified for now)
+  // Function to resolve a nickname to an address
   async function resolveNickname(nickname: string): Promise<string | null> {
     console.log(`[resolveNickname] Resolving nickname: ${nickname}`);
     
-    // In a real implementation, you would call the Koinos Name Service
-    // For now, we'll just return null to simulate a non-existent nickname
-    return null;
+    // Use the actual implementation from koinos/utils
+    try {
+      const address = await koinosResolveNickname(nickname);
+      return address;
+    } catch (error) {
+      console.error(`[resolveNickname] Error resolving nickname:`, error);
+      return null;
+    }
   }
 
   // The main search handler function

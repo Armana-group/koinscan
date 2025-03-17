@@ -15,7 +15,7 @@ interface NavItem {
 }
 
 const navs: NavItem[] = [
-  { name: "Explorer", href: "/" },
+  { name: "Home", href: "/" },
   { name: "Blocks", href: "/blocks" },
   { name: "Tokens", href: "/tokens" },
   { name: "Contracts", href: "/contracts" },

@@ -35,7 +35,7 @@ export function Navbar() {
               <DropdownMenuSeparator />
               <Link href="/">
                 <DropdownMenuItem className={pathname === "/" ? "bg-accent" : ""}>
-                  Explorer
+                  Home
                 </DropdownMenuItem>
               </Link>
               <Link href="/blocks">

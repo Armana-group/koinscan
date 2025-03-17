@@ -3,7 +3,7 @@ import { ReactNode } from 'react';
 
 // Default toast options for consistent positioning and behavior
 const defaultOptions: ToastOptions = {
-  position: 'top-center',
+  position: 'bottom-center',
   duration: 3000,
 };
 

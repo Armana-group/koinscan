@@ -28,7 +28,7 @@ export function Toaster() {
 
   return (
     <HotToaster
-      position="top-center"
+      position="bottom-center"
       toastOptions={{
         className: "!bg-background !text-foreground border-border shadow-lg",
         style: {

@@ -1,4 +1,4 @@
-import { Navigation } from "./navigation";
+import { NavigationWithSearch } from "./NavigationWithSearch";
 import { Logo } from "./Logo";
 import { WalletButton } from "./WalletButton";
 import { ThemeToggle } from "./theme-toggle";
@@ -68,7 +68,7 @@ export function Navbar() {
 
         {/* Desktop Navigation (Center) */}
         <div className="hidden md:flex flex-1 justify-center">
-          <Navigation />
+          <NavigationWithSearch />
         </div>
 
         {/* Wallet Button (Right) */}

@@ -14,6 +14,7 @@ import { Contract, Provider } from 'koilib';
 import { RPC_NODE, NICKNAMES_CONTRACT_ID } from "@/koinos/constants"; 
 import * as toast from "@/lib/toast";
 import { resolveNickname } from "@/koinos/utils";
+import { useSearch } from "@/components/SearchProvider";
 
 // Dynamically import the TransactionHistory component
 const TransactionHistory = dynamic(
@@ -73,6 +74,7 @@ const KNOWN_TOKEN_ADDRESSES = [
 export default function Home() {
   const inputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
+  const searchContext = useSearch();
   const [searchAddress, setSearchAddress] = useState<string>("");
   const [isSearching, setIsSearching] = useState<boolean>(false);
   const [tokenList, setTokenList] = useState<string[]>(KNOWN_TOKEN_ADDRESSES);

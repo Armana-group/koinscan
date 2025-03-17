@@ -4,6 +4,7 @@ import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/toaster";
 import { WalletProvider } from "@/contexts/WalletContext";
+import { SearchProvider } from "@/components/SearchProvider";
 
 const poppins = Poppins({
   subsets: ["latin"],
@@ -32,8 +33,10 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <WalletProvider>
-            {children}
-            <Toaster />
+            <SearchProvider>
+              {children}
+              <Toaster />
+            </SearchProvider>
           </WalletProvider>
         </ThemeProvider>
       </body>

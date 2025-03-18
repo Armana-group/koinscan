@@ -5,6 +5,8 @@
  * Set BETA_ACCESS_ENABLED to false when ready for public release.
  */
 
+import whitelist from './whitelist.json';
+
 // Master toggle for beta access restriction
 export const BETA_ACCESS_ENABLED = true;
 
@@ -17,28 +19,8 @@ export const PUBLIC_PATHS = [
   '/images',
 ];
 
-// Add wallet addresses that are allowed to access the beta
-export const WHITELISTED_WALLETS: string[] = [
-  // Add your invited wallet addresses here
-  // Example: "15DJN4a8SgrbGhhGksSBASiSYjGnMU8dGL",
-  
-  // ⬇️ ADD YOUR WALLET ADDRESS BELOW FOR TESTING ⬇️
-  
-  // ⬆️ ADD YOUR WALLET ADDRESS ABOVE FOR TESTING ⬆️
-  "12mutMcqqWavhfri2yXWSv77oh7PVY2WSS",
-  "18fjEQn9bJQnB75BX97WXghMeVKHNJ6mmg",
-  "@jga",
-  "jga",
-  "1AQjQSbD2oHUNTi7FSvVywUQpWbNbjS8pD"
-];
-
-// Optional: Add some test wallets for your team during development
-export const DEV_WALLETS: string[] = [
-  // Add your development team wallets here
-];
-
 // Combined list of all allowed wallets
-export const ALLOWED_WALLETS = [...WHITELISTED_WALLETS, ...DEV_WALLETS];
+export const ALLOWED_WALLETS = [...whitelist.whitelisted, ...whitelist.dev];
 
 // Function to get nickname for a wallet if available
 export function getNicknameForWallet(walletAddress: string): string | null {
@@ -52,4 +34,33 @@ export function getNicknameForWallet(walletAddress: string): string | null {
 }
 
 // Local storage key for storing beta access state
-export const BETA_ACCESS_KEY = "koinos-explorer-beta-access"; 
+export const BETA_ACCESS_KEY = "koinos-explorer-beta-access";
+
+// Functions to manage whitelist
+export async function addWalletToWhitelist(wallet: string): Promise<void> {
+  const response = await fetch('/api/admin/whitelist', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ wallet, action: 'add' }),
+  });
+  
+  if (!response.ok) {
+    throw new Error('Failed to add wallet to whitelist');
+  }
+}
+
+export async function removeWalletFromWhitelist(wallet: string): Promise<void> {
+  const response = await fetch('/api/admin/whitelist', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ wallet, action: 'remove' }),
+  });
+  
+  if (!response.ok) {
+    throw new Error('Failed to remove wallet from whitelist');
+  }
+} 

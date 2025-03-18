@@ -5,6 +5,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/toaster";
 import { WalletProvider } from "@/contexts/WalletContext";
 import { SearchProvider } from "@/components/SearchProvider";
+import { Footer } from "@/components/Footer";
 
 const poppins = Poppins({
   subsets: ["latin"],
@@ -25,7 +26,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${poppins.className} ${poppins.variable}`}>
+      <body className={`${poppins.className} ${poppins.variable} h-[100dvh] flex flex-col overflow-hidden`}>
         <ThemeProvider
           attribute="class"
           defaultTheme="system"
@@ -34,7 +35,10 @@ export default function RootLayout({
         >
           <WalletProvider>
             <SearchProvider>
-              {children}
+              <main className="flex-1 overflow-auto">
+                {children}
+              </main>
+              <Footer />
               <Toaster />
             </SearchProvider>
           </WalletProvider>

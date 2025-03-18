@@ -149,15 +149,15 @@ export default function ContractsPage() {
             </div>
             
             {/* Search and filter */}
-            <div className="flex flex-col md:flex-row gap-4">
-              <form onSubmit={handleSearchSubmit} className="flex-grow relative">
+            <div className="flex flex-col gap-4">
+              <form onSubmit={handleSearchSubmit} className="w-full relative">
                 <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
                   <Search className="h-5 w-5 text-muted-foreground" />
                 </div>
                 <Input
                   type="text"
                   placeholder="Search by name, description, or contract address"
-                  className="pl-12 pr-14 h-14 text-lg bg-background border-2 border-border/50 rounded-2xl shadow-[0_0_0_1px_rgba(0,0,0,0.02)] hover:border-border focus:border-foreground/30 focus:ring-2 focus:ring-foreground/10 transition-all"
+                  className="pl-12 pr-14 h-14 text-lg bg-background border-2 border-border/50 rounded-2xl shadow-[0_0_0_1px_rgba(0,0,0,0.02)] hover:border-border focus:border-foreground/30 focus:ring-2 focus:ring-foreground/10 transition-all w-full"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   ref={searchInputRef}
@@ -173,7 +173,7 @@ export default function ContractsPage() {
               </form>
               
               {/* Category filter */}
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-2 justify-center sm:justify-start">
                 {categories.map((category) => (
                   <motion.div
                     key={category}

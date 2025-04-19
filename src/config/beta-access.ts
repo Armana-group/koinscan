@@ -8,7 +8,7 @@
 import whitelist from './whitelist.json';
 
 // Master toggle for beta access restriction
-export const BETA_ACCESS_ENABLED = true;
+export const BETA_ACCESS_ENABLED = false;
 
 // Paths that should always be accessible even when beta access is enabled
 export const PUBLIC_PATHS = [

@@ -6,6 +6,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { WalletProvider } from "@/contexts/WalletContext";
 import { SearchProvider } from "@/components/SearchProvider";
 import { Footer } from "@/components/Footer";
+import { BetaBanner } from "@/components/BetaBanner";
 
 const poppins = Poppins({
   subsets: ["latin"],
@@ -36,6 +37,9 @@ export default function RootLayout({
           <WalletProvider>
             <SearchProvider>
               <main className="flex-1 overflow-auto">
+                <div className="container mx-auto px-4 pt-4">
+                  <BetaBanner />
+                </div>
                 {children}
               </main>
               <Footer />

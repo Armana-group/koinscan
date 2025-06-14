@@ -42,7 +42,7 @@ export default function ContractPage({
   const [selectedMethod, setSelectedMethod] = useState<string>("");
   const [submitText, setSubmitText] = useState<string>("");
   const [functionSearchQuery, setFunctionSearchQuery] = useState<string>("");
-  const { signer } = useWallet();
+  const { signer, provider } = useWallet();
   const [code, setCode] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
   const [results, setResults] = useState<string>("");
@@ -60,7 +60,6 @@ export default function ContractPage({
       try {
         setLoading(true);
         setError("");
-        const provider = new Provider([RPC_NODE]);
         const nicknames = new Contract({
           id: NICKNAMES_CONTRACT_ID,
           provider,
@@ -135,7 +134,7 @@ export default function ContractPage({
         // Initialize contract
         const c = new Contract({
           id: contractId,
-          provider: new Provider([RPC_NODE]),
+          provider,
         });
 
         try {
@@ -198,7 +197,7 @@ export default function ContractPage({
         setLoading(false);
       }
     })();
-  }, [params.contractId]);
+  }, [params.contractId, provider]);
 
   const contractMethods = useMemo(() => {
     if (!contract) return [];

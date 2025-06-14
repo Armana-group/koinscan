@@ -19,7 +19,6 @@ import {
 } from "./ui/dropdown-menu";
 import * as toast from "@/lib/toast";
 import { useWallet } from "@/contexts/WalletContext";
-import { useEffect, useState } from "react";
 import * as kondor from "kondor-js";
 import { Check, ChevronDown } from "lucide-react";
 import { useRouter } from "next/navigation";

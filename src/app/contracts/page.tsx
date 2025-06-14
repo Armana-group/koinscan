@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { Search, ArrowUp } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence, stagger } from "framer-motion";
 import { Navbar } from "@/components/Navbar";
 import { Input } from "@/components/ui/input";
+import { useWallet } from "@/contexts/WalletContext";
 import { 
   Card, 
   CardHeader, 
@@ -18,7 +19,7 @@ import {
 import { Button } from "@/components/ui/button";
 
 // List of contracts
-const contracts = [
+const systemContracts = [
   {
     id: "koin",
     name: "Koin",
@@ -68,17 +69,71 @@ const contracts = [
     address: "1HGN9h47CzoFwU2bQZwe6BYoX4TM6pXc4b",
     categories: ["system"],
   },
+  {
+    id: "koinos-fund",
+    name: "Koinos Fund",
+    description: "Fund for Koinos projects",
+    address: "1HGN9h47CzoFwU2bQZwe6BYoX4TM6pXc4b",
+    categories: ["system", "utility"],
+  },
+  {
+    id: "bytelauncher",
+    name: "Byte Launcher",
+    description: "Utility contract to update system contracts",
+    address: "1HGN9h47CzoFwU2bQZwe6BYoX4TM6pXc4b",
+    categories: ["system", "utility"],
+  },
+  {
+    id: "bytestorage",
+    name: "Byte Storage",
+    description: "Utility contract to save the bytecode of new system contracts",
+    address: "1HGN9h47CzoFwU2bQZwe6BYoX4TM6pXc4b",
+    categories: ["system", "utility"],
+  },
 ];
-
-// Get unique categories
-const categories = ["all", ...Array.from(new Set(contracts.flatMap((contract) => contract.categories)))];
 
 export default function ContractsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
   const router = useRouter();
   const searchInputRef = useRef<HTMLInputElement>(null);
-  
+  const { provider } = useWallet();
+  const [contracts, setContracts] = useState<typeof systemContracts>([]);
+
+  // Fetch Koin contract address
+  useEffect(() => {
+    async function fetchKoinAddress() {
+      if (!provider || typeof provider.invokeGetContractAddress !== 'function') return;
+
+      const newContracts = [];
+      for (let i = 0; i < systemContracts.length; i++) {
+        try {
+          const contract = systemContracts[i];
+          const response = await provider.invokeGetContractAddress(contract.id);
+          if (response && response.value && response.value.address) {
+            contract.address = response.value.address;
+            newContracts.push(contract);
+          }
+        } catch (error) {
+          console.error("Error fetching Koin contract address:", error);
+        }
+      }
+      setContracts(newContracts);
+    }
+
+    fetchKoinAddress();
+  }, [provider]);
+
+  // Get unique categories
+  const categories = useMemo(() => [
+    "all",
+    ...Array.from(
+      new Set(contracts.flatMap(
+        (contract) => contract.categories)
+      )
+    )
+  ], [contracts]);
+
   // Filter contracts based on search query and category
   const filteredContracts = contracts.filter((contract) => {
     const query = searchQuery.toLowerCase();

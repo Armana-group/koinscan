@@ -1,6 +1,6 @@
 "use client";
 
-import { SignerInterface } from "koilib";
+import { SignerInterface, ProviderInterface, Provider } from "koilib";
 import { createContext, useContext, useState, ReactNode, useEffect } from "react";
 import * as kondor from "kondor-js";
 import { 
@@ -17,6 +17,7 @@ import { saveBetaAccess, clearBetaAccess } from "@/lib/beta-access";
 // Local storage keys
 const ADDRESS_STORAGE_KEY = "koinos-explorer-address";
 const WALLET_TYPE_STORAGE_KEY = "koinos-explorer-wallet-type";
+export const RPC_NODE_STORAGE_KEY = "rpc-node";
 
 // Add kondor type declaration to make TypeScript happy
 declare global {
@@ -38,6 +39,8 @@ interface WalletContextType {
   forgetAddress: () => void;
   isReconnecting: boolean;
   kondorAccounts: any[];
+  provider: ProviderInterface | undefined;
+  setProvider: (provider: ProviderInterface) => void;
 }
 
 const WalletContext = createContext<WalletContextType | undefined>(undefined);
@@ -48,6 +51,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   const [savedWalletType, setSavedWalletType] = useState<WalletName | null>(null);
   const [isReconnecting, setIsReconnecting] = useState(false);
   const [kondorAccounts, setKondorAccounts] = useState<any[]>([]);
+  const [provider, setProvider] = useState<ProviderInterface>();
 
   // Load saved wallets on initial render
   useEffect(() => {
@@ -106,6 +110,20 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       if (storedWalletType) {
         setSavedWalletType(storedWalletType);
       }
+    }
+  }, []);
+
+  // Load provider from localStorage on initial render
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      let rpcNode = localStorage.getItem(RPC_NODE_STORAGE_KEY);
+      if (!rpcNode) {
+        rpcNode = "https://api.koinos.io";
+        localStorage.setItem(RPC_NODE_STORAGE_KEY, rpcNode);
+      }
+      
+      const newProvider = new Provider([rpcNode]);
+      setProvider(newProvider);
     }
   }, []);
 
@@ -177,7 +195,9 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       savedWalletType,
       forgetAddress,
       isReconnecting,
-      kondorAccounts
+      kondorAccounts,
+      provider,
+      setProvider
     }}>
       {children}
     </WalletContext.Provider>

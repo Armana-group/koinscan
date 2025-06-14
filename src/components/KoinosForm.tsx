@@ -320,13 +320,16 @@ const RecursiveFormField = ({
       <div className="space-y-2">
         <Label>{fieldPrettyName}</Label>
         <RadioGroup
-          value={value as string}
-          onValueChange={(newValue) => onChange(newValue)}
+          value={String(value)}
+          onValueChange={(newValue) => {
+            const numValue = Number(newValue);
+            onChange(numValue);
+          }}
           className="flex flex-col space-y-1"
         >
           {enums.map((enumValue) => (
             <div key={enumValue.name} className="flex items-center space-x-2">
-              <RadioGroupItem value={enumValue.name} id={`${name}-${enumValue.name}`} />
+              <RadioGroupItem value={String(enumValue.value)} id={`${name}-${enumValue.name}`} />
               <Label htmlFor={`${name}-${enumValue.name}`}>{enumValue.name}</Label>
             </div>
           ))}

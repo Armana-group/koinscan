@@ -28,6 +28,7 @@ import {
 import { Clock, Hash, ArrowRight, ExternalLink, User, Coins, FileText } from "lucide-react";
 import { Navbar } from '@/components/Navbar';
 import { JsonDisplay } from '@/components/JsonDisplay';
+import { useWallet } from "@/contexts/WalletContext";
 
 interface TransactionPageProps {
   params: {
@@ -61,6 +62,7 @@ export default function TransactionPage({ params }: TransactionPageProps) {
   const [transaction, setTransaction] = useState<any>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const { rpcNode } = useWallet();
 
   useEffect(() => {
     async function fetchTransaction() {
@@ -68,7 +70,7 @@ export default function TransactionPage({ params }: TransactionPageProps) {
         setLoading(true);
         setError(null);
         
-        const data = await getTransactionDetails(txid);
+        const data = await getTransactionDetails(rpcNode, txid);
         setTransaction(data);
       } catch (e: any) {
         setError(e.message || 'Failed to fetch transaction details');

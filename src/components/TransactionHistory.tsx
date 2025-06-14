@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, ArrowRight, ExternalLink } from "lucide-react";
+import { useWallet } from '@/contexts/WalletContext';
 
 interface Transaction {
   id: string;
@@ -45,13 +46,14 @@ export function TransactionHistory({ initialAddress }: TransactionHistoryProps) 
   const [error, setError] = useState<string | null>(null);
   const [limit, setLimit] = useState<number>(10);
   const [page, setPage] = useState<number>(1);
+  const { provider } = useWallet();
 
   const fetchTransactions = useCallback(async (address: string) => {
     setLoading(true);
     setError(null);
     try {
       console.log('Making API call to getAddressHistory...');
-      const data = await getAddressHistory(address, limit, false, true);
+      const data = await getAddressHistory(provider!,address, limit, false, true);
       console.log('Received transaction data:', data);
       
       if (data && Array.isArray(data)) {
@@ -69,7 +71,7 @@ export function TransactionHistory({ initialAddress }: TransactionHistoryProps) 
     } finally {
       setLoading(false);
     }
-  }, [limit]);
+  }, [limit, provider]);
 
   // Fetch transactions when initialAddress changes
   useEffect(() => {

@@ -31,6 +31,7 @@ import { Input } from "@/components/ui/input";
 import { formatDistanceToNow } from "date-fns";
 import { Clock, Hash, Layers, Cpu, ArrowDown, ChevronLeft, ChevronRight, ExternalLink, Search, ArrowUp } from "lucide-react";
 import Link from "next/link";
+import { useWallet } from "@/contexts/WalletContext";
 
 export default function BlocksPage() {
   const router = useRouter();
@@ -41,6 +42,7 @@ export default function BlocksPage() {
   const [searchValue, setSearchValue] = useState<string>("");
   const [isSearching, setIsSearching] = useState<boolean>(false);
   const [searchError, setSearchError] = useState<string | null>(null);
+  const { rpcNode } = useWallet();
 
   useEffect(() => {
     async function fetchHeadBlock() {
@@ -48,11 +50,11 @@ export default function BlocksPage() {
         setLoading(true);
         setError(null);
         
-        const headData = await getHeadBlockInfo();
+        const headData = await getHeadBlockInfo(rpcNode);
         setHeadBlock(headData);
 
         if (headData && headData.head_topology && headData.head_topology.height) {
-          const blockData = await getBlockByHeight(headData.head_topology.height);
+          const blockData = await getBlockByHeight(rpcNode, headData.head_topology.height);
           setBlockDetail(blockData);
         }
         

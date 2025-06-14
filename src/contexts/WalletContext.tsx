@@ -41,6 +41,8 @@ interface WalletContextType {
   kondorAccounts: any[];
   provider: ProviderInterface | undefined;
   setProvider: (provider: ProviderInterface) => void;
+  rpcNode: string;
+  setRpcNode: (node: string) => void;
 }
 
 const WalletContext = createContext<WalletContextType | undefined>(undefined);
@@ -52,6 +54,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   const [isReconnecting, setIsReconnecting] = useState(false);
   const [kondorAccounts, setKondorAccounts] = useState<any[]>([]);
   const [provider, setProvider] = useState<ProviderInterface>();
+  const [rpcNode, setRpcNode] = useState<string>("");
 
   // Load saved wallets on initial render
   useEffect(() => {
@@ -116,16 +119,26 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   // Load provider from localStorage on initial render
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      let rpcNode = localStorage.getItem(RPC_NODE_STORAGE_KEY);
-      if (!rpcNode) {
-        rpcNode = "https://api.koinos.io";
-        localStorage.setItem(RPC_NODE_STORAGE_KEY, rpcNode);
+      let storedRpcNode = localStorage.getItem(RPC_NODE_STORAGE_KEY);
+      if (!storedRpcNode) {
+        storedRpcNode = "https://api.koinos.io";
+        localStorage.setItem(RPC_NODE_STORAGE_KEY, storedRpcNode);
       }
       
-      const newProvider = new Provider([rpcNode]);
+      setRpcNode(storedRpcNode);
+      const newProvider = new Provider([storedRpcNode]);
       setProvider(newProvider);
     }
   }, []);
+
+  // Update provider when rpcNode changes
+  useEffect(() => {
+    if (rpcNode) {
+      const newProvider = new Provider([rpcNode]);
+      setProvider(newProvider);
+      localStorage.setItem(RPC_NODE_STORAGE_KEY, rpcNode);
+    }
+  }, [rpcNode]);
 
   // Handle Kondor account changes
   useEffect(() => {
@@ -197,7 +210,9 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       isReconnecting,
       kondorAccounts,
       provider,
-      setProvider
+      setProvider,
+      rpcNode,
+      setRpcNode
     }}>
       {children}
     </WalletContext.Provider>

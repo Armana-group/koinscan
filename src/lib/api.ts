@@ -1,8 +1,5 @@
-import { Provider, Transaction, utils } from 'koilib';
+import { Provider, ProviderInterface, Transaction, utils } from 'koilib';
 import { getTokenByAddress, formatTokenAmount, getTokenBySymbol } from '@/lib/tokens';
-
-// Initialize the Koinos provider
-const provider = new Provider(['https://api.koinos.io']);
 
 export interface FormattedOperation {
   type: string;
@@ -117,6 +114,7 @@ export interface TransactionAction {
 }
 
 export async function getAddressHistory(
+  provider: ProviderInterface,
   address: string,
   limit: number = 10,
   includeIncoming: boolean = false,
@@ -987,6 +985,7 @@ export function formatDetailedTransactions(transactions: DetailedTransaction[], 
  * @returns Array of detailed transactions
  */
 export async function getDetailedAccountHistory(
+  restNode: string,
   address: string,
   limit: number = 10,
   ascending: boolean = false,
@@ -994,7 +993,7 @@ export async function getDetailedAccountHistory(
   sequenceNumber?: string
 ): Promise<DetailedTransaction[]> {
   try {
-    let url = `https://api.koinos.io/v1/account/${address}/history?limit=${limit}&ascending=${ascending}&irreversible=${irreversible}&decode_operations=true&decode_events=true`;
+    let url = `${restNode}/v1/account/${address}/history?limit=${limit}&ascending=${ascending}&irreversible=${irreversible}&decode_operations=true&decode_events=true`;
     
     // Add sequence_number parameter if provided
     if (sequenceNumber) {
@@ -1025,9 +1024,9 @@ export async function getDetailedAccountHistory(
  * @param transactionId The ID of the transaction to fetch
  * @returns Transaction details including timestamp
  */
-export async function getTransactionDetails(transactionId: string): Promise<any> {
+export async function getTransactionDetails(restNode: string, transactionId: string): Promise<any> {
   try {
-    const url = `https://api.koinos.io/v1/transaction/${transactionId}?return_receipt=true&decode_operations=true&decode_events=true`;
+    const url = `${restNode}/v1/transaction/${transactionId}?return_receipt=true&decode_operations=true&decode_events=true`;
     
     const response = await fetch(url);
     
@@ -1048,9 +1047,9 @@ export async function getTransactionDetails(transactionId: string): Promise<any>
  * @param blockId The ID of the block to fetch
  * @returns Block information including height
  */
-export async function getBlockInfo(blockId: string): Promise<any> {
+export async function getBlockInfo(restNode: string, blockId: string): Promise<any> {
   try {
-    const url = `https://api.koinos.io/v1/chain/blocks/${blockId}`;
+    const url = `${restNode}/v1/chain/blocks/${blockId}`;
     
     const response = await fetch(url);
     
@@ -1070,9 +1069,9 @@ export async function getBlockInfo(blockId: string): Promise<any> {
  * Fetches information about the head (latest) block on the blockchain
  * @returns Head block information including ID, height, and timestamp
  */
-export async function getHeadBlockInfo(): Promise<any> {
+export async function getHeadBlockInfo(restNode: string): Promise<any> {
   try {
-    const url = `https://api.koinos.io/v1/chain/head_info`;
+    const url = `${restNode}/v1/chain/head_info`;
     
     const response = await fetch(url);
     
@@ -1096,9 +1095,9 @@ export const headBlockInfo = getHeadBlockInfo;
  * @param height The height of the block to fetch
  * @returns Detailed block information including transactions and events
  */
-export async function getBlockByHeight(height: string): Promise<any> {
+export async function getBlockByHeight(restNode: string, height: string): Promise<any> {
   try {
-    const url = `https://api.koinos.io/v1/block/${height}?return_block=true&return_receipt=true&decode_operations=true&decode_events=true`;
+    const url = `${restNode}/v1/block/${height}?return_block=true&return_receipt=true&decode_operations=true&decode_events=true`;
     
     const response = await fetch(url);
     
@@ -1122,11 +1121,11 @@ export const blockByHeight = getBlockByHeight;
  * @param transactions Array of formatted transactions
  * @returns Promise resolving to transactions with timestamp information
  */
-export async function enrichTransactionsWithTimestamps(transactions: any[]): Promise<any[]> {
+export async function enrichTransactionsWithTimestamps(restNode: string, transactions: any[]): Promise<any[]> {
   const enrichedTransactions = await Promise.all(
     transactions.map(async (tx) => {
       try {
-        const txDetails = await getTransactionDetails(tx.id);
+        const txDetails = await getTransactionDetails(restNode, tx.id);
         
         if (txDetails && txDetails.transaction && txDetails.transaction.timestamp) {
           let blockHeight = '';
@@ -1136,7 +1135,7 @@ export async function enrichTransactionsWithTimestamps(transactions: any[]): Pro
           // If we have containing blocks, fetch the block height
           if (txDetails.containing_blocks && txDetails.containing_blocks.length > 0) {
             const blockId = txDetails.containing_blocks[0];
-            const blockInfo = await getBlockInfo(blockId);
+            const blockInfo = await getBlockInfo(restNode, blockId);
             
             if (blockInfo && blockInfo.header && blockInfo.header.height) {
               blockHeight = blockInfo.header.height;
@@ -1169,9 +1168,9 @@ export async function enrichTransactionsWithTimestamps(transactions: any[]): Pro
  * @param tokenContract The token contract address
  * @returns Promise resolving to the token balance as a string
  */
-export async function getTokenBalance(address: string, tokenContract: string): Promise<string> {
+export async function getTokenBalance(restNode: string, address: string, tokenContract: string): Promise<string> {
   try {
-    const url = `https://api.koinos.io/v1/account/${address}/balance/${tokenContract.toLowerCase()}`;
+    const url = `${restNode}/v1/account/${address}/balance/${tokenContract.toLowerCase()}`;
     
     const response = await fetch(url);
     

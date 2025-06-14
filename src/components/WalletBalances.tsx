@@ -7,6 +7,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import Image from 'next/image';
 import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { InfoIcon } from 'lucide-react';
+import { useWallet } from '@/contexts/WalletContext';
 
 interface WalletBalancesProps {
   address: string;
@@ -23,6 +24,7 @@ export function WalletBalances({ address }: WalletBalancesProps) {
   const [tokenBalances, setTokenBalances] = useState<TokenBalance[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { rpcNode } = useWallet();
 
   useEffect(() => {
     async function fetchBalances() {
@@ -39,7 +41,7 @@ export function WalletBalances({ address }: WalletBalancesProps) {
           try {
             // Fetch the token balance
             const response = await fetch(
-              `https://api.koinos.io/v1/account/${address}/balance/${token.address.toLowerCase()}`
+              `${rpcNode}/v1/account/${address}/balance/${token.address.toLowerCase()}`
             );
             
             if (!response.ok) {
@@ -99,7 +101,7 @@ export function WalletBalances({ address }: WalletBalancesProps) {
     }
 
     fetchBalances();
-  }, [address]);
+  }, [address, rpcNode]);
 
   return (
     <Card>

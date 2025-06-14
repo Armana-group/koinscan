@@ -81,6 +81,7 @@ import {
   AlertDescription
 } from "@/components/ui/alert";
 import { formatTokenAmount, getTokenBySymbol } from '@/lib/tokens';
+import { useWallet } from '@/contexts/WalletContext';
 
 type PaginationHistoryItem = {
   transactions: DetailedTransaction[];
@@ -236,6 +237,7 @@ export function DetailedTransactionHistory({
   // Use refs to track if we've already started fetching
   const fetchingRef = useRef<boolean>(false);
   const paginationRef = useRef(paginationHistory);
+  const { rpcNode } = useWallet();
   
   // Update the ref when the state changes
   useEffect(() => {
@@ -284,6 +286,7 @@ export function DetailedTransactionHistory({
         console.log(`Making API request with limit=${currentLimit}`);
         
         const response = await getDetailedAccountHistory(
+          rpcNode,
           address || "",
           currentLimit,
           ascending,
@@ -308,7 +311,7 @@ export function DetailedTransactionHistory({
         console.log(`Formatted transactions with address: ${address}`, formattedTransactions);
         
         // Enrich the transactions with timestamps
-        const enrichedTransactions = await enrichTransactionsWithTimestamps(formattedTransactions);
+        const enrichedTransactions = await enrichTransactionsWithTimestamps(rpcNode, formattedTransactions);
         console.log('Enriched transactions with timestamps:', enrichedTransactions);
         
         // Only update the state if we're still on the same page
@@ -354,12 +357,12 @@ export function DetailedTransactionHistory({
     setLoadingBalance(true);
     try {
       // Fetch KOIN balance
-      const koinBalanceValue = await getTokenBalance(accountAddress, 'koin');
+      const koinBalanceValue = await getTokenBalance(rpcNode, accountAddress, 'koin');
       setKoinBalance(koinBalanceValue);
       setTokenBalance(koinBalanceValue); // Keep this for backward compatibility
       
       // Fetch VHP balance
-      const vhpBalanceValue = await getTokenBalance(accountAddress, 'vhp');
+      const vhpBalanceValue = await getTokenBalance(rpcNode, accountAddress, 'vhp');
       setVhpBalance(vhpBalanceValue);
     } catch (err) {
       console.error('Error fetching token balances:', err);

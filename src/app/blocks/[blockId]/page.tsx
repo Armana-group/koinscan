@@ -32,6 +32,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatDistanceToNow } from "date-fns";
 import { Clock, Hash, Layers, ArrowUpDown, Cpu, ChevronLeft, ChevronRight, ArrowRight, ExternalLink } from "lucide-react";
 import Link from "next/link";
+import { useWallet } from "@/contexts/WalletContext";
 
 interface BlockPageProps {
   params: {
@@ -46,6 +47,7 @@ export default function BlockPage({ params }: BlockPageProps) {
   const [headBlock, setHeadBlock] = useState<any>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const { rpcNode } = useWallet();
 
   useEffect(() => {
     async function fetchBlockData() {
@@ -54,11 +56,11 @@ export default function BlockPage({ params }: BlockPageProps) {
         setError(null);
 
         // Get head block info to know the latest block height
-        const headData = await getHeadBlockInfo();
+        const headData = await getHeadBlockInfo(rpcNode);
         setHeadBlock(headData);
         
         // Get the specified block data
-        const blockData = await getBlockByHeight(blockId);
+        const blockData = await getBlockByHeight(rpcNode, blockId);
         setBlock(blockData);
         
         setLoading(false);

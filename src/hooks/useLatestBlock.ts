@@ -2,16 +2,18 @@
 
 import { useState, useEffect } from 'react';
 import { getHeadBlockInfo } from '@/lib/api';
+import { useWallet } from '@/contexts/WalletContext';
 
 export function useLatestBlock(refreshInterval = 12000) {
   const [blockInfo, setBlockInfo] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { rpcNode } = useWallet();
 
   useEffect(() => {
     async function fetchLatestBlock() {
       try {
-        const data = await getHeadBlockInfo();
+        const data = await getHeadBlockInfo(rpcNode);
         setBlockInfo(data);
         setError(null);
       } catch (err) {

@@ -79,6 +79,11 @@ export function Navbar() {
                   Contracts
                 </DropdownMenuItem>
               </Link>
+              <Link href="/network">
+                <DropdownMenuItem className={pathname === "/network" ? "bg-accent" : ""}>
+                  Network
+                </DropdownMenuItem>
+              </Link>
               <DropdownMenuSeparator />
               <div className="px-2 py-2 space-y-2">
                 <div className="space-y-2">

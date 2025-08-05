@@ -24,3 +24,47 @@ export const WALLET_CONNECT_MODAL_SIGN_OPTIONS = {
     enableExplorer: false,
   },
 };
+
+export const KNOWN_PRODUCERS = [{
+  name: "Freedom Pool",
+  address: "18DmHs6kCnr4E9Rr2Hcvm3YfXhiQ9wBuNq",
+}, {
+  name: "Koinnoisseur's max VAPOR pool",
+  address: "15jueaBcMieDCMGw6wAmEK6cNSUVicknG1",
+}, {
+  name: "JGA Pool #1",
+  address: "1DGNQQimsyBQajzQdWXY96m84YyDC2pUpB",
+}, {
+  name: "Engrave development sponsorship pool",
+  address: "13iFaqgdnsoqUTCwZC9GtRXwh8ZvdiiPwm",
+}, {
+  name: "OnKoinos (made in Australia)",
+  address: "1MFXTiWWGGhrCzGsH5TJ9x1zRyN8sNwYPr",
+}, {
+  name: "Koinos en español",
+  address: "1KfD7n93LnnihyygopWUVTkbtWVe5aXXGW",
+}, {
+  name: "Koinos Group",
+  address: "1EPZaqve43k9Jq5mNeT2ydCjUiytTTU4U",
+}, {
+  name: "KoinForge",
+  address: "14iHqMGBznBM7xJXhkrQ266FgoFdymCqLM",
+}, {
+  name: "Koinnoisseur's max VHP pool",
+  address: "18UYKhWVCbTpFs8oYC54xoiCQQthhEkX7m",
+}, {
+  name: "AlgoScout",
+  address: "1DWpSxntZbLU9HvGDPkSqdKrVvNRoUwAis",
+}, {
+  name: "Koinnoisseur's quick KOIN restore pool",
+  address: "1GJxaZw2BPU7NhB7fuVGKfQxaQ3tkhVKb8",
+}, {
+  name: "RWA and Company",
+  address: "1FodaaRAcubVgH7goBvLx7C87Mpex7fAvs",
+}, {
+  name: "JGA Pool #2",
+  address: "1MbsVfNw6yzQqA8499d8KQj8qdLyRs8CzW",
+}, {
+  name: "1JrsQXbrDqkT9yUH6gtj4yhQi1kgWwsohh",
+  address: "1JrsQXbrDqkT9yUH6gtj4yhQi1kgWwsohh",
+}];

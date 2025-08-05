@@ -19,6 +19,7 @@ const navs: NavItem[] = [
   { name: "Blocks", href: "/blocks" },
   { name: "Tokens", href: "/tokens" },
   { name: "Contracts", href: "/contracts" },
+  { name: "Network", href: "/network" },
 ];
 
 export function NavigationWithSearch() {

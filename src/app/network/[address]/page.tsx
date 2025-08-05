@@ -11,6 +11,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { KNOWN_PRODUCERS } from "@/koinos/constants";
+import { Navbar } from "@/components/Navbar";
 
 interface ProducerStats {
   address: string;
@@ -205,51 +206,64 @@ export default function ProducerPage() {
 
   if (loading) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="flex items-center space-x-4 mb-8">
-          <Link href="/network">
-            <Button variant="outline" size="sm">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Network
-            </Button>
-          </Link>
-        </div>
-        <div className="text-center py-12">
-          <div className="text-muted-foreground">Loading producer details...</div>
-        </div>
-      </div>
+      <>
+        <Navbar />
+        <main className="min-h-[calc(100vh-4rem)] bg-background">
+          <div className="container mx-auto px-4 py-8">
+            <div className="flex items-center space-x-4 mb-8">
+              <Link href="/network">
+                <Button variant="outline" size="sm">
+                  <ArrowLeft className="h-4 w-4 mr-2" />
+                  Back to Network
+                </Button>
+              </Link>
+            </div>
+            <div className="text-center py-12">
+              <div className="text-muted-foreground">Loading producer details...</div>
+            </div>
+          </div>
+        </main>
+      </>
     );
   }
 
   if (!producerStats) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="flex items-center space-x-4 mb-8">
-          <Link href="/network">
-            <Button variant="outline" size="sm">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Network
-            </Button>
-          </Link>
-        </div>
-        <div className="text-center py-12">
-          <div className="text-muted-foreground">Producer not found</div>
-        </div>
-      </div>
+      <>
+        <Navbar />
+        <main className="min-h-[calc(100vh-4rem)] bg-background">
+          <div className="container mx-auto px-4 py-8">
+            <div className="flex items-center space-x-4 mb-8">
+              <Link href="/network">
+                <Button variant="outline" size="sm">
+                  <ArrowLeft className="h-4 w-4 mr-2" />
+                  Back to Network
+                </Button>
+              </Link>
+            </div>
+            <div className="text-center py-12">
+              <div className="text-muted-foreground">Producer not found</div>
+            </div>
+          </div>
+        </main>
+      </>
     );
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      {/* Header with back button */}
-      <div className="flex items-center space-x-4 mb-8">
-        <Link href="/network">
-          <Button variant="outline" size="sm">
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Network
-          </Button>
-        </Link>
-      </div>
+    <>
+      <Navbar />
+      <main className="min-h-[calc(100vh-4rem)] bg-background">
+        <div className="container mx-auto px-4 py-8">
+          {/* Header with back button */}
+          <div className="flex items-center space-x-4 mb-8">
+            <Link href="/network">
+              <Button variant="outline" size="sm">
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Back to Network
+              </Button>
+            </Link>
+          </div>
 
       {/* Producer Header */}
       <div className="mb-8">
@@ -329,6 +343,7 @@ export default function ProducerPage() {
           </CardContent>
         </Card>
 
+        {/*
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Governance</CardTitle>
@@ -341,10 +356,11 @@ export default function ProducerPage() {
             </p>
           </CardContent>
         </Card>
+        */}
       </div>
 
       {/* Governance Proposals */}
-      <Card>
+      {/* <Card>
         <CardHeader>
           <CardTitle>Governance Proposals Approved</CardTitle>
           <CardDescription>
@@ -379,7 +395,9 @@ export default function ProducerPage() {
             </div>
           )}
         </CardContent>
-      </Card>
-    </div>
+      </Card> */}
+        </div>
+      </main>
+    </>
   );
 } 

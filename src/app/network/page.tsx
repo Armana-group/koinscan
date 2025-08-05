@@ -19,6 +19,7 @@ import { Pie } from 'react-chartjs-2';
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { KNOWN_PRODUCERS } from "@/koinos/constants";
+import { Navbar } from "@/components/Navbar";
 
 ChartJS.register(
   ArcElement, 
@@ -202,13 +203,16 @@ export default function NetworkPage() {
   };
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold tracking-tight">Network Overview</h1>
-        <p className="text-muted-foreground mt-2">
-          Real-time statistics and distribution of the Koinos network
-        </p>
-      </div>
+    <>
+      <Navbar />
+      <main className="min-h-[calc(100vh-4rem)] bg-background">
+        <div className="container mx-auto px-4 py-8">
+          <div className="mb-8">
+            <h1 className="text-3xl font-bold tracking-tight">Network Overview</h1>
+            <p className="text-muted-foreground mt-2">
+              Real-time statistics and distribution of the Koinos network
+            </p>
+          </div>
 
       {/* Network Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
@@ -292,6 +296,8 @@ export default function NetworkPage() {
           </CardContent>
         </Card>
       </div>
-    </div>
+        </div>
+      </main>
+    </>
   );
 } 

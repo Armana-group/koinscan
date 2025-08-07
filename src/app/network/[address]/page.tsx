@@ -143,9 +143,8 @@ async function getProducerStats(provider: ProviderInterface, address: string): P
   const blocksProduced = 0;
   
   // Mock VHP data (in a real implementation, this would come from the blockchain)
-  const mockVhpBalance = Math.random() * 1000000 + 100000; // Random VHP between 100K and 1.1M
-  const totalNetworkVhp = 50000000; // Mock total network VHP
-  const vhpPercentage = (mockVhpBalance / totalNetworkVhp) * 100;
+  const vhpProducing = 10 * difficulty / 3000 / 1e8;
+  const vhpPercentage = (vhpBalance / vhpProducing) * 100;
   
   // Mock governance proposals (in a real implementation, this would query governance contract)
   const mockProposals = [

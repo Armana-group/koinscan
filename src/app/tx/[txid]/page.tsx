@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, ReactNode } from "react";
+import { useParams } from "next/navigation";
 import { getTransactionDetails } from "@/lib/api";
 import { 
   Card,
@@ -30,12 +31,6 @@ import { Navbar } from '@/components/Navbar';
 import { JsonDisplay } from '@/components/JsonDisplay';
 import { useWallet } from "@/contexts/WalletContext";
 
-interface TransactionPageProps {
-  params: {
-    txid: string;
-  };
-}
-
 // Helper function to get human-readable date
 const formatDate = (timestamp: string | number): string => {
   if (!timestamp) return 'Unknown';
@@ -57,8 +52,9 @@ const formatAmount = (amount: string | number, decimals = 8): string => {
   return value.toLocaleString(undefined, { maximumFractionDigits: decimals });
 };
 
-export default function TransactionPage({ params }: TransactionPageProps) {
-  const { txid } = params;
+export default function TransactionPage() {
+  const params = useParams();
+  const txid = params.txid as string;
   const [transaction, setTransaction] = useState<any>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);

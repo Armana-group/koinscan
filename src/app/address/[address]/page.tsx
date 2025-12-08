@@ -9,15 +9,11 @@ import { AlertCircle, Copy, Check, ExternalLink, Wallet } from "lucide-react";
 import { Navbar } from "@/components/Navbar";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { useParams } from "next/navigation";
 
-interface AddressPageProps {
-  params: {
-    address: string;
-  };
-}
-
-export default function AddressPage({ params }: AddressPageProps) {
-  const { address } = params;
+export default function AddressPage() {
+  const params = useParams();
+  const address = params.address as string;
   const [error, setError] = useState<Error | null>(null);
   const [copied, setCopied] = useState(false);
 

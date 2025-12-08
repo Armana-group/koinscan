@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useParams } from "next/navigation";
 import { blockByHeight as getBlockByHeight, headBlockInfo as getHeadBlockInfo } from "@/lib/api";
 import { Navbar } from "@/components/Navbar";
 import { 
@@ -34,14 +34,9 @@ import { Clock, Hash, Layers, ArrowUpDown, Cpu, ChevronLeft, ChevronRight, Arrow
 import Link from "next/link";
 import { useWallet } from "@/contexts/WalletContext";
 
-interface BlockPageProps {
-  params: {
-    blockId: string;
-  };
-}
-
-export default function BlockPage({ params }: BlockPageProps) {
-  const { blockId } = params;
+export default function BlockPage() {
+  const params = useParams();
+  const blockId = params.blockId as string;
   const router = useRouter();
   const [block, setBlock] = useState<any>(null);
   const [headBlock, setHeadBlock] = useState<any>(null);

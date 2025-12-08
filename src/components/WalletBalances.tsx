@@ -28,7 +28,7 @@ export function WalletBalances({ address }: WalletBalancesProps) {
 
   useEffect(() => {
     async function fetchBalances() {
-      if (!address) return;
+      if (!address || !rpcNode) return;
 
       try {
         setLoading(true);
@@ -104,14 +104,20 @@ export function WalletBalances({ address }: WalletBalancesProps) {
   }, [address, rpcNode]);
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-xl flex items-center">
-          Wallet Details
+    <Card className="bg-gradient-to-br from-green-500/5 via-emerald-500/5 to-transparent">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-lg flex items-center gap-2">
+          <div className="p-2 rounded-lg bg-green-500/10">
+            <svg className="h-4 w-4 text-green-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1" />
+              <path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4" />
+            </svg>
+          </div>
+          Token Balances
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
-                <InfoIcon className="ml-2 h-4 w-4 text-muted-foreground cursor-help" />
+                <InfoIcon className="h-4 w-4 text-muted-foreground cursor-help" />
               </TooltipTrigger>
               <TooltipContent>
                 Showing tokens with non-zero balances from the official Koinos token list
@@ -122,46 +128,57 @@ export function WalletBalances({ address }: WalletBalancesProps) {
       </CardHeader>
       <CardContent>
         {loading ? (
-          <div className="space-y-2">
-            <Skeleton className="h-5 w-2/3" />
-            <Skeleton className="h-5 w-3/4" />
-            <Skeleton className="h-5 w-1/2" />
+          <div className="space-y-3">
+            <Skeleton className="h-12 w-full rounded-lg" />
+            <Skeleton className="h-12 w-full rounded-lg" />
           </div>
         ) : error ? (
           <div className="text-destructive">{error}</div>
         ) : tokenBalances.length > 0 ? (
-          <div className="font-mono text-base space-y-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {tokenBalances.map(({ token, formattedBalance }) => (
-              <div key={token.symbol} className="flex justify-between items-center">
-                <div className="flex items-center">
-                  {token.logoURI && (
-                    <div className="rounded-full overflow-hidden h-5 w-5 mr-2">
-                      <Image 
+              <div
+                key={token.symbol}
+                className="flex items-center justify-between p-3 rounded-lg bg-background/50 border border-border/40 hover:border-border/60 transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-muted/50 flex items-center justify-center overflow-hidden ring-2 ring-border/20">
+                    {token.logoURI ? (
+                      <Image
                         src={token.logoURI}
                         alt={token.symbol}
-                        width={20}
-                        height={20}
+                        width={32}
+                        height={32}
+                        className="object-contain"
                       />
-                    </div>
-                  )}
-                  <span className="font-bold">{formattedBalance}</span>
+                    ) : (
+                      <span className="text-sm font-bold text-muted-foreground">
+                        {token.symbol.charAt(0)}
+                      </span>
+                    )}
+                  </div>
+                  <div>
+                    <div className="font-semibold text-lg">{formattedBalance}</div>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div className="text-xs text-muted-foreground cursor-help">{token.symbol}</div>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p className="font-normal">{token.name}</p>
+                          {token.description && <p className="text-xs text-muted-foreground max-w-xs">{token.description}</p>}
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </div>
                 </div>
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <span className="text-muted-foreground cursor-help">{token.symbol}</span>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p className="font-normal">{token.name}</p>
-                      {token.description && <p className="text-xs text-muted-foreground">{token.description}</p>}
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
               </div>
             ))}
           </div>
         ) : (
-          <div className="text-muted-foreground text-center py-2">No token balances found</div>
+          <div className="text-muted-foreground text-center py-6 bg-muted/20 rounded-lg">
+            No token balances found
+          </div>
         )}
       </CardContent>
     </Card>

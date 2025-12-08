@@ -9,10 +9,20 @@ import { NETWORK_NAME, WALLET_CONNECT_MODAL_SIGN_OPTIONS } from "./constants";
 
 export type WalletName = "kondor" | "walletConnect";
 
-// setup wallets
-const walletConnectKoinos = new WebWalletConnectKoinos(
-  WALLET_CONNECT_MODAL_SIGN_OPTIONS,
-);
+// Lazy-initialize WalletConnect to avoid SSR issues
+let walletConnectKoinos: WebWalletConnectKoinos | null = null;
+
+function getWalletConnectKoinos(): WebWalletConnectKoinos {
+  if (!walletConnectKoinos && typeof window !== 'undefined') {
+    walletConnectKoinos = new WebWalletConnectKoinos(
+      WALLET_CONNECT_MODAL_SIGN_OPTIONS,
+    );
+  }
+  if (!walletConnectKoinos) {
+    throw new Error("WalletConnect is only available in the browser");
+  }
+  return walletConnectKoinos;
+}
 
 // Track Kondor connection state
 let isKondorConnecting = false;
@@ -120,7 +130,7 @@ export async function connectWallet(walletName: WalletName): Promise<string> {
       }
     }
     case "walletConnect": {
-      const [address] = await walletConnectKoinos.connect(
+      const [address] = await getWalletConnectKoinos().connect(
         [
           (NETWORK_NAME as string) === "mainnet"
             ? ChainIds.Mainnet
@@ -132,13 +142,13 @@ export async function connectWallet(walletName: WalletName): Promise<string> {
           Methods.WaitForTransaction,
         ],
       );
-      
+
       // Store wallet connect info
       localStorage.setItem(WALLET_CONNECT_SESSION_KEY, JSON.stringify({
         connected: true,
         address: address
       }));
-      
+
       return address;
     }
     default: {
@@ -157,7 +167,7 @@ export async function disconnectWallet(walletName: WalletName): Promise<void> {
       return;
     }
     case "walletConnect": {
-      await walletConnectKoinos.disconnect();
+      await getWalletConnectKoinos().disconnect();
       localStorage.removeItem(WALLET_CONNECT_SESSION_KEY);
       return;
     }
@@ -176,7 +186,7 @@ export function getWalletSigner(
       return kondor.getSigner(address) as any as SignerInterface;
     }
     case "walletConnect": {
-      return walletConnectKoinos.getSigner(address);
+      return getWalletConnectKoinos().getSigner(address);
     }
     default: {
       throw new Error(`"${walletName}" not implemented`);

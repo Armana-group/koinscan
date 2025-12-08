@@ -1,22 +1,62 @@
 "use client";
 
-import { useState, useRef, useEffect, useMemo } from "react";
-import { Search, ArrowUp } from "lucide-react";
+import { useState, useRef, useMemo } from "react";
+import { Search, ArrowUp, Coins, Flame, Vote, FileCode, Landmark, Server, Wallet, ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { motion, AnimatePresence, stagger } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { Navbar } from "@/components/Navbar";
 import { Input } from "@/components/ui/input";
-import { useWallet } from "@/contexts/WalletContext";
-import { 
-  Card, 
-  CardHeader, 
-  CardTitle, 
-  CardDescription, 
-  CardContent, 
-  CardFooter 
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+  CardFooter
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+
+// Icon mapping for contracts
+const contractIcons: Record<string, React.ReactNode> = {
+  koin: <Coins className="h-6 w-6" />,
+  vhp: <Flame className="h-6 w-6" />,
+  pob: <Flame className="h-6 w-6" />,
+  governance: <Vote className="h-6 w-6" />,
+  claim: <Wallet className="h-6 w-6" />,
+  name_service: <FileCode className="h-6 w-6" />,
+  resources: <Server className="h-6 w-6" />,
+  "koinos-fund": <Landmark className="h-6 w-6" />,
+  bytelauncher: <FileCode className="h-6 w-6" />,
+  bytestorage: <Server className="h-6 w-6" />,
+};
+
+// Gradient colors for contract cards
+const contractGradients: Record<string, string> = {
+  koin: "from-amber-500/20 to-yellow-500/5",
+  vhp: "from-purple-500/20 to-violet-500/5",
+  pob: "from-orange-500/20 to-red-500/5",
+  governance: "from-blue-500/20 to-cyan-500/5",
+  claim: "from-green-500/20 to-emerald-500/5",
+  name_service: "from-pink-500/20 to-rose-500/5",
+  resources: "from-slate-500/20 to-gray-500/5",
+  "koinos-fund": "from-indigo-500/20 to-blue-500/5",
+  bytelauncher: "from-teal-500/20 to-cyan-500/5",
+  bytestorage: "from-violet-500/20 to-purple-500/5",
+};
+
+const iconColors: Record<string, string> = {
+  koin: "text-amber-500",
+  vhp: "text-purple-500",
+  pob: "text-orange-500",
+  governance: "text-blue-500",
+  claim: "text-green-500",
+  name_service: "text-pink-500",
+  resources: "text-slate-400",
+  "koinos-fund": "text-indigo-500",
+  bytelauncher: "text-teal-500",
+  bytestorage: "text-violet-500",
+};
 
 // List of contracts
 const systemContracts = [
@@ -97,32 +137,8 @@ export default function ContractsPage() {
   const [selectedCategory, setSelectedCategory] = useState("all");
   const router = useRouter();
   const searchInputRef = useRef<HTMLInputElement>(null);
-  const { provider } = useWallet();
-  const [contracts, setContracts] = useState<typeof systemContracts>([]);
-
-  // Fetch Koin contract address
-  useEffect(() => {
-    async function fetchKoinAddress() {
-      if (!provider || typeof provider.invokeGetContractAddress !== 'function') return;
-
-      const newContracts = [];
-      for (let i = 0; i < systemContracts.length; i++) {
-        try {
-          const contract = systemContracts[i];
-          const response = await provider.invokeGetContractAddress(contract.id);
-          if (response && response.value && response.value.address) {
-            contract.address = response.value.address;
-            newContracts.push(contract);
-          }
-        } catch (error) {
-          console.error("Error fetching Koin contract address:", error);
-        }
-      }
-      setContracts(newContracts);
-    }
-
-    fetchKoinAddress();
-  }, [provider]);
+  // Use the static list of system contracts directly
+  const contracts = systemContracts;
 
   // Get unique categories
   const categories = useMemo(() => [
@@ -268,36 +284,45 @@ export default function ContractsPage() {
                     exit="exit"
                     custom={index}
                   >
-                    <Link 
+                    <Link
                       href={`/contracts/${contract.address}`}
-                      className="transition-transform hover:scale-[1.02] block h-full"
+                      className="block h-full group"
                     >
-                      <Card className="h-full flex flex-col">
-                        <CardHeader>
-                          <div className="flex justify-between items-start">
-                            <CardTitle className="text-2xl">{contract.name}</CardTitle>
-                            <div className="flex flex-wrap gap-1 justify-end">
-                              {contract.categories.map((category) => (
-                                <motion.div 
-                                  key={`${contract.id}-${category}`}
-                                  className="text-xs px-2 py-1 rounded-full bg-secondary text-secondary-foreground capitalize"
-                                  whileHover={{ scale: 1.1 }}
-                                >
-                                  {category}
-                                </motion.div>
-                              ))}
+                      <Card className={`h-full flex flex-col overflow-hidden bg-gradient-to-br ${contractGradients[contract.id] || "from-slate-500/10 to-gray-500/5"} hover:shadow-lg hover:scale-[1.02] transition-all duration-300`}>
+                        <CardHeader className="pb-3">
+                          <div className="flex items-start gap-4">
+                            <div className={`p-3 rounded-xl bg-background/50 backdrop-blur-sm ${iconColors[contract.id] || "text-muted-foreground"}`}>
+                              {contractIcons[contract.id] || <FileCode className="h-6 w-6" />}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex justify-between items-start gap-2">
+                                <CardTitle className="text-xl">{contract.name}</CardTitle>
+                                <div className="flex flex-wrap gap-1 justify-end">
+                                  {contract.categories.map((category) => (
+                                    <span
+                                      key={`${contract.id}-${category}`}
+                                      className="text-[10px] px-2 py-0.5 rounded-full bg-background/60 text-muted-foreground capitalize font-medium"
+                                    >
+                                      {category}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                              <CardDescription className="mt-1">{contract.description}</CardDescription>
                             </div>
                           </div>
-                          <CardDescription>{contract.description}</CardDescription>
                         </CardHeader>
-                        <CardContent className="flex-grow">
-                          <div className="mt-2">
-                            <div className="text-sm font-medium text-muted-foreground">Address:</div>
-                            <div className="text-sm font-mono truncate">{contract.address}</div>
+                        <CardContent className="flex-grow pt-0">
+                          <div className="p-3 rounded-lg bg-background/30 backdrop-blur-sm">
+                            <div className="text-xs font-medium text-muted-foreground mb-1">Contract Address</div>
+                            <div className="text-sm font-mono truncate text-foreground/80">{contract.address}</div>
                           </div>
                         </CardContent>
-                        <CardFooter>
-                          <Button variant="outline" className="">View Contract</Button>
+                        <CardFooter className="pt-2">
+                          <Button variant="ghost" className="w-full group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+                            View Contract
+                            <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
+                          </Button>
                         </CardFooter>
                       </Card>
                     </Link>

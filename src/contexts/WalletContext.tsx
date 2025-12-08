@@ -120,8 +120,9 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (typeof window !== 'undefined') {
       let storedRpcNode = localStorage.getItem(RPC_NODE_STORAGE_KEY);
-      if (!storedRpcNode) {
-        storedRpcNode = "https://api.koinos.io";
+      // Use rest.koinos.io for REST API calls (not api.koinos.io which is JSON-RPC only)
+      if (!storedRpcNode || storedRpcNode === "https://api.koinos.io" || storedRpcNode === "https://api.koinosblocks.com") {
+        storedRpcNode = "https://rest.koinos.io";
         localStorage.setItem(RPC_NODE_STORAGE_KEY, storedRpcNode);
       }
       

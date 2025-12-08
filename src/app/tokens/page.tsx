@@ -5,10 +5,29 @@ import { Navbar } from "@/components/Navbar";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Search, ArrowUpDown, ChevronDown, Filter, ArrowUp } from "lucide-react";
+import { Search, ArrowUpDown, ChevronDown, Filter, ArrowUp, ExternalLink, Coins } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { motion } from "framer-motion";
+
+// Category colors for gradients
+const categoryGradients: Record<string, string> = {
+  native: "from-amber-500/10 via-yellow-500/5 to-transparent",
+  wrapped: "from-blue-500/10 via-cyan-500/5 to-transparent",
+  meme: "from-pink-500/10 via-rose-500/5 to-transparent",
+  gaming: "from-purple-500/10 via-violet-500/5 to-transparent",
+  defi: "from-green-500/10 via-emerald-500/5 to-transparent",
+  other: "from-slate-500/10 via-gray-500/5 to-transparent",
+};
+
+const categoryBadgeColors: Record<string, string> = {
+  native: "bg-amber-500/20 text-amber-600 dark:text-amber-400 border-amber-500/30",
+  wrapped: "bg-blue-500/20 text-blue-600 dark:text-blue-400 border-blue-500/30",
+  meme: "bg-pink-500/20 text-pink-600 dark:text-pink-400 border-pink-500/30",
+  gaming: "bg-purple-500/20 text-purple-600 dark:text-purple-400 border-purple-500/30",
+  defi: "bg-green-500/20 text-green-600 dark:text-green-400 border-green-500/30",
+  other: "bg-slate-500/20 text-slate-600 dark:text-slate-400 border-slate-500/30",
+};
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -308,64 +327,78 @@ export default function TokensPage() {
               </div>
               
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredTokens.map((token, index) => (
-                  <motion.div
-                    key={token.address}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.3, delay: index * 0.05 }}
-                  >
-                    <Link 
-                      href={`/contracts/${token.address}`}
-                      className="block h-full"
+                {filteredTokens.map((token, index) => {
+                  const category = getTokenCategory(token);
+                  return (
+                    <motion.div
+                      key={token.address}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.3, delay: Math.min(index * 0.03, 0.3) }}
                     >
-                      <Card className="overflow-hidden h-full hover:shadow-md transition-shadow duration-300">
-                        <div className="flex p-4 items-center">
-                          {/* Token Logo - smaller and to the left */}
-                          <div className="w-12 h-12 rounded-full bg-muted/50 flex-shrink-0 flex items-center justify-center mr-4 overflow-hidden">
-                            {token.logoURI && !failedImages[token.address] ? (
-                              <Image
-                                src={token.logoURI}
-                                alt={token.name}
-                                width={48}
-                                height={48}
-                                className="object-contain"
-                                onError={() => handleImageError(token.address)}
-                                unoptimized={token.logoURI.includes('githubusercontent')}
-                              />
-                            ) : (
-                              <span className="text-xl font-bold text-primary">
-                                {token.symbol.charAt(0)}
-                              </span>
-                            )}
-                          </div>
-                          
-                          {/* Token Information */}
-                          <div className="flex-1 min-w-0">
-                            <div className="flex justify-between items-start">
-                              <h3 className="text-lg font-medium leading-6 truncate">
-                                {token.name}
-                              </h3>
-                              <Badge variant="outline" className="ml-2 flex-shrink-0">
-                                {token.symbol}
-                              </Badge>
+                      <Link
+                        href={`/contracts/${token.address}`}
+                        className="block h-full group"
+                      >
+                        <Card className={`overflow-hidden h-full hover:shadow-lg hover:scale-[1.02] transition-all duration-300 bg-gradient-to-br ${categoryGradients[category]}`}>
+                          <div className="flex p-5 items-start gap-4">
+                            {/* Token Logo */}
+                            <div className="w-14 h-14 rounded-2xl bg-background/60 backdrop-blur-sm flex-shrink-0 flex items-center justify-center overflow-hidden ring-1 ring-border/50 group-hover:ring-border transition-all">
+                              {token.logoURI && !failedImages[token.address] ? (
+                                <Image
+                                  src={token.logoURI}
+                                  alt={token.name}
+                                  width={48}
+                                  height={48}
+                                  className="object-contain"
+                                  onError={() => handleImageError(token.address)}
+                                  unoptimized={token.logoURI.includes('githubusercontent')}
+                                />
+                              ) : (
+                                <Coins className="h-6 w-6 text-muted-foreground" />
+                              )}
                             </div>
-                            <p className="text-xs text-muted-foreground mt-1 truncate">
-                              {formatAddress(token.address)}
-                            </p>
+
+                            {/* Token Information */}
+                            <div className="flex-1 min-w-0">
+                              <div className="flex justify-between items-start gap-2">
+                                <h3 className="text-lg font-semibold leading-tight truncate group-hover:text-primary transition-colors">
+                                  {token.name}
+                                </h3>
+                                <Badge className={`flex-shrink-0 font-mono text-xs ${categoryBadgeColors[category]}`}>
+                                  {token.symbol}
+                                </Badge>
+                              </div>
+                              <p className="text-xs text-muted-foreground mt-1.5 font-mono truncate">
+                                {formatAddress(token.address)}
+                              </p>
+                            </div>
                           </div>
-                        </div>
-                        
-                        {/* Description section */}
-                        <div className="px-4 pb-4 pt-0">
-                          <p className="text-sm text-muted-foreground line-clamp-2">
-                            {token.description || "No description available"}
-                          </p>
-                        </div>
-                      </Card>
-                    </Link>
-                  </motion.div>
-                ))}
+
+                          {/* Description section */}
+                          <div className="px-5 pb-5 pt-0">
+                            <p className="text-sm text-muted-foreground line-clamp-2 leading-relaxed">
+                              {token.description || "No description available"}
+                            </p>
+
+                            {/* Quick actions */}
+                            <div className="flex items-center gap-2 mt-4 pt-4 border-t border-border/40">
+                              <span className="text-xs text-muted-foreground">
+                                {parseInt(token.decimals)} decimals
+                              </span>
+                              {token.token_website && (
+                                <span className="text-xs text-muted-foreground flex items-center gap-1 ml-auto">
+                                  <ExternalLink className="h-3 w-3" />
+                                  Website
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </Card>
+                      </Link>
+                    </motion.div>
+                  );
+                })}
               </div>
               
               {filteredTokens.length === 0 && (

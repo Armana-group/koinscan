@@ -1,5 +1,8 @@
 export const CONTRACT_ID = "1FaSvLjQJsCJKq5ybmGsMMQs8RQYyVv8ju";
-export const RPC_NODE = "https://api.koinos.io";
+// REST API endpoint for account history, balances, etc.
+export const RPC_NODE = "https://rest.koinos.io";
+// JSON-RPC endpoints (for koilib Provider):
+// export const RPC_NODE = "https://api.koinos.io";
 // export const RPC_NODE = "https://api.koinosblocks.com";
 // Use our own explorer instead of external service
 export const BLOCK_EXPLORER = "";  // Empty string means relative URLs

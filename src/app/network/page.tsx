@@ -42,6 +42,7 @@
 
 import { Abi, Contract, Provider, ProviderInterface, Serializer, SignerInterface, utils } from "koilib";
 import { abiGovernance, abiPob } from "@/koinos/abis";
+import tokenAbi from "@/koinos/abi";
 import { getTokenImageUrl } from "@/koinos/utils";
 import { useWallet } from "@/contexts/WalletContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -198,13 +199,13 @@ async function getNetworkData(provider: ProviderInterface) {
 
   let resultInvoke = await provider.invokeGetContractAddress!("vhp");
   let id = resultInvoke!.value.address;
-  const vhpContract = new Contract({ id, provider, abi: utils.tokenAbi });
+  const vhpContract = new Contract({ id, provider, abi: tokenAbi });
   const { result: resultVhp } = await vhpContract.functions.totalSupply();
   const totalVhp = Number(resultVhp!.value) / 1e8;
 
   resultInvoke = await provider.invokeGetContractAddress!("koin");
   id = resultInvoke!.value.address;
-  const koinContract = new Contract({ id, provider, abi: utils.tokenAbi });
+  const koinContract = new Contract({ id, provider, abi: tokenAbi });
   const { result: resultKoin } = await koinContract.functions.totalSupply();
   const totalKoin = Number(resultKoin!.value) / 1e8;
 
@@ -351,8 +352,8 @@ export default function NetworkPage() {
               </Badge> */}
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stat.value}</div>
-              <p className="text-xs text-muted-foreground">
+              <div className="text-xl sm:text-2xl font-bold truncate">{stat.value}</div>
+              <p className="text-xs text-muted-foreground truncate">
                 {stat.description}
               </p>
             </CardContent>
@@ -392,22 +393,22 @@ export default function NetworkPage() {
           <CardContent className="space-y-4">
             <div className="space-y-3">
               {networkData.map((item, index) => (
-                <div key={index} className="flex items-center justify-between p-3 rounded-lg border">
-                  <div className="flex items-center space-x-3">
-                    <div 
-                      className="w-4 h-4 rounded-full"
+                <div key={index} className="flex items-center justify-between gap-3 p-3 rounded-lg border">
+                  <div className="flex items-center space-x-3 min-w-0 flex-1">
+                    <div
+                      className="w-4 h-4 rounded-full flex-shrink-0"
                       style={{ backgroundColor: generateColors(networkData.length).backgroundColor[index] }}
                     />
-                    <Link 
+                    <Link
                       href={`/network/${item.address}`}
-                      className="font-medium font-mono text-sm hover:underline cursor-pointer"
+                      className="font-medium font-mono text-sm hover:underline cursor-pointer truncate"
                     >
                       {item.name || item.address.slice(0, 8) + '...'}
                     </Link>
                   </div>
-                  <div className="text-right">
-                    <div className="font-semibold">{item.percentage === 0 ? "less than 1.0" : item.percentage.toFixed(1)}%</div>
-                    <div className="text-xs text-muted-foreground">
+                  <div className="text-right flex-shrink-0">
+                    <div className="font-semibold whitespace-nowrap">{item.percentage === 0 ? "<1.0" : item.percentage.toFixed(1)}%</div>
+                    <div className="text-xs text-muted-foreground whitespace-nowrap">
                       Block producer
                     </div>
                   </div>

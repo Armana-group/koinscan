@@ -349,7 +349,7 @@ export function DetailedTransactionHistory({
         return []; // Return empty array to allow promise chaining
       }
     },
-    [address, limit, ascending]
+    [address, limit, ascending, rpcNode]
   );
 
   // Update function to fetch both token balances
@@ -374,15 +374,24 @@ export function DetailedTransactionHistory({
 
   // Fetch transactions when address changes or when limit/ascending changes
   useEffect(() => {
-    if (address && !fetchingRef.current) {
+    console.log('[DetailedTransactionHistory] useEffect triggered:', { address, rpcNode, fetchingRef: fetchingRef.current });
+    if (address && rpcNode && !fetchingRef.current) {
+      console.log('[DetailedTransactionHistory] Starting fetch for address:', address);
       fetchingRef.current = true;
       // Reset pagination when address, limit, or ascending changes
       setPage(1);
       fetchTransactions(1).finally(() => {
         fetchingRef.current = false;
+        console.log('[DetailedTransactionHistory] Fetch completed');
+      });
+    } else {
+      console.log('[DetailedTransactionHistory] Skipping fetch - conditions not met:', {
+        hasAddress: !!address,
+        hasRpcNode: !!rpcNode,
+        isFetching: fetchingRef.current
       });
     }
-  }, [address, fetchTransactions, limit, ascending]);
+  }, [address, fetchTransactions, limit, ascending, rpcNode]);
 
   // Fetch transactions when page changes
   useEffect(() => {
@@ -452,10 +461,10 @@ export function DetailedTransactionHistory({
 
   // Replace fetchTokenBalance with fetchTokenBalances in useEffect
   useEffect(() => {
-    if (address) {
+    if (address && rpcNode) {
       fetchTokenBalances(address);
     }
-  }, [address]);
+  }, [address, rpcNode]);
 
   const formatDate = (timestamp: string) => {
     if (!timestamp) return 'Unknown';

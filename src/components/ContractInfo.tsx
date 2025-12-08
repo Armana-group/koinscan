@@ -3,8 +3,9 @@ import { Button } from "@/components/ui/button";
 import { Copy, ExternalLink, Shield, Wallet, Coins } from "lucide-react";
 import * as toast from "@/lib/toast";
 import { useEffect, useState } from "react";
-import { Contract, Provider, utils } from "koilib";
+import { Contract, Provider } from "koilib";
 import { BLOCK_EXPLORER, RPC_NODE } from "@/koinos/constants";
+import tokenAbi from "@/koinos/abi";
 import { getTokenImageUrl } from "@/koinos/utils";
 import Image from "next/image";
 
@@ -31,7 +32,7 @@ export const ContractInfo = (props: {
         const contract = new Contract({
           id: props.address,
           provider,
-          abi: utils.tokenAbi
+          abi: tokenAbi
         });
 
         // First try to fetch decimals to check if it's a token

@@ -19,18 +19,16 @@ import {
 } from "@/koinos/constants";
 import { ContractInfo } from "@/components/ContractInfo";
 import { JsonDisplay } from "@/components/JsonDisplay";
-import { useRouter } from "next/navigation";
+import { useRouter, useParams } from "next/navigation";
 import { Navbar } from "@/components/Navbar";
 import { useWallet } from "@/contexts/WalletContext";
 import { cn } from "@/lib/utils";
 import { abiGovernance } from "@/koinos/abis";
 import { getTokenImageUrl } from "@/koinos/utils";
 
-export default function ContractPage({
-  params,
-}: {
-  params: { contractId: string };
-}) {
+export default function ContractPage() {
+  const params = useParams();
+  const contractIdParam = params.contractId as string;
   const router = useRouter();
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [methodStates, setMethodStates] = useState<Record<string, {
@@ -70,8 +68,8 @@ export default function ContractPage({
         let nickname = "";
         
         // Handle contract ID resolution
-        if (params.contractId.startsWith("1")) {
-          contractId = params.contractId;
+        if (contractIdParam.startsWith("1")) {
+          contractId = contractIdParam;
           try {
             const { result } = await nicknames.functions.get_main_token({
               value: contractId,
@@ -85,18 +83,18 @@ export default function ContractPage({
             console.warn("Failed to resolve nickname for contract:", error);
           }
         } else {
-          nickname = params.contractId;
+          nickname = contractIdParam;
           try {
             // resolve nickname
             const { result } = await nicknames.functions.get_address({
-              value: params.contractId.replace("@", ""),
+              value: contractIdParam.replace("@", ""),
             });
             if (!result || !result.value) {
-              throw new Error(`Contract not found for nickname: @${params.contractId}`);
+              throw new Error(`Contract not found for nickname: @${contractIdParam}`);
             }
             contractId = result.value;
           } catch (error) {
-            throw new Error(`Failed to resolve address for @${params.contractId}`);
+            throw new Error(`Failed to resolve address for @${contractIdParam}`);
           }
         }
 
@@ -197,7 +195,7 @@ export default function ContractPage({
         setLoading(false);
       }
     })();
-  }, [params.contractId, provider]);
+  }, [contractIdParam, provider]);
 
   const contractMethods = useMemo(() => {
     if (!contract) return [];

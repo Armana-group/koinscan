@@ -2,6 +2,7 @@
 
 import { Abi, BlockHeaderJson, Contract, Provider, ProviderInterface, Serializer, SignerInterface, utils } from "koilib";
 import { abiGovernance, abiPob } from "@/koinos/abis";
+import tokenAbi from "@/koinos/abi";
 import { useWallet } from "@/contexts/WalletContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -52,7 +53,7 @@ function formatVHP(amount: number): string {
 async function getVhpBalance(provider: ProviderInterface, address: string): Promise<number> {
   const resultInvoke = await provider.invokeGetContractAddress!("vhp");
   const id = resultInvoke!.value.address;
-  const vhpContract = new Contract({ id, provider, abi: utils.tokenAbi });
+  const vhpContract = new Contract({ id, provider, abi: tokenAbi });
   const { result } = await vhpContract.functions.balanceOf({ owner: address });
   if (!result) return 0;
   return Number(result.value) / 1e8;

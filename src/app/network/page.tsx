@@ -42,6 +42,7 @@
 
 import { Abi, Contract, Provider, ProviderInterface, Serializer, SignerInterface, utils } from "koilib";
 import { abiGovernance, abiPob } from "@/koinos/abis";
+import tokenAbi from "@/koinos/abi";
 import { getTokenImageUrl } from "@/koinos/utils";
 import { useWallet } from "@/contexts/WalletContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -198,13 +199,13 @@ async function getNetworkData(provider: ProviderInterface) {
 
   let resultInvoke = await provider.invokeGetContractAddress!("vhp");
   let id = resultInvoke!.value.address;
-  const vhpContract = new Contract({ id, provider, abi: utils.tokenAbi });
+  const vhpContract = new Contract({ id, provider, abi: tokenAbi });
   const { result: resultVhp } = await vhpContract.functions.totalSupply();
   const totalVhp = Number(resultVhp!.value) / 1e8;
 
   resultInvoke = await provider.invokeGetContractAddress!("koin");
   id = resultInvoke!.value.address;
-  const koinContract = new Contract({ id, provider, abi: utils.tokenAbi });
+  const koinContract = new Contract({ id, provider, abi: tokenAbi });
   const { result: resultKoin } = await koinContract.functions.totalSupply();
   const totalKoin = Number(resultKoin!.value) / 1e8;
 

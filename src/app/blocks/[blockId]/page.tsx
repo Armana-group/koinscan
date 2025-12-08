@@ -51,6 +51,8 @@ export default function BlockPage({ params }: BlockPageProps) {
 
   useEffect(() => {
     async function fetchBlockData() {
+      if (!rpcNode) return;
+
       try {
         setLoading(true);
         setError(null);
@@ -58,11 +60,11 @@ export default function BlockPage({ params }: BlockPageProps) {
         // Get head block info to know the latest block height
         const headData = await getHeadBlockInfo(rpcNode);
         setHeadBlock(headData);
-        
+
         // Get the specified block data
         const blockData = await getBlockByHeight(rpcNode, blockId);
         setBlock(blockData);
-        
+
         setLoading(false);
       } catch (err) {
         console.error("Error fetching block data:", err);
@@ -72,7 +74,7 @@ export default function BlockPage({ params }: BlockPageProps) {
     }
 
     fetchBlockData();
-  }, [blockId]);
+  }, [blockId, rpcNode]);
 
   function formatTimestamp(timestamp: string) {
     if (!timestamp) return "Unknown";

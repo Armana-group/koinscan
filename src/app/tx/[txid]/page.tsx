@@ -66,10 +66,12 @@ export default function TransactionPage({ params }: TransactionPageProps) {
 
   useEffect(() => {
     async function fetchTransaction() {
+      if (!rpcNode) return;
+
       try {
         setLoading(true);
         setError(null);
-        
+
         const data = await getTransactionDetails(rpcNode, txid);
         setTransaction(data);
       } catch (e: any) {
@@ -80,7 +82,7 @@ export default function TransactionPage({ params }: TransactionPageProps) {
     }
 
     fetchTransaction();
-  }, [txid]);
+  }, [txid, rpcNode]);
 
   // Simplified address shortener for the UI
   const shortenAddress = (address: string): string => {

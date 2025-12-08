@@ -18,6 +18,11 @@ import { saveBetaAccess, clearBetaAccess } from "@/lib/beta-access";
 const ADDRESS_STORAGE_KEY = "koinos-explorer-address";
 const WALLET_TYPE_STORAGE_KEY = "koinos-explorer-wallet-type";
 export const RPC_NODE_STORAGE_KEY = "rpc-node";
+export const REST_NODE_STORAGE_KEY = "rest-node";
+
+// Default endpoints
+const DEFAULT_RPC_NODE = "https://api.koinos.io"; // JSON-RPC for koilib Provider
+const DEFAULT_REST_NODE = "https://rest.koinos.io"; // REST API for account history, balances
 
 // Add kondor type declaration to make TypeScript happy
 declare global {
@@ -41,8 +46,10 @@ interface WalletContextType {
   kondorAccounts: any[];
   provider: ProviderInterface | undefined;
   setProvider: (provider: ProviderInterface) => void;
-  rpcNode: string;
+  rpcNode: string; // REST API endpoint for account history, balances
   setRpcNode: (node: string) => void;
+  jsonRpcNode: string; // JSON-RPC endpoint for koilib Provider
+  setJsonRpcNode: (node: string) => void;
 }
 
 const WalletContext = createContext<WalletContextType | undefined>(undefined);
@@ -54,7 +61,8 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   const [isReconnecting, setIsReconnecting] = useState(false);
   const [kondorAccounts, setKondorAccounts] = useState<any[]>([]);
   const [provider, setProvider] = useState<ProviderInterface>();
-  const [rpcNode, setRpcNode] = useState<string>("");
+  const [rpcNode, setRpcNode] = useState<string>(""); // REST API endpoint
+  const [jsonRpcNode, setJsonRpcNode] = useState<string>(""); // JSON-RPC endpoint for koilib
 
   // Load saved wallets on initial render
   useEffect(() => {
@@ -119,25 +127,42 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   // Load provider from localStorage on initial render
   useEffect(() => {
     if (typeof window !== 'undefined') {
+      // REST API endpoint for account history, balances, etc.
+      let storedRestNode = localStorage.getItem(REST_NODE_STORAGE_KEY);
+      if (!storedRestNode) {
+        storedRestNode = DEFAULT_REST_NODE;
+        localStorage.setItem(REST_NODE_STORAGE_KEY, storedRestNode);
+      }
+      setRpcNode(storedRestNode);
+
+      // JSON-RPC endpoint for koilib Provider (network page, contract calls)
       let storedRpcNode = localStorage.getItem(RPC_NODE_STORAGE_KEY);
-      // Use rest.koinos.io for REST API calls (not api.koinos.io which is JSON-RPC only)
-      if (!storedRpcNode || storedRpcNode === "https://api.koinos.io" || storedRpcNode === "https://api.koinosblocks.com") {
-        storedRpcNode = "https://rest.koinos.io";
+      // Migrate old values that were incorrectly set to rest.koinos.io
+      if (!storedRpcNode || storedRpcNode === "https://rest.koinos.io") {
+        storedRpcNode = DEFAULT_RPC_NODE;
         localStorage.setItem(RPC_NODE_STORAGE_KEY, storedRpcNode);
       }
-      
-      setRpcNode(storedRpcNode);
+      setJsonRpcNode(storedRpcNode);
+
+      // Create provider with JSON-RPC endpoint
       const newProvider = new Provider([storedRpcNode]);
       setProvider(newProvider);
     }
   }, []);
 
-  // Update provider when rpcNode changes
+  // Update provider when jsonRpcNode changes
+  useEffect(() => {
+    if (jsonRpcNode) {
+      const newProvider = new Provider([jsonRpcNode]);
+      setProvider(newProvider);
+      localStorage.setItem(RPC_NODE_STORAGE_KEY, jsonRpcNode);
+    }
+  }, [jsonRpcNode]);
+
+  // Update REST node storage when rpcNode changes
   useEffect(() => {
     if (rpcNode) {
-      const newProvider = new Provider([rpcNode]);
-      setProvider(newProvider);
-      localStorage.setItem(RPC_NODE_STORAGE_KEY, rpcNode);
+      localStorage.setItem(REST_NODE_STORAGE_KEY, rpcNode);
     }
   }, [rpcNode]);
 
@@ -202,10 +227,10 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <WalletContext.Provider value={{ 
-      signer, 
-      setSigner, 
-      savedAddress, 
+    <WalletContext.Provider value={{
+      signer,
+      setSigner,
+      savedAddress,
       savedWalletType,
       forgetAddress,
       isReconnecting,
@@ -213,7 +238,9 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       provider,
       setProvider,
       rpcNode,
-      setRpcNode
+      setRpcNode,
+      jsonRpcNode,
+      setJsonRpcNode
     }}>
       {children}
     </WalletContext.Provider>

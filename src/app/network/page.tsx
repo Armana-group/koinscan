@@ -351,8 +351,8 @@ export default function NetworkPage() {
               </Badge> */}
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stat.value}</div>
-              <p className="text-xs text-muted-foreground">
+              <div className="text-xl sm:text-2xl font-bold truncate">{stat.value}</div>
+              <p className="text-xs text-muted-foreground truncate">
                 {stat.description}
               </p>
             </CardContent>
@@ -392,22 +392,22 @@ export default function NetworkPage() {
           <CardContent className="space-y-4">
             <div className="space-y-3">
               {networkData.map((item, index) => (
-                <div key={index} className="flex items-center justify-between p-3 rounded-lg border">
-                  <div className="flex items-center space-x-3">
-                    <div 
-                      className="w-4 h-4 rounded-full"
+                <div key={index} className="flex items-center justify-between gap-3 p-3 rounded-lg border">
+                  <div className="flex items-center space-x-3 min-w-0 flex-1">
+                    <div
+                      className="w-4 h-4 rounded-full flex-shrink-0"
                       style={{ backgroundColor: generateColors(networkData.length).backgroundColor[index] }}
                     />
-                    <Link 
+                    <Link
                       href={`/network/${item.address}`}
-                      className="font-medium font-mono text-sm hover:underline cursor-pointer"
+                      className="font-medium font-mono text-sm hover:underline cursor-pointer truncate"
                     >
                       {item.name || item.address.slice(0, 8) + '...'}
                     </Link>
                   </div>
-                  <div className="text-right">
-                    <div className="font-semibold">{item.percentage === 0 ? "less than 1.0" : item.percentage.toFixed(1)}%</div>
-                    <div className="text-xs text-muted-foreground">
+                  <div className="text-right flex-shrink-0">
+                    <div className="font-semibold whitespace-nowrap">{item.percentage === 0 ? "<1.0" : item.percentage.toFixed(1)}%</div>
+                    <div className="text-xs text-muted-foreground whitespace-nowrap">
                       Block producer
                     </div>
                   </div>

@@ -27,7 +27,7 @@ export function BetaBanner({
     <div
       className={cn(
         "w-full px-4 py-2 text-sm text-center",
-        "bg-amber-100 text-amber-800 dark:bg-indigo-900/30 dark:text-yellow-300",
+        "text-amber-700 dark:text-amber-400/80",
         className,
       )}
     >

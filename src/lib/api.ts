@@ -1181,26 +1181,43 @@ export async function enrichTransactionsWithTimestamps(restNode: string, transac
   return enrichedTransactions;
 }
 
+// Token name to contract address mapping
+const TOKEN_CONTRACTS: Record<string, string> = {
+  'koin': '15DJN4a8SgrbGhhGksSBASiSYjGnMU8dGL',
+  'vhp': '1FaSvLjQJsCJKq5ybmGsMMQs8RQYyVv8ju',
+  'vapor': '19WbXUYoAVngjfvjnU1KvCUzfyHHE9C97v',
+  'pana': '1PanaPdEDXfHpHcyxLumRsHN7SxuTSvboJ',
+};
+
 /**
  * Fetches the token balance for a specific account and token
  * @param address The account address to fetch the balance for
- * @param tokenContract The token contract address
+ * @param tokenContract The token contract address or token name (koin, vhp, etc.)
  * @returns Promise resolving to the token balance as a string
  */
 export async function getTokenBalance(restNode: string, address: string, tokenContract: string): Promise<string> {
   try {
-    const url = `${restNode}/v1/account/${address}/balance/${tokenContract.toLowerCase()}`;
+    // Resolve token name to contract address if needed
+    const contractAddress = TOKEN_CONTRACTS[tokenContract.toLowerCase()] || tokenContract;
+    const url = `${restNode}/v1/account/${address}/balance/${contractAddress}`;
     
     const response = await fetch(url);
-    
+
+    // 400/404 are expected when account has no balance for a token
     if (!response.ok) {
+      if (response.status === 400 || response.status === 404) {
+        return '0';
+      }
       throw new Error(`API request failed with status ${response.status}`);
     }
-    
+
     const data = await response.json();
     return data.value || '0';
   } catch (error) {
-    console.error(`Error fetching token balance:`, error);
+    // Only log unexpected errors
+    if (error instanceof Error && !error.message.includes('400') && !error.message.includes('404')) {
+      console.error(`Error fetching token balance:`, error);
+    }
     return '0';
   }
 }

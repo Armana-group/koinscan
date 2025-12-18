@@ -847,6 +847,11 @@ export function generateUserFriendlyInfo(tx: any): UserFriendlyTransactionInfo {
  * @returns Formatted transactions with key information extracted
  */
 export function formatDetailedTransactions(transactions: DetailedTransaction[], userAddress?: string): any[] {
+  // Guard against non-array input
+  if (!Array.isArray(transactions)) {
+    console.warn('formatDetailedTransactions received non-array input:', transactions);
+    return [];
+  }
   return transactions.map((tx) => {
     const { call_contract, upload_contract, set_system_call, set_system_contract } = tx.trx.transaction.operations[0] || {};
     
@@ -1009,10 +1014,24 @@ export async function getDetailedAccountHistory(
       throw new Error(`API request failed with status ${response.status}`);
     }
     
-    const data: DetailedTransaction[] = await response.json();
-    console.log(`API returned ${data.length} transactions`);
-    
-    return data;
+    const data = await response.json();
+
+    // Handle different response formats - API might return array directly or wrapped in an object
+    let transactions: DetailedTransaction[];
+    if (Array.isArray(data)) {
+      transactions = data;
+    } else if (data && Array.isArray(data.values)) {
+      transactions = data.values;
+    } else if (data && Array.isArray(data.transactions)) {
+      transactions = data.transactions;
+    } else {
+      console.warn('Unexpected API response format:', data);
+      transactions = [];
+    }
+
+    console.log(`API returned ${transactions.length} transactions`);
+
+    return transactions;
   } catch (error) {
     console.error('Error fetching detailed account history:', error);
     throw error;

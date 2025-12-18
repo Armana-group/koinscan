@@ -20,6 +20,7 @@ const navs: NavItem[] = [
   { name: "Tokens", href: "/tokens" },
   { name: "Contracts", href: "/contracts" },
   { name: "Network", href: "/network" },
+  { name: "dApps", href: "/dapps" },
 ];
 
 export function NavigationWithSearch() {
@@ -144,7 +145,8 @@ export function NavigationWithSearch() {
               ref={ref}
             >
               {navs.map((item) => {
-                const isActive = pathname === item.href;
+                const isActive =
+                  item.href === "/" ? pathname === item.href : pathname.startsWith(item.href);
                 return (
                   <li
                     key={item.name}

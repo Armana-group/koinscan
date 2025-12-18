@@ -6,6 +6,8 @@ export const BLOCK_EXPLORER = "";  // Empty string means relative URLs
 export const NETWORK_NAME = "mainnet";
 export const NICKNAMES_CONTRACT_ID = "1KD9Es7LBBjA1FY3ViCgQJ7e6WH1ipKbhz";
 export const GOVERNANCE_CONTRACT_ID = "19qj51eTbSFJYU7ZagudkpxPgNSzPMfdPX";
+export const FOGATA1_LIST_POOLS_CONTRACT_ID = "1MmV5nzSBVGnBrjTr3B8XtA4yPs8wcSpr";
+export const MULTICALL_CONTRACT_ID = "18dVCqPG3gwgL7DWQAciKYNuXfzEg5LW7";
 
 export const WALLET_CONNECT_MODAL_SIGN_OPTIONS = {
   // Get your projectId by creating a free WalletConnect

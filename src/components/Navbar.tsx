@@ -1,3 +1,5 @@
+"use client";
+
 import { NavigationWithSearch } from "./NavigationWithSearch";
 import { Logo } from "./Logo";
 import { WalletButton } from "./WalletButton";
@@ -17,6 +19,15 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { Input } from "./ui/input";
 import { Provider } from "koilib";
+
+const menuItems = [
+  { name: "Home", href: "/" },
+  { name: "Blocks", href: "/blocks" },
+  { name: "Tokens", href: "/tokens" },
+  { name: "Contracts", href: "/contracts" },
+  { name: "Network", href: "/network" },
+  { name: "dApps", href: "/dapps" },
+];
 
 export function Navbar() {
   const pathname = usePathname();
@@ -59,31 +70,18 @@ export function Navbar() {
                 <Logo />
               </div>
               <DropdownMenuSeparator />
-              <Link href="/">
-                <DropdownMenuItem className={pathname === "/" ? "bg-accent" : ""}>
-                  Home
-                </DropdownMenuItem>
-              </Link>
-              <Link href="/blocks">
-                <DropdownMenuItem className={pathname === "/blocks" ? "bg-accent" : ""}>
-                  Blocks
-                </DropdownMenuItem>
-              </Link>
-              <Link href="/tokens">
-                <DropdownMenuItem className={pathname === "/tokens" ? "bg-accent" : ""}>
-                  Tokens
-                </DropdownMenuItem>
-              </Link>
-              <Link href="/contracts">
-                <DropdownMenuItem className={pathname === "/contracts" ? "bg-accent" : ""}>
-                  Contracts
-                </DropdownMenuItem>
-              </Link>
-              <Link href="/network">
-                <DropdownMenuItem className={pathname === "/network" ? "bg-accent" : ""}>
-                  Network
-                </DropdownMenuItem>
-              </Link>
+              {menuItems.map((item) => {
+                const isActive =
+                  item.href === "/" ? pathname === item.href : pathname.startsWith(item.href);
+
+                return (
+                  <Link key={item.name} href={item.href}>
+                    <DropdownMenuItem className={isActive ? "bg-accent" : ""}>
+                      {item.name}
+                    </DropdownMenuItem>
+                  </Link>
+                );
+              })}
               <DropdownMenuSeparator />
               <div className="px-2 py-2 space-y-2">
                 <div className="space-y-2">

@@ -192,25 +192,30 @@ export function extractTransactionActions(tx: any, userAddress?: string): Transa
     if (eventName.includes('transfer')) {
       const { from, to, value } = eventData;
       console.log('[extractTransactionActions] Found transfer event:', eventName, 'from:', from, 'to:', to, 'value:', value);
-      
+
       if (from && to && value) {
-        // Identify the token
+        // Identify the token - get full info from KoinDX list
         const tokenAddress = event.source;
-        const tokenSymbol = getTokenSymbolSync(tokenAddress);
-        const decimals = '8'; // Default decimals
-        
+        const tokenInfo = getTokenInfoSync(tokenAddress);
+        const tokenSymbol = tokenInfo?.symbol || getTokenSymbolSync(tokenAddress);
+        const decimals = tokenInfo?.decimals || 8;
+        const logoURI = tokenInfo?.logoURI || '';
+        const tokenName = tokenInfo?.name || tokenSymbol;
+
         // Create or update token transfer entry
         if (!tokenTransfers.has(tokenAddress)) {
           tokenTransfers.set(tokenAddress, []);
         }
-        
+
         tokenTransfers.get(tokenAddress)?.push({
           from,
-          to, 
+          to,
           value,
           decimals,
           symbol: tokenSymbol,
-          address: tokenAddress
+          address: tokenAddress,
+          logoURI,
+          name: tokenName
         });
       }
     }
@@ -221,27 +226,29 @@ export function extractTransactionActions(tx: any, userAddress?: string): Transa
     // Use Array.from to convert the Map entries to an array for iteration
     Array.from(tokenTransfers.entries()).forEach(([tokenAddress, transfers]) => {
       transfers.forEach(transfer => {
-        const { from, to, value, decimals, symbol } = transfer;
+        const { from, to, value, decimals, symbol, logoURI, name } = transfer;
         const isOutgoing = userAddress && from.toLowerCase() === userAddress.toLowerCase();
         const isIncoming = userAddress && to.toLowerCase() === userAddress.toLowerCase();
-        
+
         // Only add relevant transfers if user address is provided
         if (userAddress && !isOutgoing && !isIncoming) {
           return;
         }
-        
-        const formattedAmount = formatTokenAmount(value, parseInt(decimals.toString()));
-        
+
+        const formattedAmount = formatTokenAmount(value, typeof decimals === 'number' ? decimals : parseInt(decimals.toString()));
+
         actions.push({
           type: 'token_transfer',
-          description: isIncoming 
+          description: isIncoming
             ? `Received ${formattedAmount} ${symbol}`
             : `Sent ${formattedAmount} ${symbol}`,
           tokenTransfers: [{
             token: {
               symbol,
               address: tokenAddress,
-              decimals
+              decimals,
+              name,
+              logoURI
             },
             amount: value,
             formattedAmount,
@@ -255,22 +262,25 @@ export function extractTransactionActions(tx: any, userAddress?: string): Transa
   }
   
   // Handle mint events
-  const mintEvents = tx.events?.filter((event: any) => 
+  const mintEvents = tx.events?.filter((event: any) =>
     event.name?.toLowerCase().includes('mint_event') || event.name?.toLowerCase().includes('mint.')
   ) || [];
-  
+
   for (const mint of mintEvents) {
     const eventData = mint.data || {};
     const { to, value } = eventData;
-    
+
     if (to && value) {
-      // Identify the token
+      // Identify the token - get full info from KoinDX list
       const tokenAddress = mint.source;
-      const tokenSymbol = getTokenSymbolSync(tokenAddress);
-      const decimals = '8'; // Default decimals
-      
-      const formattedAmount = formatTokenAmount(value, parseInt(decimals));
-      
+      const tokenInfo = getTokenInfoSync(tokenAddress);
+      const tokenSymbol = tokenInfo?.symbol || getTokenSymbolSync(tokenAddress);
+      const decimals = tokenInfo?.decimals || 8;
+      const logoURI = tokenInfo?.logoURI || '';
+      const tokenName = tokenInfo?.name || tokenSymbol;
+
+      const formattedAmount = formatTokenAmount(value, decimals);
+
       actions.push({
         type: 'token_mint',
         description: `Minted ${formattedAmount} ${tokenSymbol}`,
@@ -278,7 +288,9 @@ export function extractTransactionActions(tx: any, userAddress?: string): Transa
           token: {
             symbol: tokenSymbol,
             address: tokenAddress,
-            decimals
+            decimals,
+            name: tokenName,
+            logoURI
           },
           amount: value,
           formattedAmount,
@@ -289,24 +301,27 @@ export function extractTransactionActions(tx: any, userAddress?: string): Transa
       });
     }
   }
-  
+
   // Handle burn events
-  const burnEvents = tx.events?.filter((event: any) => 
+  const burnEvents = tx.events?.filter((event: any) =>
     event.name?.toLowerCase().includes('burn_event') || event.name?.toLowerCase().includes('burn.')
   ) || [];
-  
+
   for (const burn of burnEvents) {
     const eventData = burn.data || {};
     const { from, value } = eventData;
-    
+
     if (from && value) {
-      // Identify the token
+      // Identify the token - get full info from KoinDX list
       const tokenAddress = burn.source;
-      const tokenSymbol = getTokenSymbolSync(tokenAddress);
-      const decimals = '8'; // Default decimals
-      
-      const formattedAmount = formatTokenAmount(value, parseInt(decimals));
-      
+      const tokenInfo = getTokenInfoSync(tokenAddress);
+      const tokenSymbol = tokenInfo?.symbol || getTokenSymbolSync(tokenAddress);
+      const decimals = tokenInfo?.decimals || 8;
+      const logoURI = tokenInfo?.logoURI || '';
+      const tokenName = tokenInfo?.name || tokenSymbol;
+
+      const formattedAmount = formatTokenAmount(value, decimals);
+
       actions.push({
         type: 'token_burn',
         description: `Burned ${formattedAmount} ${tokenSymbol}`,
@@ -314,7 +329,9 @@ export function extractTransactionActions(tx: any, userAddress?: string): Transa
           token: {
             symbol: tokenSymbol,
             address: tokenAddress,
-            decimals
+            decimals,
+            name: tokenName,
+            logoURI
           },
           amount: value,
           formattedAmount,
@@ -1246,11 +1263,22 @@ export function shortenAddress(address: string): string {
   return `${address.substring(0, 6)}...${address.substring(address.length - 4)}`;
 }
 
-// Token cache for dynamically loaded tokens
-let tokenCache: Record<string, string> = {};
+// Token cache for dynamically loaded tokens - stores full token info
+interface CachedToken {
+  symbol: string;
+  name: string;
+  decimals: number;
+  logoURI: string;
+  address: string;
+}
 
-// Initialize token cache from the token list
+let tokenCache: Record<string, CachedToken> = {};
+let tokenCacheInitialized = false;
+
+// Initialize token cache from the KoinDX token list
 async function initializeTokenCache() {
+  if (tokenCacheInitialized) return;
+
   try {
     const response = await fetch('https://raw.githubusercontent.com/koindx/token-list/main/src/tokens/mainnet.json');
     if (response.ok) {
@@ -1258,10 +1286,17 @@ async function initializeTokenCache() {
       if (data?.tokens && Array.isArray(data.tokens)) {
         data.tokens.forEach((token: any) => {
           if (token.address && token.symbol) {
-            tokenCache[token.address] = token.symbol;
+            tokenCache[token.address] = {
+              symbol: token.symbol,
+              name: token.name || token.symbol,
+              decimals: parseInt(token.decimals) || 8,
+              logoURI: token.logoURI || '',
+              address: token.address
+            };
           }
         });
-        console.log('[TokenCache] Loaded', Object.keys(tokenCache).length, 'tokens');
+        tokenCacheInitialized = true;
+        console.log('[TokenCache] Loaded', Object.keys(tokenCache).length, 'tokens from KoinDX');
       }
     }
   } catch (error) {
@@ -1272,54 +1307,71 @@ async function initializeTokenCache() {
 // Initialize cache on module load
 initializeTokenCache();
 
-// Synchronous token symbol lookup for use in non-async contexts
-function getTokenSymbolSync(address: string): string {
-  const commonTokens: Record<string, string> = {
-    // KOIN
-    '15DJN4a8SgrbGhhGksSBASiSYjGnMU8dGL': 'KOIN',
-    // VHP (multiple address formats)
-    '1FaSvLjQJsCJKq5ybmGsMMQs8RQYyVv8ju': 'VHP',
-    '18tWNU7E4yuQzz7hMVpceb9ixmaWLVyQsr': 'VHP',
-    '18tWNU7EdyUrzr7NMVyqa9YImzaKLgz2r7MVdpqR9LepWL': 'VHP',
-    // Other commonly used tokens
-    '19WbXUYoAVngjfvjnU1KvCUzfyHHE9C97v': 'VAPOR',
-    '1PanaPdEDXfHpHcyxLumRsHN7SxuTSvboJ': 'PANA',
-    '1NsQbH5AhQXgtSNg1ejpFqTi2hmCWz1eQS': 'KOINDX',
-    '1KD9Es7LBBjA1FY3ViCgQJ7e6WH1ipKbhz': 'KOINE',
-    '1DdERbxQte8XCwLQT8KVDyq1NJo5EGhpdg': 'KOINDX',
-    '15twURbNdh6S7GVXhqVs6MoZAhCfDSdoyd': 'ETH',
-    '14MjxccMUZrtBPXnNkuAC5MLtPev2Zsk3N': 'USDT',
-    '15zQzktjXHPRstPYB9dqs6jUuCUCVvMGB9': 'BTC',
-    '1Htbqhoi9ixk1VvvKDhSinD5PcnJvzDSjH': 'KAS',
-    '1NHReq2apWsQ6UPBjNqcV3ABsj88Ncimiy': 'pVHP',
-    '1LeWGhDVD8g5rGCL4aDegEf9fKyTL1KhsS': 'KAN',
-    '1F81UPvBW4g2jFLU5VuBvoPeZFFHL5fPqQ': 'BTK',
-    '1BTQCpospHJRA7VAtZ4wvitdcqYCvkwBCD': 'KCT',
-    '1A7ix1dr77wUVD3XtCwbthbysT5LeB1CeG': 'DRUGS',
-    '18JRrBdnNqQ99faV6sn6Un1MbvU5sZWgzf': 'RUN',
-    '16aD3Ax1kC8WKAsNevAfwyEAzoYL9T7AYs': 'BALD',
-    '1KqhJUNdv3pTwVomjkCPh95Bx1w7WaUHU7': 'KINU',
-    '1CXt6cUVQ26gRWdXLFPDhL1TvUNR5vp2JB': 'TITCOIN',
-    '19AXVkzeetLUgQx7xoZnoJoZ4JnezDeT3q': 'QUACK',
-    '169UynEtFWxuvk2EX6mPphZutYDxy1NAjV': '52KPH',
-    '14Dj8RjYqy8hQ1GarrJGGeaGu6AuCwxcgy': 'FAITH',
-    '1A4Nv58odXgVK91bFHgCFWPgiu7kfsxdVY': 'PACKS',
-    '1HpqHhCQPqeJf15MwAGF6RmhJ9aet8Hd5k': 'Kat',
-    '1MKWW9dJXVUcJU9PHF1zDnzRTFQJ6q4NKy': 'Snake',
-    '1C4pGZS9oBBLs4vCTehGNBa7StXqYFRc16': 'FR',
-  };
-
-  // Try exact match from hardcoded list first
-  if (commonTokens[address]) {
-    return commonTokens[address];
-  }
-
-  // Try cached tokens from the dynamically loaded list
+// Get full token info by address
+export function getTokenInfoSync(address: string): CachedToken | null {
+  // Check cached tokens first
   if (tokenCache[address]) {
     return tokenCache[address];
   }
 
-  // Log unknown addresses for debugging (only if not already logged recently)
+  // Fallback for native tokens with special addresses
+  const nativeTokens: Record<string, CachedToken> = {
+    'koin': {
+      symbol: 'KOIN',
+      name: 'Koin',
+      decimals: 8,
+      logoURI: 'https://raw.githubusercontent.com/koindx/token-list/main/src/images/mainnet/koin.png',
+      address: 'koin'
+    },
+    'vhp': {
+      symbol: 'VHP',
+      name: 'Virtual Hash Power',
+      decimals: 8,
+      logoURI: 'https://raw.githubusercontent.com/koindx/token-list/main/src/images/mainnet/vhp.png',
+      address: 'vhp'
+    },
+    '15DJN4a8SgrbGhhGksSBASiSYjGnMU8dGL': {
+      symbol: 'KOIN',
+      name: 'Koin',
+      decimals: 8,
+      logoURI: 'https://raw.githubusercontent.com/koindx/token-list/main/src/images/mainnet/koin.png',
+      address: '15DJN4a8SgrbGhhGksSBASiSYjGnMU8dGL'
+    },
+    '1FaSvLjQJsCJKq5ybmGsMMQs8RQYyVv8ju': {
+      symbol: 'VHP',
+      name: 'Virtual Hash Power',
+      decimals: 8,
+      logoURI: 'https://raw.githubusercontent.com/koindx/token-list/main/src/images/mainnet/vhp.png',
+      address: '1FaSvLjQJsCJKq5ybmGsMMQs8RQYyVv8ju'
+    }
+  };
+
+  if (nativeTokens[address]) {
+    return nativeTokens[address];
+  }
+
+  return null;
+}
+
+// Synchronous token symbol lookup for use in non-async contexts
+function getTokenSymbolSync(address: string): string {
+  // Try the full token info lookup first (includes KoinDX cache)
+  const tokenInfo = getTokenInfoSync(address);
+  if (tokenInfo) {
+    return tokenInfo.symbol;
+  }
+
+  // Fallback hardcoded list for tokens not in KoinDX list
+  const fallbackTokens: Record<string, string> = {
+    '18tWNU7E4yuQzz7hMVpceb9ixmaWLVyQsr': 'VHP',
+    '18tWNU7EdyUrzr7NMVyqa9YImzaKLgz2r7MVdpqR9LepWL': 'VHP',
+  };
+
+  if (fallbackTokens[address]) {
+    return fallbackTokens[address];
+  }
+
+  // Log unknown addresses for debugging
   console.log('[getTokenSymbolSync] Unknown token address:', address);
   return 'Unknown';
 } 

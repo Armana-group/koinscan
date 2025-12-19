@@ -1366,7 +1366,15 @@ export function getTokenInfoSync(address: string): CachedToken | null {
       logoURI: 'https://raw.githubusercontent.com/koindx/token-list/main/src/images/mainnet/koin.png',
       address: '15DJN4a8SgrbGhhGksSBASiSYjGnMU8dGL'
     },
-    // CURRENT VHP contract
+    // CURRENT VHP contract (after upgrade)
+    '12Y5vW6gk8GceH53YfRkRre2Rrcsgw7Naq': {
+      symbol: 'VHP',
+      name: 'Virtual Hash Power',
+      decimals: 8,
+      logoURI: 'https://raw.githubusercontent.com/koindx/token-list/main/src/images/mainnet/vhp.png',
+      address: '12Y5vW6gk8GceH53YfRkRre2Rrcsgw7Naq'
+    },
+    // LEGACY VHP contract (before upgrade - for historical transactions)
     '1FaSvLjQJsCJKq5ybmGsMMQs8RQYyVv8ju': {
       symbol: 'VHP',
       name: 'Virtual Hash Power',
@@ -1374,7 +1382,7 @@ export function getTokenInfoSync(address: string): CachedToken | null {
       logoURI: 'https://raw.githubusercontent.com/koindx/token-list/main/src/images/mainnet/vhp.png',
       address: '1FaSvLjQJsCJKq5ybmGsMMQs8RQYyVv8ju'
     },
-    // Alternative VHP contract address
+    // Alternative legacy VHP contract address
     '18tWNU7E4yuQzz7hMVpceb9ixmaWLVyQsr': {
       symbol: 'VHP',
       name: 'Virtual Hash Power',

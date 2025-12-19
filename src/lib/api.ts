@@ -1213,25 +1213,28 @@ export async function enrichTransactionsWithTimestamps(restNode: string, transac
   return enrichedTransactions;
 }
 
-// Token name to contract address mapping
-const TOKEN_CONTRACTS: Record<string, string> = {
-  'koin': '15DJN4a8SgrbGhhGksSBASiSYjGnMU8dGL',
-  'vhp': '1FaSvLjQJsCJKq5ybmGsMMQs8RQYyVv8ju',
-  'vapor': '19WbXUYoAVngjfvjnU1KvCUzfyHHE9C97v',
-  'pana': '1PanaPdEDXfHpHcyxLumRsHN7SxuTSvboJ',
+// Contract address to REST API token name mapping
+// The REST API uses short names like 'koin', 'vhp' instead of full addresses
+const CONTRACT_TO_API_NAME: Record<string, string> = {
+  '15DJN4a8SgrbGhhGksSBASiSYjGnMU8dGL': 'koin',
+  '1FaSvLjQJsCJKq5ybmGsMMQs8RQYyVv8ju': 'vhp',
 };
 
 /**
  * Fetches the token balance for a specific account and token
  * @param address The account address to fetch the balance for
  * @param tokenContract The token contract address or token name (koin, vhp, etc.)
- * @returns Promise resolving to the token balance as a string
+ * @returns Promise resolving to the token balance as a string (in whole units, not satoshis)
  */
 export async function getTokenBalance(restNode: string, address: string, tokenContract: string): Promise<string> {
   try {
-    // Resolve token name to contract address if needed
-    const contractAddress = TOKEN_CONTRACTS[tokenContract.toLowerCase()] || tokenContract;
-    const url = `${restNode}/v1/account/${address}/balance/${contractAddress}`;
+    // The REST API expects short names like 'koin', 'vhp' - not full contract addresses
+    // If given a full address, try to convert it to the API name
+    let apiTokenName = tokenContract.toLowerCase();
+    if (CONTRACT_TO_API_NAME[tokenContract]) {
+      apiTokenName = CONTRACT_TO_API_NAME[tokenContract];
+    }
+    const url = `${restNode}/v1/account/${address}/balance/${apiTokenName}`;
     
     const response = await fetch(url);
 
@@ -1275,6 +1278,12 @@ interface CachedToken {
 let tokenCache: Record<string, CachedToken> = {};
 let tokenCacheInitialized = false;
 
+// Map short token names to full contract addresses
+const SHORT_NAME_TO_ADDRESS: Record<string, string> = {
+  'koin': '15DJN4a8SgrbGhhGksSBASiSYjGnMU8dGL',
+  'vhp': '1FaSvLjQJsCJKq5ybmGsMMQs8RQYyVv8ju',
+};
+
 // Initialize token cache from the KoinDX token list
 async function initializeTokenCache() {
   if (tokenCacheInitialized) return;
@@ -1286,13 +1295,22 @@ async function initializeTokenCache() {
       if (data?.tokens && Array.isArray(data.tokens)) {
         data.tokens.forEach((token: any) => {
           if (token.address && token.symbol) {
-            tokenCache[token.address] = {
+            const tokenInfo: CachedToken = {
               symbol: token.symbol,
               name: token.name || token.symbol,
               decimals: parseInt(token.decimals) || 8,
               logoURI: token.logoURI || '',
               address: token.address
             };
+
+            // Add by the address in the token list
+            tokenCache[token.address] = tokenInfo;
+
+            // Also add by full contract address if this is a short name (like 'koin', 'vhp')
+            const fullAddress = SHORT_NAME_TO_ADDRESS[token.address.toLowerCase()];
+            if (fullAddress) {
+              tokenCache[fullAddress] = { ...tokenInfo, address: fullAddress };
+            }
           }
         });
         tokenCacheInitialized = true;

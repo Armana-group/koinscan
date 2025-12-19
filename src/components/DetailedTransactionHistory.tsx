@@ -222,6 +222,16 @@ export function DetailedTransactionHistory({
   const [koinBalance, setKoinBalance] = useState<string>('0');
   const [vhpBalance, setVhpBalance] = useState<string>('0');
   const [loadingBalance, setLoadingBalance] = useState<boolean>(false);
+
+  // Format balance for display (REST API returns whole units, not satoshis)
+  const formatBalanceDisplay = (balance: string): string => {
+    const value = parseFloat(balance) || 0;
+    if (value === 0) return '0';
+    if (value < 0.01) return '< 0.01';
+    if (value < 1000) return value.toFixed(2);
+    if (value < 1000000) return `${(value / 1000).toFixed(2)}K`;
+    return `${(value / 1000000).toFixed(2)}M`;
+  };
   
   // Maintain tokenBalance and tokenSymbol for backward compatibility
   const [tokenBalance, setTokenBalance] = useState<string>('0');
@@ -1030,7 +1040,7 @@ export function DetailedTransactionHistory({
               {loadingBalance ? (
                 <Skeleton className="h-4 w-20 bg-muted" />
               ) : (
-                <span>{koinBalance} KOIN</span>
+                <span>{formatBalanceDisplay(koinBalance)} KOIN</span>
               )}
             </div>
             <div className="flex items-center gap-1">
@@ -1038,7 +1048,7 @@ export function DetailedTransactionHistory({
               {loadingBalance ? (
                 <Skeleton className="h-4 w-20 bg-muted" />
               ) : (
-                <span>{vhpBalance} VHP</span>
+                <span>{formatBalanceDisplay(vhpBalance)} VHP</span>
               )}
             </div>
           </div>
@@ -1122,13 +1132,9 @@ export function DetailedTransactionHistory({
                   </div>
                   
                   <p className="text-sm text-muted-foreground">
-                    {totalTransactionCount 
-                      ? `Showing ${formattedTransactions.length} of ${totalTransactionCount} transactions${formattedTransactions.filter(tx => tx.totalValueTransferred && parseFloat(tx.totalValueTransferred) > 0).length > 0 
-                          ? ` with ${formattedTransactions.filter(tx => tx.totalValueTransferred && parseFloat(tx.totalValueTransferred) > 0).length} transfers` 
-                          : ''}`
-                      : `Showing ${formattedTransactions.length} transactions${formattedTransactions.filter(tx => tx.totalValueTransferred && parseFloat(tx.totalValueTransferred) > 0).length > 0 
-                          ? ` with ${formattedTransactions.filter(tx => tx.totalValueTransferred && parseFloat(tx.totalValueTransferred) > 0).length} transfers` 
-                          : ''}`
+                    {totalTransactionCount
+                      ? `Showing ${formattedTransactions.length} of ${totalTransactionCount} transactions`
+                      : `Showing ${formattedTransactions.length} transactions`
                     }
                   </p>
                 </div>

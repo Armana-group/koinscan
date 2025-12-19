@@ -816,210 +816,200 @@ export function DetailedTransactionHistory({
     return formatDate(timestamp);
   };
 
-  // Update TransactionRow component to use the new model
-  const TransactionRow: React.FC<{ 
+  // Minimal TransactionRow component
+  const TransactionRow: React.FC<{
     tx: FormattedTransaction;
     isExpanded: boolean;
-    toggleExpand: () => void; 
+    toggleExpand: () => void;
   }> = ({ tx, isExpanded, toggleExpand }) => {
-    // Extract transaction actions from the transaction if available
     const actions = tx.actions || [];
-    
-    // Use the first action as the primary one for display
-    const primaryAction = actions[0] || {
-      type: 'other',
-      description: 'Transaction'
+    const primaryAction = actions[0] || { type: 'other', description: 'Transaction' };
+
+    // Get the primary token transfer for display
+    const primaryTransfer = primaryAction.tokenTransfers?.[0];
+    const isReceive = primaryTransfer?.isPositive;
+    const isSend = primaryTransfer && !primaryTransfer.isPositive;
+
+    // Determine transaction type icon and styling
+    const getTypeIcon = () => {
+      switch(primaryAction.type) {
+        case 'token_transfer':
+          return isReceive ? ArrowDownLeft : ArrowUpRight;
+        case 'token_mint':
+          return Plus;
+        case 'token_burn':
+          return Flame;
+        case 'contract_interaction':
+          return Component;
+        case 'contract_upload':
+          return FileUp;
+        case 'governance':
+          return BarChart4;
+        default:
+          return Layers;
+      }
     };
-    
-    // Determine icon and color based on action type
-    let ActionIcon = ArrowRight;
-    let bgColorClass = "bg-muted";
-    let textColorClass = "text-muted-foreground";
-    
-    switch(primaryAction.type) {
-      case 'token_transfer':
-        if (primaryAction.tokenTransfers?.[0]?.isPositive) {
-          ActionIcon = ArrowDownLeft;
-          bgColorClass = "bg-green-100 dark:bg-green-900";
-          textColorClass = "text-green-800 dark:text-green-200";
-        } else {
-          ActionIcon = ArrowUpRight;
-          bgColorClass = "bg-blue-100 dark:bg-blue-900";
-          textColorClass = "text-blue-800 dark:text-blue-200";
+
+    const TypeIcon = getTypeIcon();
+
+    // Get amount color class
+    const getAmountColor = () => {
+      if (primaryAction.type === 'token_mint' || isReceive) return 'text-green-600 dark:text-green-400';
+      if (primaryAction.type === 'token_burn' || isSend) return 'text-orange-600 dark:text-orange-400';
+      return 'text-foreground';
+    };
+
+    // Get icon color class
+    const getIconColor = () => {
+      if (primaryAction.type === 'token_mint' || isReceive) return 'text-green-600 dark:text-green-400';
+      if (primaryAction.type === 'token_burn') return 'text-red-500';
+      if (isSend) return 'text-orange-600 dark:text-orange-400';
+      if (primaryAction.type === 'contract_interaction') return 'text-purple-600 dark:text-purple-400';
+      if (primaryAction.type === 'governance') return 'text-indigo-600 dark:text-indigo-400';
+      return 'text-muted-foreground';
+    };
+
+    // Format amount with +/- prefix
+    const formatAmount = () => {
+      if (!primaryTransfer) return null;
+      const prefix = isReceive ? '+' : '-';
+      return `${prefix}${primaryTransfer.formattedAmount} ${primaryTransfer.token.symbol}`;
+    };
+
+    // Get counterparty address
+    const getCounterparty = () => {
+      if (!primaryTransfer) return null;
+      if (isReceive) return primaryTransfer.from;
+      return primaryTransfer.to;
+    };
+
+    // Get counterparty label
+    const getCounterpartyLabel = () => {
+      if (!primaryTransfer) return null;
+      return isReceive ? 'from' : 'to';
+    };
+
+    // Get token image URL
+    const getTokenImage = () => {
+      if (primaryTransfer?.token.logoURI) return primaryTransfer.token.logoURI;
+      if (primaryTransfer?.token.address) {
+        const symbol = primaryTransfer.token.symbol?.toLowerCase();
+        if (symbol === 'koin' || symbol === 'vhp') {
+          return `https://raw.githubusercontent.com/koindx/token-list/main/src/images/mainnet/${symbol}.png`;
         }
-        break;
-      case 'token_mint':
-        ActionIcon = Plus;
-        bgColorClass = "bg-green-100 dark:bg-green-900";
-        textColorClass = "text-green-800 dark:text-green-200";
-        break;
-      case 'token_burn':
-        ActionIcon = Flame;
-        bgColorClass = "bg-red-100 dark:bg-red-900";
-        textColorClass = "text-red-800 dark:text-red-200";
-        break;
-      case 'contract_interaction':
-        ActionIcon = Component;
-        bgColorClass = "bg-purple-100 dark:bg-purple-900";
-        textColorClass = "text-purple-800 dark:text-purple-200";
-        break;
-      case 'contract_upload':
-        ActionIcon = FileUpIcon;
-        bgColorClass = "bg-amber-100 dark:bg-amber-900";
-        textColorClass = "text-amber-800 dark:text-amber-200";
-        break;
-      case 'governance':
-        ActionIcon = BarChart4;
-        bgColorClass = "bg-indigo-100 dark:bg-indigo-900";
-        textColorClass = "text-indigo-800 dark:text-indigo-200";
-        break;
-      default:
-        ActionIcon = ArrowRight;
-        break;
-    }
-    
-    // Format transaction date
-    const txDate = tx.timestamp ? formatDate(tx.timestamp) : '...';
-    
-    // Format transaction info for display
-    const txInfo = primaryAction.description || 'Transaction';
-    
-    // Determine if there are multiple token transfers
-    const hasMultipleTokenTransfers = actions.reduce((count, action) => {
-      return count + (action.tokenTransfers?.length || 0);
-    }, 0) > 1;
-    
+      }
+      return null;
+    };
+
+    const tokenImage = getTokenImage();
+    const counterparty = getCounterparty();
+    const counterpartyLabel = getCounterpartyLabel();
+    const amount = formatAmount();
+    const relativeTime = tx.timestamp ? formatRelativeTime(tx.timestamp) : '...';
+
+    // Get action label for non-transfer transactions
+    const getActionLabel = () => {
+      switch(primaryAction.type) {
+        case 'token_mint': return 'Minted';
+        case 'token_burn': return 'Burned';
+        case 'contract_interaction': return primaryAction.dappName || 'Contract';
+        case 'contract_upload': return 'Deployed';
+        case 'governance': return 'Governance';
+        default: return primaryAction.description || 'Transaction';
+      }
+    };
+
     return (
-      <div className={`border rounded-lg mb-3 overflow-hidden ${isExpanded ? 'border-primary' : ''}`}>
-        {/* Transaction summary row - clickable to expand */}
-        <div 
-          className="p-4 flex items-center justify-between cursor-pointer hover:bg-muted/50 transition-colors"
+      <div className={`border-b border-border/50 last:border-b-0 ${isExpanded ? 'bg-muted/30' : ''}`}>
+        {/* Main row - minimal design */}
+        <div
+          className="py-4 px-2 flex items-center justify-between cursor-pointer hover:bg-muted/20 transition-colors"
           onClick={toggleExpand}
         >
-          {/* Icon and type */}
-          <div className="flex items-center space-x-3">
-            <div className={`w-10 h-10 rounded-full flex items-center justify-center ${bgColorClass}`}>
-              <ActionIcon className={`h-5 w-5 ${textColorClass}`} />
+          {/* Left: Icon + Amount/Action */}
+          <div className="flex items-center gap-3 min-w-0 flex-1">
+            {/* Type Icon */}
+            <div className="flex-shrink-0">
+              <TypeIcon className={`h-5 w-5 ${getIconColor()}`} />
             </div>
-            <div>
-              <div className="font-medium">{txInfo}</div>
-              <div className="text-xs text-muted-foreground">
-                {tx.id ? shortenAddress(tx.id) : '...'}
+
+            {/* Token Icon (if available) */}
+            {tokenImage && (
+              <div className="flex-shrink-0 w-6 h-6 rounded-full overflow-hidden bg-muted">
+                <img
+                  src={tokenImage}
+                  alt={primaryTransfer?.token.symbol || 'token'}
+                  className="w-full h-full object-cover"
+                  onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                />
               </div>
-            </div>
-          </div>
-          
-          {/* Date and expand indicator */}
-          <div className="flex items-center space-x-3">
-            <div className="text-right">
-              <div className="text-sm">{txDate}</div>
-              {hasMultipleTokenTransfers && (
-                <div className="text-xs text-muted-foreground">Multiple token transfers</div>
+            )}
+
+            {/* Amount or Action */}
+            <div className="min-w-0 flex-1">
+              {amount ? (
+                <div className={`font-semibold text-base ${getAmountColor()}`}>
+                  {amount}
+                </div>
+              ) : (
+                <div className="font-medium text-base">
+                  {getActionLabel()}
+                </div>
+              )}
+
+              {/* Counterparty */}
+              {counterparty && (
+                <div className="text-xs text-muted-foreground truncate">
+                  {counterpartyLabel} {shortenAddress(counterparty)}
+                </div>
               )}
             </div>
-            <div className="text-muted-foreground">
-              {isExpanded ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
-            </div>
+          </div>
+
+          {/* Right: Time + Expand */}
+          <div className="flex items-center gap-2 flex-shrink-0 ml-4">
+            <span className="text-xs text-muted-foreground">{relativeTime}</span>
+            <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
           </div>
         </div>
-        
-        {/* Expanded details */}
+
+        {/* Expanded details - clean grid */}
         {isExpanded && (
-          <div className="p-4 border-t bg-muted/20">
-            <div className="grid gap-6">
-              <div>
-                <h4 className="text-sm font-medium mb-2">Transaction Details</h4>
-                <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-                  <div className="font-medium">Transaction ID:</div>
-                  <div className="font-mono break-all">
-                    {tx.id}
-                  </div>
-                  <div className="font-medium">Payer:</div>
-                  <div className="font-mono">
-                    {tx.payer}
-                  </div>
-                  <div className="font-medium">Block:</div>
-                  <div className="font-mono">
-                    {tx.blockId ? shortenAddress(tx.blockId) : 'Pending'}
-                  </div>
-                  <div className="font-medium">Timestamp:</div>
-                  <div className="font-mono">
-                    {txDate}
-                  </div>
-                  
-                  {/* Show token transfers if present */}
-                  {actions.map((action, actionIndex) => (
-                    action.tokenTransfers && action.tokenTransfers.length > 0 && (
-                      <React.Fragment key={`action-${actionIndex}`}>
-                        <div className="font-medium col-span-2 mt-2 pt-2 border-t">
-                          {action.type === 'token_transfer' ? 'Token Transfer' : 
-                           action.type === 'token_mint' ? 'Token Mint' : 
-                           action.type === 'token_burn' ? 'Token Burn' : 'Token Action'}:
-                        </div>
-                        {action.tokenTransfers.map((transfer, transferIndex) => (
-                          <React.Fragment key={`transfer-${actionIndex}-${transferIndex}`}>
-                            <div className="font-medium">Token:</div>
-                            <div className="font-mono">
-                              {transfer.token.symbol}
-                            </div>
-                            <div className="font-medium">Amount:</div>
-                            <div className="font-mono">
-                              {transfer.formattedAmount}
-                            </div>
-                            <div className="font-medium">From:</div>
-                            <div className="font-mono">
-                              {shortenAddress(transfer.from)}
-                            </div>
-                            <div className="font-medium">To:</div>
-                            <div className="font-mono">
-                              {shortenAddress(transfer.to)}
-                            </div>
-                          </React.Fragment>
-                        ))}
-                      </React.Fragment>
-                    )
-                  ))}
-                  
-                  <div className="font-medium">RC Used:</div>
-                  <div className="font-mono">
-                    {tx.rc_used}
-                  </div>
-                  <div className="font-medium">Signature Count:</div>
-                  <div className="font-mono">
-                    {tx.signatures.length}
-                  </div>
-                </div>
+          <div className="px-2 pb-4 pt-2 border-t border-border/30">
+            <div className="grid gap-3 text-sm">
+              {/* Transaction ID */}
+              <div className="flex items-start gap-2">
+                <Hash className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+                <span className="font-mono text-xs break-all text-muted-foreground">{tx.id}</span>
               </div>
-              <div>
-                <h4 className="text-sm font-medium mb-2">Transaction Events</h4>
-                <div className="space-y-2">
-                  {tx.events.map((event: TransactionEvent, index: number) => (
-                    <div key={index} className="flex justify-between items-center">
-                      <div className="font-mono text-xs text-muted-foreground">
-                        {renderEventSummary(event)}
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        {tx.timestamp ? formatDate(tx.timestamp) : '...'}
-                      </div>
-                    </div>
-                  ))}
-                </div>
+
+              {/* All token transfers */}
+              {actions.map((action, i) =>
+                action.tokenTransfers?.map((transfer, j) => (
+                  <div key={`${i}-${j}`} className="flex items-center gap-2 pl-6">
+                    <span className={`font-medium ${transfer.isPositive ? 'text-green-600 dark:text-green-400' : 'text-orange-600 dark:text-orange-400'}`}>
+                      {transfer.isPositive ? '+' : '-'}{transfer.formattedAmount} {transfer.token.symbol}
+                    </span>
+                    <span className="text-muted-foreground text-xs">
+                      {transfer.isPositive ? 'from' : 'to'} {shortenAddress(transfer.isPositive ? transfer.from : transfer.to)}
+                    </span>
+                  </div>
+                ))
+              )}
+
+              {/* Mana used */}
+              <div className="flex items-center gap-2 pl-6 text-xs text-muted-foreground">
+                <Flame className="h-3 w-3" />
+                <span>{formatTokenAmount(tx.rc_used, 8)} mana</span>
               </div>
-              <div>
-                <h4 className="text-sm font-medium mb-2">Operations</h4>
-                <div className="space-y-2">
-                  {tx.operations.map((operation: any, index: number) => (
-                    <div key={index} className="flex justify-between items-center">
-                      <div className="font-mono text-xs text-muted-foreground">
-                        {renderOperationSummary(operation)}
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        {tx.timestamp ? formatDate(tx.timestamp) : '...'}
-                      </div>
-                    </div>
-                  ))}
+
+              {/* Block info */}
+              {tx.blockId && (
+                <div className="flex items-center gap-2 pl-6 text-xs text-muted-foreground">
+                  <Layers className="h-3 w-3" />
+                  <span>Block {shortenAddress(tx.blockId)}</span>
                 </div>
-              </div>
+              )}
             </div>
           </div>
         )}
@@ -1298,61 +1288,52 @@ export function DetailedTransactionHistory({
                   </div>
                 </div>
                 
-                <div>
-                  <Accordion
-                    type="single"
-                    collapsible
-                    className="w-full space-y-3 border-none"
-                    style={noBorderStyles}
-                  >
-                    {loading && page === 1 ? (
-                      <div className="space-y-3">
-                        {[...Array(3)].map((_, i) => (
-                          <div key={i} className="h-16 bg-muted/50 rounded-lg animate-pulse" />
-                        ))}
-                      </div>
-                    ) : (
-                      <>
-                        {filteredTransactions.length === 0 && transactions.length > 0 ? (
-                          <div className="text-center py-8 bg-muted/10 rounded-lg">
-                            <div className="mb-4">
-                              <Filter className="h-12 w-12 mx-auto text-muted-foreground/60" />
-                            </div>
-                            <h3 className="text-lg font-medium mb-2">No matching transactions</h3>
-                            <p className="text-muted-foreground max-w-md mx-auto mb-6">
-                              There are no transactions matching your current filter criteria. Try adjusting your filters or viewing all transactions.
-                            </p>
-                            <div className="flex justify-center">
-                              <Button 
-                                variant="outline" 
-                                size="sm" 
-                                onClick={() => {
-                                  setSelectedFilters(["all"]);
-                                  fetchTransactions(1);
-                                }}
-                                className="h-8 text-xs flex items-center justify-center rounded-md hover:bg-opacity-80 hover:border-opacity-50"
-                                style={inactiveButtonStyle}
-                              >
-                                View All Transactions
-                              </Button>
-                            </div>
+                {/* Transaction List */}
+                <div className="rounded-lg border border-border/50 overflow-hidden">
+                  {loading && page === 1 ? (
+                    <div className="divide-y divide-border/50">
+                      {[...Array(3)].map((_, i) => (
+                        <div key={i} className="py-4 px-2 flex items-center gap-3">
+                          <div className="w-5 h-5 bg-muted rounded animate-pulse" />
+                          <div className="flex-1 space-y-2">
+                            <div className="h-4 bg-muted rounded w-32 animate-pulse" />
+                            <div className="h-3 bg-muted rounded w-24 animate-pulse" />
                           </div>
-                        ) : (
-                          filteredTransactions.map((tx, index) => (
-                            <TransactionRow
-                              key={index}
-                              tx={tx}
-                              isExpanded={expandedRows[tx.id] || false}
-                              toggleExpand={() => setExpandedRows(prev => ({
-                                ...prev,
-                                [tx.id]: !prev[tx.id]
-                              }))}
-                            />
-                          ))
-                        )}
-                      </>
-                    )}
-                  </Accordion>
+                          <div className="h-3 bg-muted rounded w-16 animate-pulse" />
+                        </div>
+                      ))}
+                    </div>
+                  ) : filteredTransactions.length === 0 && transactions.length > 0 ? (
+                    <div className="text-center py-12 px-4">
+                      <Filter className="h-8 w-8 mx-auto text-muted-foreground/40 mb-3" />
+                      <p className="text-sm text-muted-foreground mb-4">No matching transactions</p>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setSelectedFilters([]);
+                          fetchTransactions(1);
+                        }}
+                        className="text-xs"
+                      >
+                        Clear filters
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="divide-y divide-border/50">
+                      {filteredTransactions.map((tx, index) => (
+                        <TransactionRow
+                          key={tx.id || index}
+                          tx={tx}
+                          isExpanded={expandedRows[tx.id] || false}
+                          toggleExpand={() => setExpandedRows(prev => ({
+                            ...prev,
+                            [tx.id]: !prev[tx.id]
+                          }))}
+                        />
+                      ))}
+                    </div>
+                  )}
                 </div>
               </>
             )}

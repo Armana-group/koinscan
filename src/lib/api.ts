@@ -1246,6 +1246,32 @@ export function shortenAddress(address: string): string {
   return `${address.substring(0, 6)}...${address.substring(address.length - 4)}`;
 }
 
+// Token cache for dynamically loaded tokens
+let tokenCache: Record<string, string> = {};
+
+// Initialize token cache from the token list
+async function initializeTokenCache() {
+  try {
+    const response = await fetch('https://raw.githubusercontent.com/koindx/token-list/main/src/tokens/mainnet.json');
+    if (response.ok) {
+      const data = await response.json();
+      if (data?.tokens && Array.isArray(data.tokens)) {
+        data.tokens.forEach((token: any) => {
+          if (token.address && token.symbol) {
+            tokenCache[token.address] = token.symbol;
+          }
+        });
+        console.log('[TokenCache] Loaded', Object.keys(tokenCache).length, 'tokens');
+      }
+    }
+  } catch (error) {
+    console.warn('[TokenCache] Error loading token list:', error);
+  }
+}
+
+// Initialize cache on module load
+initializeTokenCache();
+
 // Synchronous token symbol lookup for use in non-async contexts
 function getTokenSymbolSync(address: string): string {
   const commonTokens: Record<string, string> = {
@@ -1255,19 +1281,45 @@ function getTokenSymbolSync(address: string): string {
     '1FaSvLjQJsCJKq5ybmGsMMQs8RQYyVv8ju': 'VHP',
     '18tWNU7E4yuQzz7hMVpceb9ixmaWLVyQsr': 'VHP',
     '18tWNU7EdyUrzr7NMVyqa9YImzaKLgz2r7MVdpqR9LepWL': 'VHP',
-    // Other tokens
+    // Other commonly used tokens
     '19WbXUYoAVngjfvjnU1KvCUzfyHHE9C97v': 'VAPOR',
     '1PanaPdEDXfHpHcyxLumRsHN7SxuTSvboJ': 'PANA',
     '1NsQbH5AhQXgtSNg1ejpFqTi2hmCWz1eQS': 'KOINDX',
     '1KD9Es7LBBjA1FY3ViCgQJ7e6WH1ipKbhz': 'KOINE',
+    '1DdERbxQte8XCwLQT8KVDyq1NJo5EGhpdg': 'KOINDX',
+    '15twURbNdh6S7GVXhqVs6MoZAhCfDSdoyd': 'ETH',
+    '14MjxccMUZrtBPXnNkuAC5MLtPev2Zsk3N': 'USDT',
+    '15zQzktjXHPRstPYB9dqs6jUuCUCVvMGB9': 'BTC',
+    '1Htbqhoi9ixk1VvvKDhSinD5PcnJvzDSjH': 'KAS',
+    '1NHReq2apWsQ6UPBjNqcV3ABsj88Ncimiy': 'pVHP',
+    '1LeWGhDVD8g5rGCL4aDegEf9fKyTL1KhsS': 'KAN',
+    '1F81UPvBW4g2jFLU5VuBvoPeZFFHL5fPqQ': 'BTK',
+    '1BTQCpospHJRA7VAtZ4wvitdcqYCvkwBCD': 'KCT',
+    '1A7ix1dr77wUVD3XtCwbthbysT5LeB1CeG': 'DRUGS',
+    '18JRrBdnNqQ99faV6sn6Un1MbvU5sZWgzf': 'RUN',
+    '16aD3Ax1kC8WKAsNevAfwyEAzoYL9T7AYs': 'BALD',
+    '1KqhJUNdv3pTwVomjkCPh95Bx1w7WaUHU7': 'KINU',
+    '1CXt6cUVQ26gRWdXLFPDhL1TvUNR5vp2JB': 'TITCOIN',
+    '19AXVkzeetLUgQx7xoZnoJoZ4JnezDeT3q': 'QUACK',
+    '169UynEtFWxuvk2EX6mPphZutYDxy1NAjV': '52KPH',
+    '14Dj8RjYqy8hQ1GarrJGGeaGu6AuCwxcgy': 'FAITH',
+    '1A4Nv58odXgVK91bFHgCFWPgiu7kfsxdVY': 'PACKS',
+    '1HpqHhCQPqeJf15MwAGF6RmhJ9aet8Hd5k': 'Kat',
+    '1MKWW9dJXVUcJU9PHF1zDnzRTFQJ6q4NKy': 'Snake',
+    '1C4pGZS9oBBLs4vCTehGNBa7StXqYFRc16': 'FR',
   };
 
-  // Try exact match first
+  // Try exact match from hardcoded list first
   if (commonTokens[address]) {
     return commonTokens[address];
   }
 
-  // Log unknown addresses for debugging
+  // Try cached tokens from the dynamically loaded list
+  if (tokenCache[address]) {
+    return tokenCache[address];
+  }
+
+  // Log unknown addresses for debugging (only if not already logged recently)
   console.log('[getTokenSymbolSync] Unknown token address:', address);
   return 'Unknown';
 } 

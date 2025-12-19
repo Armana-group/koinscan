@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { getAllTokens, KoinosToken, formatTokenAmount } from '@/lib/tokens';
+import { getAllTokens, KoinosToken } from '@/lib/tokens';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import Image from 'next/image';
@@ -54,26 +54,30 @@ export function WalletBalances({ address }: WalletBalancesProps) {
             // Skip tokens with zero balance
             if (balance === '0') return null;
             
-            // Calculate numeric value for sorting
-            const decimals = parseInt(token.decimals);
+            // The REST API returns balance in whole token units (not satoshis)
+            // So we just need to parse it as a number, no decimal division needed
             let numericValue = 0;
-            
+
             try {
-              if (balance.includes('.')) {
-                numericValue = parseFloat(balance);
-              } else {
-                const rawNum = BigInt(balance);
-                const divisor = BigInt(10 ** decimals);
-                numericValue = Number(rawNum) / (10 ** decimals);
-              }
+              numericValue = parseFloat(balance);
             } catch (e) {
               console.error(`Error calculating numeric value for ${token.symbol}:`, e);
             }
-            
+
+            // Format the balance for display (it's already in whole units)
+            const formatBalance = (value: number): string => {
+              if (value === 0) return '0';
+              if (value < 0.000001) return '< 0.000001';
+              if (value < 1) return value.toFixed(6);
+              if (value < 1000) return value.toFixed(4);
+              if (value < 1000000) return `${(value / 1000).toFixed(2)}K`;
+              return `${(value / 1000000).toFixed(2)}M`;
+            };
+
             return {
               token,
               balance,
-              formattedBalance: formatTokenAmount(balance, decimals),
+              formattedBalance: formatBalance(numericValue),
               numericValue
             };
           } catch (err) {

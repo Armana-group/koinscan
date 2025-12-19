@@ -1246,16 +1246,28 @@ export function shortenAddress(address: string): string {
   return `${address.substring(0, 6)}...${address.substring(address.length - 4)}`;
 }
 
-// Need to create a synchronous function alternative for token lookups in non-async contexts
+// Synchronous token symbol lookup for use in non-async contexts
 function getTokenSymbolSync(address: string): string {
-  // This is a synchronous version that uses a simplified mapping for common tokens
-  // It's used when we can't easily use async/await in the current context
   const commonTokens: Record<string, string> = {
+    // KOIN
     '15DJN4a8SgrbGhhGksSBASiSYjGnMU8dGL': 'KOIN',
+    // VHP (multiple address formats)
     '1FaSvLjQJsCJKq5ybmGsMMQs8RQYyVv8ju': 'VHP',
+    '18tWNU7E4yuQzz7hMVpceb9ixmaWLVyQsr': 'VHP',
+    '18tWNU7EdyUrzr7NMVyqa9YImzaKLgz2r7MVdpqR9LepWL': 'VHP',
+    // Other tokens
     '19WbXUYoAVngjfvjnU1KvCUzfyHHE9C97v': 'VAPOR',
     '1PanaPdEDXfHpHcyxLumRsHN7SxuTSvboJ': 'PANA',
+    '1NsQbH5AhQXgtSNg1ejpFqTi2hmCWz1eQS': 'KOINDX',
+    '1KD9Es7LBBjA1FY3ViCgQJ7e6WH1ipKbhz': 'KOINE',
   };
-  
-  return commonTokens[address] || 'Unknown';
+
+  // Try exact match first
+  if (commonTokens[address]) {
+    return commonTokens[address];
+  }
+
+  // Log unknown addresses for debugging
+  console.log('[getTokenSymbolSync] Unknown token address:', address);
+  return 'Unknown';
 } 

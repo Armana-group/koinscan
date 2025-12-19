@@ -1333,9 +1333,9 @@ export function getTokenInfoSync(address: string): CachedToken | null {
   }
 
   // Fallback for native tokens with special addresses
-  // Koinos uses multiple addresses for the same token in different contexts
+  // Koinos token contracts were upgraded - we support both old and new addresses
   const nativeTokens: Record<string, CachedToken> = {
-    // Short names used in KoinDX token list
+    // Short names used in KoinDX token list and REST API
     'koin': {
       symbol: 'KOIN',
       name: 'Koin',
@@ -1350,15 +1350,7 @@ export function getTokenInfoSync(address: string): CachedToken | null {
       logoURI: 'https://raw.githubusercontent.com/koindx/token-list/main/src/images/mainnet/vhp.png',
       address: 'vhp'
     },
-    // KOIN contract addresses (used in transfer events)
-    '15DJN4a8SgrbGhhGksSBASiSYjGnMU8dGL': {
-      symbol: 'KOIN',
-      name: 'Koin',
-      decimals: 8,
-      logoURI: 'https://raw.githubusercontent.com/koindx/token-list/main/src/images/mainnet/koin.png',
-      address: '15DJN4a8SgrbGhhGksSBASiSYjGnMU8dGL'
-    },
-    // Alternative KOIN contract address (also returns KOIN symbol)
+    // CURRENT KOIN contract (after upgrade)
     '19GYjDBVXU7keLbYvMLazsGQn3GTWHjHkK': {
       symbol: 'KOIN',
       name: 'Koin',
@@ -1366,7 +1358,15 @@ export function getTokenInfoSync(address: string): CachedToken | null {
       logoURI: 'https://raw.githubusercontent.com/koindx/token-list/main/src/images/mainnet/koin.png',
       address: '19GYjDBVXU7keLbYvMLazsGQn3GTWHjHkK'
     },
-    // VHP contract addresses
+    // LEGACY KOIN contract (before upgrade - for historical transactions)
+    '15DJN4a8SgrbGhhGksSBASiSYjGnMU8dGL': {
+      symbol: 'KOIN',
+      name: 'Koin',
+      decimals: 8,
+      logoURI: 'https://raw.githubusercontent.com/koindx/token-list/main/src/images/mainnet/koin.png',
+      address: '15DJN4a8SgrbGhhGksSBASiSYjGnMU8dGL'
+    },
+    // CURRENT VHP contract
     '1FaSvLjQJsCJKq5ybmGsMMQs8RQYyVv8ju': {
       symbol: 'VHP',
       name: 'Virtual Hash Power',

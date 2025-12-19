@@ -175,15 +175,23 @@ export async function getAddressHistory(
 export function extractTransactionActions(tx: any, userAddress?: string): TransactionAction[] {
   const actions: TransactionAction[] = [];
   const tokenTransfers = new Map<string, any[]>();
-  
+
+  // Debug: log event structure
+  console.log('[extractTransactionActions] tx.events count:', tx.events?.length || 0);
+  console.log('[extractTransactionActions] userAddress:', userAddress);
+  if (tx.events?.length > 0) {
+    console.log('[extractTransactionActions] First event:', JSON.stringify(tx.events[0], null, 2));
+  }
+
   // First pass: collect all token transfers grouped by token
   for (const event of tx.events || []) {
     const eventName = event.name?.toLowerCase() || '';
     const eventData = event.data || {};
     
-    // Process transfer events
-    if (eventName.includes('transfer_event') || eventName.includes('transfer.')) {
+    // Process transfer events - check various formats (koinos.contracts.token.transfer_event, transfer_event, etc.)
+    if (eventName.includes('transfer')) {
       const { from, to, value } = eventData;
+      console.log('[extractTransactionActions] Found transfer event:', eventName, 'from:', from, 'to:', to, 'value:', value);
       
       if (from && to && value) {
         // Identify the token
@@ -383,12 +391,15 @@ export function extractTransactionActions(tx: any, userAddress?: string): Transa
   
   // If no actions were identified, add a generic one
   if (actions.length === 0) {
+    console.log('[extractTransactionActions] No actions found, adding generic');
     actions.push({
       type: 'other',
       description: 'Transaction'
     });
+  } else {
+    console.log('[extractTransactionActions] Actions found:', actions.length, actions.map(a => a.type));
   }
-  
+
   return actions;
 }
 
@@ -963,15 +974,19 @@ export function formatDetailedTransactions(transactions: DetailedTransaction[], 
     });
 
     formattedTx.operations = operations;
-    
+
+    // Extract actions for the new minimal display
+    const actions = extractTransactionActions(formattedTx, userAddress);
+    formattedTx.actions = actions;
+
     // Analyze and tag the transaction
     const { tags, primaryTag } = analyzeAndTagTransaction(formattedTx);
     formattedTx.tags = tags;
     formattedTx.primaryTag = primaryTag;
-    
+
     // After the transaction is fully formatted and tagged
     const userFriendlyInfo = generateUserFriendlyInfo(formattedTx);
-    
+
     // Add the user-friendly info to the transaction
     return {
       ...formattedTx,

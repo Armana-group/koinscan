@@ -58,11 +58,15 @@ export default function ContractPage() {
       try {
         setLoading(true);
         setError("");
+
+        // Create nicknames contract without serializer to avoid extension resolution errors
         const nicknames = new Contract({
           id: NICKNAMES_CONTRACT_ID,
           provider,
-          abi: utils.nicknamesAbi,
         });
+        // Set ABI without creating serializer (we only need the functions for lookups)
+        nicknames.abi = utils.nicknamesAbi;
+        nicknames.updateFunctionsFromAbi();
 
         let contractId = "";
         let nickname = "";
@@ -168,30 +172,20 @@ export default function ContractPage() {
 
         // Try to create a serializer, but continue without one if it fails
         // Some contracts have ABIs with protobuf extensions that can't be resolved
-        console.log("[Contract] Attempting to create serializer for", contractId);
-        console.log("[Contract] Has koilib_types:", !!c.abi.koilib_types);
-        console.log("[Contract] Has types:", !!c.abi.types);
         try {
           if (c.abi.koilib_types) {
-            console.log("[Contract] Creating serializer from koilib_types");
             const serializer = new Serializer(c.abi.koilib_types);
             serializer.root.resolveAll();
             c.serializer = serializer;
-            console.log("[Contract] Serializer created successfully from koilib_types");
           } else if (c.abi.types) {
-            console.log("[Contract] Creating serializer from types (binary)");
             const serializer = new Serializer(c.abi.types);
-            console.log("[Contract] Serializer created, now resolving...");
             serializer.root.resolveAll();
             c.serializer = serializer;
-            console.log("[Contract] Serializer created successfully from types");
           }
         } catch (serializerError) {
-          console.error("[Contract] Error initializing serializer:", serializerError);
-          console.log("[Contract] Continuing without serializer");
+          console.warn("Serializer unavailable for contract:", serializerError);
           // Continue without a serializer - the KoinosForm will show a warning
         }
-        console.log("[Contract] Setting contract, serializer is:", c.serializer ? "present" : "absent");
 
         setContract(c);
         setInfo({

@@ -166,15 +166,17 @@ export default function ContractPage() {
           c.abi = abi;
           c.updateFunctionsFromAbi();
           
-          if (c.abi.koilib_types) {
-            c.serializer = new Serializer(c.abi.koilib_types);
-          } else if (c.abi.types) {
-            try {
+          // Try to create a serializer, but continue without one if it fails
+          // Some contracts have ABIs with protobuf extensions that can't be resolved
+          try {
+            if (c.abi.koilib_types) {
+              c.serializer = new Serializer(c.abi.koilib_types);
+            } else if (c.abi.types) {
               c.serializer = new Serializer(c.abi.types);
-            } catch (serializerError) {
-              console.error("Error initializing serializer:", serializerError);
-              // Continue without a serializer
             }
+          } catch (serializerError) {
+            console.error("Error initializing serializer:", serializerError);
+            // Continue without a serializer - the KoinosForm will show a warning
           }
           
           setContract(c);

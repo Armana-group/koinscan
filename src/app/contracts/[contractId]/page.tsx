@@ -135,67 +135,71 @@ export default function ContractPage() {
           provider,
         });
 
-        try {
-          let abi: Abi | undefined;
-          if (contractId === GOVERNANCE_CONTRACT_ID) {
-            // special case to fix the abi of governance
-            abi = abiGovernance;
-          } else {
-            abi = await c.fetchAbi({
-              updateFunctions: false,
-              updateSerializer: false,
-            });
-          }
-          
-          if (!abi || !abi.methods) {
-            throw new Error(`No ABI found for contract ${contractId}`);
-          }
-
-          // Process ABI methods
-          Object.keys(abi.methods).forEach((m) => {
-            if (abi.methods[m].entry_point === undefined) {
-              abi.methods[m].entry_point = Number(
-                (abi.methods[m] as any)["entry-point"]
-              );
-            }
-            if (abi.methods[m].read_only === undefined) {
-              abi.methods[m].read_only = (abi.methods[m] as any)["read-only"];
-            }
+        // Fetch and process ABI
+        let abi: Abi | undefined;
+        if (contractId === GOVERNANCE_CONTRACT_ID) {
+          // special case to fix the abi of governance
+          abi = abiGovernance;
+        } else {
+          abi = await c.fetchAbi({
+            updateFunctions: false,
+            updateSerializer: false,
           });
-
-          c.abi = abi;
-          c.updateFunctionsFromAbi();
-          
-          // Try to create a serializer, but continue without one if it fails
-          // Some contracts have ABIs with protobuf extensions that can't be resolved
-          try {
-            if (c.abi.koilib_types) {
-              const serializer = new Serializer(c.abi.koilib_types);
-              // Force resolution of all types to catch deferred errors
-              serializer.root.resolveAll();
-              c.serializer = serializer;
-            } else if (c.abi.types) {
-              const serializer = new Serializer(c.abi.types);
-              // Force resolution of all types to catch deferred errors
-              serializer.root.resolveAll();
-              c.serializer = serializer;
-            }
-          } catch (serializerError) {
-            console.error("Error initializing serializer:", serializerError);
-            // Continue without a serializer - the KoinosForm will show a warning
-          }
-          
-          setContract(c);
-          setInfo({
-            nickname,
-            address: contractId,
-            description,
-            image,
-          });
-        } catch (error) {
-          console.error("Failed to load contract ABI:", error);
-          throw new Error(`Failed to load contract ABI: ${(error as Error).message}`);
         }
+
+        if (!abi || !abi.methods) {
+          throw new Error(`No ABI found for contract ${contractId}`);
+        }
+
+        // Process ABI methods
+        Object.keys(abi.methods).forEach((m) => {
+          if (abi.methods[m].entry_point === undefined) {
+            abi.methods[m].entry_point = Number(
+              (abi.methods[m] as any)["entry-point"]
+            );
+          }
+          if (abi.methods[m].read_only === undefined) {
+            abi.methods[m].read_only = (abi.methods[m] as any)["read-only"];
+          }
+        });
+
+        c.abi = abi;
+        c.updateFunctionsFromAbi();
+
+        // Try to create a serializer, but continue without one if it fails
+        // Some contracts have ABIs with protobuf extensions that can't be resolved
+        console.log("[Contract] Attempting to create serializer for", contractId);
+        console.log("[Contract] Has koilib_types:", !!c.abi.koilib_types);
+        console.log("[Contract] Has types:", !!c.abi.types);
+        try {
+          if (c.abi.koilib_types) {
+            console.log("[Contract] Creating serializer from koilib_types");
+            const serializer = new Serializer(c.abi.koilib_types);
+            serializer.root.resolveAll();
+            c.serializer = serializer;
+            console.log("[Contract] Serializer created successfully from koilib_types");
+          } else if (c.abi.types) {
+            console.log("[Contract] Creating serializer from types (binary)");
+            const serializer = new Serializer(c.abi.types);
+            console.log("[Contract] Serializer created, now resolving...");
+            serializer.root.resolveAll();
+            c.serializer = serializer;
+            console.log("[Contract] Serializer created successfully from types");
+          }
+        } catch (serializerError) {
+          console.error("[Contract] Error initializing serializer:", serializerError);
+          console.log("[Contract] Continuing without serializer");
+          // Continue without a serializer - the KoinosForm will show a warning
+        }
+        console.log("[Contract] Setting contract, serializer is:", c.serializer ? "present" : "absent");
+
+        setContract(c);
+        setInfo({
+          nickname,
+          address: contractId,
+          description,
+          image,
+        });
       } catch (error) {
         setError((error as Error).message);
         setContract(null);

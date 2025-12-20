@@ -170,9 +170,15 @@ export default function ContractPage() {
           // Some contracts have ABIs with protobuf extensions that can't be resolved
           try {
             if (c.abi.koilib_types) {
-              c.serializer = new Serializer(c.abi.koilib_types);
+              const serializer = new Serializer(c.abi.koilib_types);
+              // Force resolution of all types to catch deferred errors
+              serializer.root.resolveAll();
+              c.serializer = serializer;
             } else if (c.abi.types) {
-              c.serializer = new Serializer(c.abi.types);
+              const serializer = new Serializer(c.abi.types);
+              // Force resolution of all types to catch deferred errors
+              serializer.root.resolveAll();
+              c.serializer = serializer;
             }
           } catch (serializerError) {
             console.error("Error initializing serializer:", serializerError);

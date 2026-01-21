@@ -58,43 +58,99 @@ export default function ContractPage() {
       try {
         setLoading(true);
         setError("");
-        const nicknames = new Contract({
-          id: NICKNAMES_CONTRACT_ID,
-          provider,
-          abi: utils.nicknamesAbi,
-        });
+
+        // Create nicknames contract - handle serializer errors gracefully
+        let nicknames: Contract | null = null;
+        let nicknamesSerializerWorking = false;
+        try {
+          nicknames = new Contract({
+            id: NICKNAMES_CONTRACT_ID,
+            provider,
+            abi: utils.nicknamesAbi,
+          });
+          nicknamesSerializerWorking = true;
+        } catch (e) {
+          console.warn("Failed to create nicknames contract with serializer:", e);
+          // Create without ABI for basic operations
+          nicknames = new Contract({
+            id: NICKNAMES_CONTRACT_ID,
+            provider,
+          });
+        }
 
         let contractId = "";
         let nickname = "";
-        
+
         // Handle contract ID resolution
         if (contractIdParam.startsWith("1")) {
           contractId = contractIdParam;
-          try {
-            const { result } = await nicknames.functions.get_main_token({
-              value: contractId,
-            });
-            if (result) {
-              nickname = new TextDecoder().decode(
-                utils.toUint8Array(result.token_id.slice(2)),
-              );
+          if (nicknamesSerializerWorking && nicknames.functions.get_main_token) {
+            try {
+              const { result } = await nicknames.functions.get_main_token({
+                value: contractId,
+              });
+              if (result) {
+                nickname = new TextDecoder().decode(
+                  utils.toUint8Array(result.token_id.slice(2)),
+                );
+              }
+            } catch (error) {
+              console.warn("Failed to resolve nickname for contract:", error);
             }
-          } catch (error) {
-            console.warn("Failed to resolve nickname for contract:", error);
           }
         } else {
-          nickname = contractIdParam;
-          try {
-            // resolve nickname
-            const { result } = await nicknames.functions.get_address({
-              value: contractIdParam.replace("@", ""),
-            });
-            if (!result || !result.value) {
-              throw new Error(`Contract not found for nickname: @${contractIdParam}`);
+          nickname = contractIdParam.replace("@", "");
+
+          if (nicknamesSerializerWorking && nicknames.functions.get_address) {
+            try {
+              // resolve nickname using contract
+              const { result } = await nicknames.functions.get_address({
+                value: nickname,
+              });
+              if (!result || !result.value) {
+                throw new Error(`Contract not found for nickname: @${nickname}`);
+              }
+              contractId = result.value;
+            } catch (error) {
+              throw new Error(`Failed to resolve address for @${nickname}`);
             }
-            contractId = result.value;
-          } catch (error) {
-            throw new Error(`Failed to resolve address for @${contractIdParam}`);
+          } else {
+            // Fallback: use provider to call contract directly
+            try {
+              const entryPoint = 0xa61ae5e8; // get_address entry point from nicknamesAbi
+
+              // Encode argument as protobuf common.str: { value: string }
+              // Field 1 (string) = tag 0x0a, then length, then bytes
+              const nicknameBytes = new TextEncoder().encode(nickname);
+              const argBuffer = new Uint8Array(2 + nicknameBytes.length);
+              argBuffer[0] = 0x0a; // tag for field 1, wire type 2 (length-delimited)
+              argBuffer[1] = nicknameBytes.length;
+              argBuffer.set(nicknameBytes, 2);
+              const args = utils.encodeBase64url(argBuffer);
+
+              const response = await provider.readContract({
+                contract_id: NICKNAMES_CONTRACT_ID,
+                entry_point: entryPoint,
+                args,
+              });
+
+              if (response.result) {
+                // Decode the result as protobuf address_data: { value: bytes (ADDRESS) }
+                const resultBytes = utils.decodeBase64url(response.result);
+                // Field 1 (bytes) = tag 0x0a, then length, then address bytes
+                if (resultBytes.length > 2 && resultBytes[0] === 0x0a) {
+                  const addrLen = resultBytes[1];
+                  const addrBytes = resultBytes.slice(2, 2 + addrLen);
+                  contractId = utils.encodeBase58(addrBytes);
+                }
+              }
+
+              if (!contractId) {
+                throw new Error(`Contract not found for nickname: @${nickname}`);
+              }
+            } catch (error) {
+              throw new Error(`Failed to resolve address for @${nickname}`);
+            }
           }
         }
 
@@ -135,59 +191,61 @@ export default function ContractPage() {
           provider,
         });
 
-        try {
-          let abi: Abi | undefined;
-          if (contractId === GOVERNANCE_CONTRACT_ID) {
-            // special case to fix the abi of governance
-            abi = abiGovernance;
-          } else {
-            abi = await c.fetchAbi({
-              updateFunctions: false,
-              updateSerializer: false,
-            });
-          }
-          
-          if (!abi || !abi.methods) {
-            throw new Error(`No ABI found for contract ${contractId}`);
-          }
-
-          // Process ABI methods
-          Object.keys(abi.methods).forEach((m) => {
-            if (abi.methods[m].entry_point === undefined) {
-              abi.methods[m].entry_point = Number(
-                (abi.methods[m] as any)["entry-point"]
-              );
-            }
-            if (abi.methods[m].read_only === undefined) {
-              abi.methods[m].read_only = (abi.methods[m] as any)["read-only"];
-            }
+        // Fetch and process ABI
+        let abi: Abi | undefined;
+        if (contractId === GOVERNANCE_CONTRACT_ID) {
+          // special case to fix the abi of governance
+          abi = abiGovernance;
+        } else {
+          abi = await c.fetchAbi({
+            updateFunctions: false,
+            updateSerializer: false,
           });
-
-          c.abi = abi;
-          c.updateFunctionsFromAbi();
-          
-          if (c.abi.koilib_types) {
-            c.serializer = new Serializer(c.abi.koilib_types);
-          } else if (c.abi.types) {
-            try {
-              c.serializer = new Serializer(c.abi.types);
-            } catch (serializerError) {
-              console.error("Error initializing serializer:", serializerError);
-              // Continue without a serializer
-            }
-          }
-          
-          setContract(c);
-          setInfo({
-            nickname,
-            address: contractId,
-            description,
-            image,
-          });
-        } catch (error) {
-          console.error("Failed to load contract ABI:", error);
-          throw new Error(`Failed to load contract ABI: ${(error as Error).message}`);
         }
+
+        if (!abi || !abi.methods) {
+          throw new Error(`No ABI found for contract ${contractId}`);
+        }
+
+        // Process ABI methods
+        Object.keys(abi.methods).forEach((m) => {
+          if (abi.methods[m].entry_point === undefined) {
+            abi.methods[m].entry_point = Number(
+              (abi.methods[m] as any)["entry-point"]
+            );
+          }
+          if (abi.methods[m].read_only === undefined) {
+            abi.methods[m].read_only = (abi.methods[m] as any)["read-only"];
+          }
+        });
+
+        c.abi = abi;
+        c.updateFunctionsFromAbi();
+
+        // Try to create a serializer, but continue without one if it fails
+        // Some contracts have ABIs with protobuf extensions that can't be resolved
+        try {
+          if (c.abi.koilib_types) {
+            const serializer = new Serializer(c.abi.koilib_types);
+            serializer.root.resolveAll();
+            c.serializer = serializer;
+          } else if (c.abi.types) {
+            const serializer = new Serializer(c.abi.types);
+            serializer.root.resolveAll();
+            c.serializer = serializer;
+          }
+        } catch (serializerError) {
+          console.warn("Serializer unavailable for contract:", serializerError);
+          // Continue without a serializer - the KoinosForm will show a warning
+        }
+
+        setContract(c);
+        setInfo({
+          nickname,
+          address: contractId,
+          description,
+          image,
+        });
       } catch (error) {
         setError((error as Error).message);
         setContract(null);

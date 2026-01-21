@@ -11,7 +11,7 @@ import { motion } from "framer-motion";
 import dynamic from 'next/dynamic';
 import type { TransactionHistory as TransactionHistoryType } from '@/components/TransactionHistory';
 import { Contract, Provider } from 'koilib';
-import { RPC_NODE, NICKNAMES_CONTRACT_ID } from "@/koinos/constants"; 
+import { NICKNAMES_CONTRACT_ID } from "@/koinos/constants"; 
 import * as toast from "@/lib/toast";
 import { resolveNickname } from "@/koinos/utils";
 import { useSearch } from "@/components/SearchProvider";
@@ -34,13 +34,36 @@ const TransactionHistory = dynamic(
   }
 );
 
-// Standard KRC20 ABI with just the decimals function
+// JSON-RPC endpoints for koilib Provider (different from REST API)
+const JSON_RPC_NODES = [
+  'https://api.koinos.io',
+  'https://api.koinosblocks.com'
+];
+
+// Standard KRC20 ABI with just the decimals function - using koilib's built-in types
 const minimalKRC20Abi = {
+  koilib_types: {
+    nested: {
+      google: {
+        nested: {
+          protobuf: {
+            nested: {
+              UInt32Value: {
+                fields: {
+                  value: { type: "uint32", id: 1 }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
   methods: {
     decimals: {
-      entry_point: 0x9a3b2b2f, // This is the entry point ID for the decimals function
-      argument: undefined,
-      return: "uint32",
+      entry_point: 0x9a3b2b2f,
+      argument: "",
+      return: "google.protobuf.UInt32Value",
       read_only: true
     }
   }
@@ -123,12 +146,9 @@ export default function Home() {
       return true;
     }
     
-    // List of RPC nodes to try in case the first one fails
-    const rpcNodes = [
-      RPC_NODE,
-      'https://api.koinos.io',
-      'https://api.koinosblocks.com'
-    ];
+    // List of JSON-RPC nodes to try in case the first one fails
+    // Note: Must use JSON-RPC endpoints (not REST API) for koilib Provider
+    const rpcNodes = JSON_RPC_NODES;
     
     // Try each RPC node until one works
     for (const rpcNode of rpcNodes) {

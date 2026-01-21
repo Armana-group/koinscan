@@ -9,6 +9,8 @@ import Image from 'next/image';
 import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { InfoIcon } from 'lucide-react';
 import { useWallet } from '@/contexts/WalletContext';
+import { Contract, Provider } from 'koilib';
+import tokenAbi from '@/koinos/abi';
 
 interface WalletBalancesProps {
   address: string;
@@ -21,12 +23,41 @@ interface TokenBalance {
   numericValue: number;
 }
 
+// Map short names to actual contract addresses
+const SHORT_NAME_TO_CONTRACT: Record<string, string> = {
+  'koin': '15DJN4a8SgrbGhhGksSBASiSYjGnMU8dGL',
+  'vhp': '1AdzuXSpC6K9qtXdCBgcTLYGYyPaUfEvNm',
+};
+
+// Get the actual contract address for a token
+function getContractAddress(token: KoinosToken): string {
+  const lowerAddress = token.address.toLowerCase();
+  return SHORT_NAME_TO_CONTRACT[lowerAddress] || token.address;
+}
+
+// Helper to process tokens in batches
+async function processBatches<T, R>(
+  items: T[],
+  batchSize: number,
+  processor: (item: T) => Promise<R>
+): Promise<R[]> {
+  const results: R[] = [];
+
+  for (let i = 0; i < items.length; i += batchSize) {
+    const batch = items.slice(i, i + batchSize);
+    const batchResults = await Promise.all(batch.map(processor));
+    results.push(...batchResults);
+  }
+
+  return results;
+}
+
 export function WalletBalances({ address }: WalletBalancesProps) {
   const [tokenBalances, setTokenBalances] = useState<TokenBalance[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [koinPrice, setKoinPrice] = useState<number | null>(null);
-  const { rpcNode } = useWallet();
+  const { jsonRpcNode } = useWallet();
 
   // Fetch KOIN price
   useEffect(() => {
@@ -43,43 +74,48 @@ export function WalletBalances({ address }: WalletBalancesProps) {
 
   useEffect(() => {
     async function fetchBalances() {
-      if (!address || !rpcNode) return;
+      if (!address || !jsonRpcNode) return;
 
       try {
         setLoading(true);
-        
-        // 1. Get all tokens from the official list
+
+        // Create provider for RPC calls
+        const provider = new Provider(jsonRpcNode);
+
+        // Get all tokens from the official list
         const tokens = await getAllTokens();
-        
-        // 2. Fetch balances for each token
-        const balancePromises = tokens.map(async (token) => {
+
+        // Process tokens in batches of 10
+        const results = await processBatches(tokens, 10, async (token) => {
           try {
-            // Fetch the token balance
-            const response = await fetch(
-              `${rpcNode}/v1/account/${address}/balance/${token.address}`
-            );
-            
-            if (!response.ok) {
-              return null; // Skip this token if there's an error
-            }
-            
-            const data = await response.json();
-            const balance = data.value || '0';
-            
+            const contractAddress = getContractAddress(token);
+
+            // Create contract instance
+            const contract = new Contract({
+              id: contractAddress,
+              provider,
+              abi: tokenAbi
+            });
+
+            // Call balanceOf
+            const { result } = await contract.functions.balanceOf({
+              owner: address
+            });
+
+            // Get balance value (in satoshis)
+            const balanceRaw = result?.value || '0';
+
             // Skip tokens with zero balance
-            if (balance === '0') return null;
-            
-            // The REST API returns balance in whole token units (not satoshis)
-            // So we just need to parse it as a number, no decimal division needed
-            let numericValue = 0;
+            if (balanceRaw === '0') return null;
 
-            try {
-              numericValue = parseFloat(balance);
-            } catch (e) {
-              console.error(`Error calculating numeric value for ${token.symbol}:`, e);
-            }
+            // Convert from satoshis to whole units
+            const decimals = parseInt(token.decimals) || 8;
+            const numericValue = parseInt(balanceRaw) / Math.pow(10, decimals);
 
-            // Format the balance for display (it's already in whole units)
+            // Skip if effectively zero after conversion
+            if (numericValue === 0) return null;
+
+            // Format the balance for display
             const formatBalance = (value: number): string => {
               if (value === 0) return '0';
               if (value < 0.000001) return '< 0.000001';
@@ -91,24 +127,21 @@ export function WalletBalances({ address }: WalletBalancesProps) {
 
             return {
               token,
-              balance,
+              balance: balanceRaw,
               formattedBalance: formatBalance(numericValue),
               numericValue
             };
           } catch (err) {
-            console.error(`Error fetching balance for ${token.symbol}:`, err);
+            // Silently skip tokens that fail
             return null;
           }
         });
-        
-        // 3. Wait for all balance fetches to complete
-        const results = await Promise.all(balancePromises);
-        
-        // 4. Filter out null results (skipped tokens) and sort by value
+
+        // Filter out null results and sort by value
         const validBalances = results
           .filter((item): item is TokenBalance => !!item)
           .sort((a, b) => b.numericValue - a.numericValue);
-        
+
         setTokenBalances(validBalances);
         setError(null);
       } catch (err) {
@@ -120,7 +153,7 @@ export function WalletBalances({ address }: WalletBalancesProps) {
     }
 
     fetchBalances();
-  }, [address, rpcNode]);
+  }, [address, jsonRpcNode]);
 
   return (
     <Card className="bg-gradient-to-br from-green-500/5 via-emerald-500/5 to-transparent">
@@ -215,4 +248,4 @@ export function WalletBalances({ address }: WalletBalancesProps) {
       </CardContent>
     </Card>
   );
-} 
+}

@@ -30,6 +30,8 @@ import { Clock, Hash, ArrowRight, ExternalLink, User, Coins, FileText } from "lu
 import { Navbar } from '@/components/Navbar';
 import { JsonDisplay } from '@/components/JsonDisplay';
 import { useWallet } from "@/contexts/WalletContext";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 
 // Helper function to get human-readable date
 const formatDate = (timestamp: string | number): string => {
@@ -58,6 +60,7 @@ export default function TransactionPage() {
   const [transaction, setTransaction] = useState<any>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [advancedView, setAdvancedView] = useState<boolean>(false);
   const { rpcNode } = useWallet();
 
   useEffect(() => {
@@ -175,11 +178,23 @@ export default function TransactionPage() {
   return (
     <div className="container mx-auto py-8 px-4">
       <Navbar />
-      <h1 className="text-3xl font-bold mb-2">Transaction Details</h1>
+      <div className="flex items-center justify-between mb-2">
+        <h1 className="text-3xl font-bold">Transaction Details</h1>
+        <div className="flex items-center gap-2">
+          <Switch
+            id="advanced-view"
+            checked={advancedView}
+            onCheckedChange={setAdvancedView}
+          />
+          <Label htmlFor="advanced-view" className="text-sm text-muted-foreground cursor-pointer">
+            Advanced
+          </Label>
+        </div>
+      </div>
       <h2 className="text-xl font-medium text-muted-foreground mb-8 break-all">
         {txid}
       </h2>
-      
+
       <div className="grid gap-6">
         {/* User-friendly Summary Card - Only for transfers */}
         {isTransfer && transferInfo && (
@@ -200,40 +215,80 @@ export default function TransactionPage() {
                   <User className="h-6 w-6 text-muted-foreground mb-2" />
                   <div className="font-medium text-center">{formatAddress(transferInfo.from)}</div>
                 </div>
-                
+
                 <div className="flex flex-col items-center justify-center p-4 bg-primary/10 rounded-lg">
                   <div className="text-sm text-muted-foreground mb-1">Amount</div>
                   <div className="text-2xl font-bold text-center">{formatAmount(transferInfo.amount)}</div>
                   <div className="text-sm text-muted-foreground mt-1">{transferInfo.tokenContract}</div>
                 </div>
-                
+
                 <div className="flex flex-col items-center justify-center p-4 bg-muted/50 rounded-lg">
                   <div className="text-sm text-muted-foreground mb-1">To</div>
                   <User className="h-6 w-6 text-muted-foreground mb-2" />
                   <div className="font-medium text-center">{formatAddress(transferInfo.to)}</div>
                 </div>
               </div>
-              
+
               <div className="mt-4 pt-4 border-t flex justify-between items-center">
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <FileText className="h-4 w-4" />
-                  <span>See technical details below</span>
-                </div>
                 <Badge variant="outline" className="text-xs">
                   Status: {hasReceipt ? 'Confirmed' : 'Pending'}
                 </Badge>
+                {!advancedView && (
+                  <div className="text-xs text-muted-foreground">
+                    Toggle "Advanced" to see technical details
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Non-transfer transaction summary - simple view */}
+        {!isTransfer && !advancedView && (
+          <Card className="border-2 border-muted">
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center gap-2">
+                <Coins className="h-5 w-5 text-muted-foreground" />
+                Transaction
+              </CardTitle>
+              <CardDescription>
+                {transaction.transaction?.timestamp ? formatDate(transaction.transaction.timestamp) : 'Pending'}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground">Operations:</span>
+                  <span className="font-medium">{operations.length}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground">Events:</span>
+                  <span className="font-medium">{events.length}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground">Status:</span>
+                  <Badge variant="outline" className="text-xs">
+                    {hasReceipt ? 'Confirmed' : 'Pending'}
+                  </Badge>
+                </div>
+              </div>
+              <div className="mt-4 pt-4 border-t text-xs text-muted-foreground text-center">
+                Toggle "Advanced" to see technical details
               </div>
             </CardContent>
           </Card>
         )}
         
-        {/* Transaction Overview - Now collapsible */}
-        <Accordion type="single" collapsible defaultValue="overview">
-          <AccordionItem value="overview">
-            <AccordionTrigger className="py-4">
-              <CardTitle className="text-left">Technical Overview</CardTitle>
-            </AccordionTrigger>
-            <AccordionContent>
+        {/* Technical sections - only in advanced mode */}
+        {advancedView && (
+          <>
+            {/* Transaction Overview - Now collapsible */}
+            <Accordion type="single" collapsible defaultValue="overview">
+              <AccordionItem value="overview">
+                <AccordionTrigger className="py-4">
+                  <CardTitle className="text-left">Technical Overview</CardTitle>
+                </AccordionTrigger>
+                <AccordionContent>
               <div className="grid grid-cols-[auto_1fr] gap-y-4 gap-x-8">
                 <div className="font-medium flex items-center">
                   <Hash className="w-4 h-4 text-muted-foreground mr-2" />
@@ -310,181 +365,183 @@ export default function TransactionPage() {
               </div>
             </AccordionContent>
           </AccordionItem>
-        </Accordion>
-        
-        {/* Operations */}
-        {operations.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Operations ({operations.length})</CardTitle>
-              <CardDescription>
-                Actions executed as part of this transaction
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Accordion type="multiple">
-                {operations.map((op: any, index: number) => {
-                  const isContractCall = op.call_contract !== undefined;
-                  const isUploadContract = op.upload_contract !== undefined;
-                  
-                  let title = 'Unknown Operation';
-                  if (isContractCall) {
-                    title = `Contract Call: ${op.call_contract.contract_id}`;
-                  } else if (isUploadContract) {
-                    title = `Upload Contract: ${op.upload_contract.contract_id || 'Unknown'}`;
-                  }
-                  
-                  return (
-                    <AccordionItem key={index} value={`item-${index}`}>
-                      <AccordionTrigger className="hover:no-underline">
-                        <div className="flex items-center gap-2">
-                          <Badge variant={isContractCall ? "secondary" : isUploadContract ? "outline" : "default"}>
-                            {isContractCall ? "Call" : isUploadContract ? "Upload" : "Other"}
-                          </Badge>
-                          <span>{title}</span>
-                        </div>
-                      </AccordionTrigger>
-                      <AccordionContent>
-                        {isContractCall && (
-                          <div className="space-y-2">
-                            <div className="flex justify-between items-center">
-                              <span className="font-medium">Contract:</span>
-                              <span className="break-all">{op.call_contract.contract_id}</span>
+            </Accordion>
+
+            {/* Operations */}
+            {operations.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Operations ({operations.length})</CardTitle>
+                  <CardDescription>
+                    Actions executed as part of this transaction
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Accordion type="multiple">
+                    {operations.map((op: any, index: number) => {
+                      const isContractCall = op.call_contract !== undefined;
+                      const isUploadContract = op.upload_contract !== undefined;
+
+                      let title = 'Unknown Operation';
+                      if (isContractCall) {
+                        title = `Contract Call: ${op.call_contract.contract_id}`;
+                      } else if (isUploadContract) {
+                        title = `Upload Contract: ${op.upload_contract.contract_id || 'Unknown'}`;
+                      }
+
+                      return (
+                        <AccordionItem key={index} value={`item-${index}`}>
+                          <AccordionTrigger className="hover:no-underline">
+                            <div className="flex items-center gap-2">
+                              <Badge variant={isContractCall ? "secondary" : isUploadContract ? "outline" : "default"}>
+                                {isContractCall ? "Call" : isUploadContract ? "Upload" : "Other"}
+                              </Badge>
+                              <span>{title}</span>
                             </div>
-                            <div className="flex justify-between items-center">
-                              <span className="font-medium">Entry Point:</span>
-                              <span>{op.call_contract.entry_point}</span>
+                          </AccordionTrigger>
+                          <AccordionContent>
+                            {isContractCall && (
+                              <div className="space-y-2">
+                                <div className="flex justify-between items-center">
+                                  <span className="font-medium">Contract:</span>
+                                  <span className="break-all">{op.call_contract.contract_id}</span>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                  <span className="font-medium">Entry Point:</span>
+                                  <span>{op.call_contract.entry_point}</span>
+                                </div>
+                                <div>
+                                  <span className="font-medium">Arguments:</span>
+                                  <div className="mt-2">
+                                    <JsonDisplay data={op.call_contract.args} />
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+
+                            {isUploadContract && (
+                              <div className="space-y-2">
+                                <div className="flex justify-between items-center">
+                                  <span className="font-medium">Contract ID:</span>
+                                  <span className="break-all">{op.upload_contract.contract_id || 'Unknown'}</span>
+                                </div>
+                              </div>
+                            )}
+
+                            {!isContractCall && !isUploadContract && (
+                              <div>
+                                <span className="font-medium">Operation Data:</span>
+                                <div className="mt-2">
+                                  <JsonDisplay data={op} />
+                                </div>
+                              </div>
+                            )}
+                          </AccordionContent>
+                        </AccordionItem>
+                      );
+                    })}
+                  </Accordion>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Events */}
+            {events.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Events ({events.length})</CardTitle>
+                  <CardDescription>
+                    Events emitted during transaction execution
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Accordion type="multiple">
+                    {events.map((event: any, index: number) => {
+                      return (
+                        <AccordionItem key={index} value={`event-${index}`}>
+                          <AccordionTrigger className="hover:no-underline">
+                            <div className="flex items-center gap-2">
+                              <Badge variant="outline">
+                                {event.source}
+                              </Badge>
+                              <span>{event.name || 'Unknown Event'}</span>
                             </div>
-                            <div>
-                              <span className="font-medium">Arguments:</span>
-                              <div className="mt-2">
-                                <JsonDisplay data={op.call_contract.args} />
+                          </AccordionTrigger>
+                          <AccordionContent>
+                            <div className="space-y-2">
+                              <div className="flex justify-between items-center">
+                                <span className="font-medium">Source:</span>
+                                <span className="break-all">{event.source}</span>
+                              </div>
+                              <div className="flex justify-between items-center">
+                                <span className="font-medium">Name:</span>
+                                <span>{event.name}</span>
+                              </div>
+                              <div>
+                                <span className="font-medium">Data:</span>
+                                <div className="mt-2">
+                                  <JsonDisplay data={event.data || {}} />
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        )}
-                        
-                        {isUploadContract && (
-                          <div className="space-y-2">
-                            <div className="flex justify-between items-center">
-                              <span className="font-medium">Contract ID:</span>
-                              <span className="break-all">{op.upload_contract.contract_id || 'Unknown'}</span>
-                            </div>
-                          </div>
-                        )}
-                        
-                        {!isContractCall && !isUploadContract && (
-                          <div>
-                            <span className="font-medium">Operation Data:</span>
-                            <div className="mt-2">
-                              <JsonDisplay data={op} />
-                            </div>
-                          </div>
-                        )}
-                      </AccordionContent>
-                    </AccordionItem>
-                  );
-                })}
-              </Accordion>
-            </CardContent>
-          </Card>
-        )}
-        
-        {/* Events */}
-        {events.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Events ({events.length})</CardTitle>
-              <CardDescription>
-                Events emitted during transaction execution
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Accordion type="multiple">
-                {events.map((event: any, index: number) => {
-                  return (
-                    <AccordionItem key={index} value={`event-${index}`}>
-                      <AccordionTrigger className="hover:no-underline">
-                        <div className="flex items-center gap-2">
-                          <Badge variant="outline">
-                            {event.source}
-                          </Badge>
-                          <span>{event.name || 'Unknown Event'}</span>
-                        </div>
-                      </AccordionTrigger>
-                      <AccordionContent>
-                        <div className="space-y-2">
-                          <div className="flex justify-between items-center">
-                            <span className="font-medium">Source:</span>
-                            <span className="break-all">{event.source}</span>
-                          </div>
-                          <div className="flex justify-between items-center">
-                            <span className="font-medium">Name:</span>
-                            <span>{event.name}</span>
-                          </div>
-                          <div>
-                            <span className="font-medium">Data:</span>
-                            <div className="mt-2">
-                              <JsonDisplay data={event.data || {}} />
-                            </div>
-                          </div>
-                        </div>
-                      </AccordionContent>
-                    </AccordionItem>
-                  );
-                })}
-              </Accordion>
-            </CardContent>
-          </Card>
-        )}
-        
-        {/* Network & Compute Info */}
-        <Accordion type="single" collapsible>
-          <AccordionItem value="resource-usage">
-            <AccordionTrigger className="py-4">
-              <CardTitle className="text-left">Resource Usage</CardTitle>
-            </AccordionTrigger>
-            <AccordionContent>
-              <div className="grid gap-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <h3 className="font-medium">Network Bandwidth Used:</h3>
-                    <div className="font-mono">{hasReceipt ? transaction.receipt.network_bandwidth_used : '-'}</div>
-                  </div>
-                  <div className="space-y-2">
-                    <h3 className="font-medium">Compute Bandwidth Used:</h3>
-                    <div className="font-mono">{hasReceipt ? transaction.receipt.compute_bandwidth_used : '-'}</div>
-                  </div>
-                </div>
-                {hasReceipt && transaction.receipt.containing_blocks && (
-                  <div className="space-y-2">
-                    <h3 className="font-medium">Containing Blocks:</h3>
-                    <div className="font-mono break-all">
-                      {Array.isArray(transaction.receipt.containing_blocks) 
-                        ? transaction.receipt.containing_blocks.join('\n') 
-                        : String(transaction.receipt.containing_blocks)}
+                          </AccordionContent>
+                        </AccordionItem>
+                      );
+                    })}
+                  </Accordion>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Network & Compute Info */}
+            <Accordion type="single" collapsible>
+              <AccordionItem value="resource-usage">
+                <AccordionTrigger className="py-4">
+                  <CardTitle className="text-left">Resource Usage</CardTitle>
+                </AccordionTrigger>
+                <AccordionContent>
+                  <div className="grid gap-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <h3 className="font-medium">Network Bandwidth Used:</h3>
+                        <div className="font-mono">{hasReceipt ? transaction.receipt.network_bandwidth_used : '-'}</div>
+                      </div>
+                      <div className="space-y-2">
+                        <h3 className="font-medium">Compute Bandwidth Used:</h3>
+                        <div className="font-mono">{hasReceipt ? transaction.receipt.compute_bandwidth_used : '-'}</div>
+                      </div>
                     </div>
+                    {hasReceipt && transaction.receipt.containing_blocks && (
+                      <div className="space-y-2">
+                        <h3 className="font-medium">Containing Blocks:</h3>
+                        <div className="font-mono break-all">
+                          {Array.isArray(transaction.receipt.containing_blocks)
+                            ? transaction.receipt.containing_blocks.join('\n')
+                            : String(transaction.receipt.containing_blocks)}
+                        </div>
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-            </AccordionContent>
-          </AccordionItem>
-        </Accordion>
-        
-        {/* Raw Transaction Data */}
-        <Accordion type="single" collapsible>
-          <AccordionItem value="raw-data">
-            <AccordionTrigger className="py-4">
-              <CardTitle className="text-left">Debug: Raw Transaction Data</CardTitle>
-            </AccordionTrigger>
-            <AccordionContent>
-              <CardDescription className="mb-4">
-                Complete data returned from the API for debugging purposes
-              </CardDescription>
-              <JsonDisplay data={transaction} />
-            </AccordionContent>
-          </AccordionItem>
-        </Accordion>
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
+
+            {/* Raw Transaction Data */}
+            <Accordion type="single" collapsible>
+              <AccordionItem value="raw-data">
+                <AccordionTrigger className="py-4">
+                  <CardTitle className="text-left">Debug: Raw Transaction Data</CardTitle>
+                </AccordionTrigger>
+                <AccordionContent>
+                  <CardDescription className="mb-4">
+                    Complete data returned from the API for debugging purposes
+                  </CardDescription>
+                  <JsonDisplay data={transaction} />
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
+          </>
+        )}
       </div>
     </div>
   );

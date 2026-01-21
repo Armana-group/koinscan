@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { getAllTokens, KoinosToken } from '@/lib/tokens';
+import { getKoinPrice, formatUsdValue } from '@/lib/price';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import Image from 'next/image';
@@ -24,7 +25,21 @@ export function WalletBalances({ address }: WalletBalancesProps) {
   const [tokenBalances, setTokenBalances] = useState<TokenBalance[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [koinPrice, setKoinPrice] = useState<number | null>(null);
   const { rpcNode } = useWallet();
+
+  // Fetch KOIN price
+  useEffect(() => {
+    async function fetchPrice() {
+      const price = await getKoinPrice();
+      setKoinPrice(price);
+    }
+    fetchPrice();
+
+    // Refresh price every 60 seconds
+    const interval = setInterval(fetchPrice, 60000);
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     async function fetchBalances() {
@@ -140,44 +155,57 @@ export function WalletBalances({ address }: WalletBalancesProps) {
           <div className="text-destructive">{error}</div>
         ) : tokenBalances.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {tokenBalances.map(({ token, formattedBalance }) => (
-              <div
-                key={token.symbol}
-                className="flex items-center justify-between p-3 rounded-lg bg-background/50 border border-border/40 hover:border-border/60 transition-colors"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-muted/50 flex items-center justify-center overflow-hidden ring-2 ring-border/20">
-                    {token.logoURI ? (
-                      <Image
-                        src={token.logoURI}
-                        alt={token.symbol}
-                        width={32}
-                        height={32}
-                        className="object-contain"
-                      />
-                    ) : (
-                      <span className="text-sm font-bold text-muted-foreground">
-                        {token.symbol.charAt(0)}
-                      </span>
-                    )}
-                  </div>
-                  <div>
-                    <div className="font-semibold text-lg">{formattedBalance}</div>
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <div className="text-xs text-muted-foreground cursor-help">{token.symbol}</div>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p className="font-normal">{token.name}</p>
-                          {token.description && <p className="text-xs text-muted-foreground max-w-xs">{token.description}</p>}
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
+            {tokenBalances.map(({ token, formattedBalance, numericValue }) => {
+              // Calculate USD value for KOIN only
+              const isKoin = token.symbol.toUpperCase() === 'KOIN';
+              const usdValue = isKoin && koinPrice ? numericValue * koinPrice : null;
+
+              return (
+                <div
+                  key={token.symbol}
+                  className="flex items-center justify-between p-3 rounded-lg bg-background/50 border border-border/40 hover:border-border/60 transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-muted/50 flex items-center justify-center overflow-hidden ring-2 ring-border/20">
+                      {token.logoURI ? (
+                        <Image
+                          src={token.logoURI}
+                          alt={token.symbol}
+                          width={32}
+                          height={32}
+                          className="object-contain"
+                        />
+                      ) : (
+                        <span className="text-sm font-bold text-muted-foreground">
+                          {token.symbol.charAt(0)}
+                        </span>
+                      )}
+                    </div>
+                    <div>
+                      <div className="font-semibold text-lg">
+                        {formattedBalance}
+                        {usdValue !== null && (
+                          <span className="text-sm font-normal text-muted-foreground ml-2">
+                            (~{formatUsdValue(usdValue)})
+                          </span>
+                        )}
+                      </div>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div className="text-xs text-muted-foreground cursor-help">{token.symbol}</div>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p className="font-normal">{token.name}</p>
+                            {token.description && <p className="text-xs text-muted-foreground max-w-xs">{token.description}</p>}
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         ) : (
           <div className="text-muted-foreground text-center py-6 bg-muted/20 rounded-lg">

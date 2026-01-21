@@ -74,6 +74,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Alert,
@@ -217,6 +218,7 @@ export function DetailedTransactionHistory({
   // Constants
   const [limit, setLimit] = useState<number>(10);
   const [ascending, setAscending] = useState<boolean>(false); // Default to descending order (newest first)
+  const [advancedView, setAdvancedView] = useState<boolean>(false); // Toggle for showing technical details
   
   // Add state for token balances
   const [koinBalance, setKoinBalance] = useState<string>('0');
@@ -831,7 +833,8 @@ export function DetailedTransactionHistory({
     tx: FormattedTransaction;
     isExpanded: boolean;
     toggleExpand: () => void;
-  }> = ({ tx, isExpanded, toggleExpand }) => {
+    showAdvanced: boolean;
+  }> = ({ tx, isExpanded, toggleExpand, showAdvanced }) => {
     const actions = tx.actions || [];
     const primaryAction = actions[0] || { type: 'other', description: 'Transaction' };
 
@@ -987,16 +990,18 @@ export function DetailedTransactionHistory({
         {isExpanded && (
           <div className="px-2 pb-4 pt-2 border-t border-border/30">
             <div className="grid gap-3 text-sm">
-              {/* Transaction ID */}
-              <div className="flex items-start gap-2">
-                <Hash className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
-                <span className="font-mono text-xs break-all text-muted-foreground">{tx.id}</span>
-              </div>
+              {/* Transaction ID - only in advanced mode */}
+              {showAdvanced && (
+                <div className="flex items-start gap-2">
+                  <Hash className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+                  <span className="font-mono text-xs break-all text-muted-foreground">{tx.id}</span>
+                </div>
+              )}
 
-              {/* All token transfers */}
+              {/* All token transfers - always visible */}
               {actions.map((action, i) =>
                 action.tokenTransfers?.map((transfer, j) => (
-                  <div key={`${i}-${j}`} className="flex items-center gap-2 pl-6">
+                  <div key={`${i}-${j}`} className="flex items-center gap-2">
                     <span className={`font-medium ${transfer.isPositive ? 'text-green-600 dark:text-green-400' : 'text-orange-600 dark:text-orange-400'}`}>
                       {transfer.isPositive ? '+' : '-'}{transfer.formattedAmount} {transfer.token.symbol}
                     </span>
@@ -1007,15 +1012,17 @@ export function DetailedTransactionHistory({
                 ))
               )}
 
-              {/* Mana used */}
-              <div className="flex items-center gap-2 pl-6 text-xs text-muted-foreground">
-                <Flame className="h-3 w-3" />
-                <span>{formatTokenAmount(tx.rc_used, 8)} mana</span>
-              </div>
+              {/* Mana used - only in advanced mode */}
+              {showAdvanced && (
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <Flame className="h-3 w-3" />
+                  <span>{formatTokenAmount(tx.rc_used, 8)} mana</span>
+                </div>
+              )}
 
-              {/* Block info */}
-              {tx.blockId && (
-                <div className="flex items-center gap-2 pl-6 text-xs text-muted-foreground">
+              {/* Block info - only in advanced mode */}
+              {showAdvanced && tx.blockId && (
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
                   <Layers className="h-3 w-3" />
                   <span>Block {shortenAddress(tx.blockId)}</span>
                 </div>
@@ -1032,53 +1039,21 @@ export function DetailedTransactionHistory({
   return (
     <Card className="bg-transparent shadow-none border-none" style={{...noBorderStyles, ...cssVariables}}>
       <CardHeader className="px-0">
-        <CardTitle>Transaction History</CardTitle>
-        <CardDescription className="flex flex-col sm:flex-row justify-between items-start gap-3 text-muted-foreground">
-          <div>
-            <div className="flex items-center gap-1">
-              <span className="font-medium">KOIN balance:</span>
-              {loadingBalance ? (
-                <Skeleton className="h-4 w-20 bg-muted" />
-              ) : (
-                <span>{formatBalanceDisplay(koinBalance)} KOIN</span>
-              )}
-            </div>
-            <div className="flex items-center gap-1">
-              <span className="font-medium">VHP balance:</span>
-              {loadingBalance ? (
-                <Skeleton className="h-4 w-20 bg-muted" />
-              ) : (
-                <span>{formatBalanceDisplay(vhpBalance)} VHP</span>
-              )}
+        <div className="flex items-center justify-between">
+          <CardTitle>Transaction History</CardTitle>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <Switch
+                id="advanced-view"
+                checked={advancedView}
+                onCheckedChange={setAdvancedView}
+              />
+              <Label htmlFor="advanced-view" className="text-sm text-muted-foreground cursor-pointer">
+                Advanced
+              </Label>
             </div>
           </div>
-          
-          <div className="flex items-center gap-2">
-            <label htmlFor="per-page" className="text-sm">Items per page:</label>
-            <Select value={limit.toString()} onValueChange={(val) => handleLimitChange(parseInt(val))}>
-              <SelectTrigger 
-                id="per-page" 
-                className="h-7 w-16 text-xs bg-background rounded-md border-none flex items-center justify-between"
-                style={{
-                  ...noBorderStyles,
-                  height: "28px",
-                  borderRadius: "6px",
-                  backgroundColor: "transparent",
-                  padding: "0 8px",
-                  fontSize: "12px"
-                }}
-              >
-                <SelectValue placeholder={limit.toString()} />
-              </SelectTrigger>
-              <SelectContent position="popper">
-                <SelectItem value="5">5</SelectItem>
-                <SelectItem value="10">10</SelectItem>
-                <SelectItem value="25">25</SelectItem>
-                <SelectItem value="50">50</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </CardDescription>
+        </div>
       </CardHeader>
 
       <CardContent className="px-0 pb-2">
@@ -1124,176 +1099,62 @@ export function DetailedTransactionHistory({
               </div>
             ) : (
               <>
-                <div className="mb-6">
-                  <div className="flex items-center space-x-2 mb-2">
-                    <h3 className="text-lg font-semibold flex items-center">
-                      <span className="mr-2">Transaction Summary</span>
-                    </h3>
+                {/* Simplified Controls Bar */}
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <label htmlFor="per-page" className="text-sm text-muted-foreground">Show:</label>
+                    <Select value={limit.toString()} onValueChange={(val) => handleLimitChange(parseInt(val))}>
+                      <SelectTrigger
+                        id="per-page"
+                        className="h-7 w-16 text-xs bg-background rounded-md border-none"
+                        style={{
+                          ...noBorderStyles,
+                          height: "28px",
+                          borderRadius: "6px",
+                          backgroundColor: "transparent",
+                          padding: "0 8px",
+                          fontSize: "12px"
+                        }}
+                      >
+                        <SelectValue placeholder={limit.toString()} />
+                      </SelectTrigger>
+                      <SelectContent position="popper">
+                        <SelectItem value="5">5</SelectItem>
+                        <SelectItem value="10">10</SelectItem>
+                        <SelectItem value="25">25</SelectItem>
+                        <SelectItem value="50">50</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
-                  
-                  <p className="text-sm text-muted-foreground">
-                    {totalTransactionCount
-                      ? `Showing ${formattedTransactions.length} of ${totalTransactionCount} transactions`
-                      : `Showing ${formattedTransactions.length} transactions`
-                    }
-                  </p>
+
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setAscending(!ascending)}
+                      className="h-8 text-xs flex items-center justify-center rounded-md bg-background border-none"
+                      style={inactiveButtonStyle}
+                    >
+                      {ascending ? (
+                        <ChevronUp className="h-4 w-4 mr-1" />
+                      ) : (
+                        <ChevronDown className="h-4 w-4 mr-1" />
+                      )}
+                      {ascending ? "Oldest" : "Newest"}
+                    </Button>
+
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => fetchTransactions(1)}
+                      className="h-8 w-8 flex items-center justify-center rounded-md bg-background border-none p-0"
+                      style={inactiveButtonStyle}
+                    >
+                      <RotateCw className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
 
-                <div className="flex flex-col space-y-4 mb-6">
-                  <div className="flex justify-between items-center">
-                    <div className="flex items-center space-x-2">
-                      <span className="text-sm font-medium">View:</span>
-                      <Select value={selectedFilters.length > 0 ? "filtered" : "all"} onValueChange={handleFilterChange}>
-                        <SelectTrigger 
-                          className="h-8 text-xs bg-background rounded-md border-none flex items-center justify-between"
-                          style={{
-                            ...noBorderStyles,
-                            height: "28px",
-                            borderRadius: "6px",
-                            backgroundColor: "transparent",
-                            padding: "0 8px",
-                            fontSize: "12px"
-                          }}
-                        >
-                          <SelectValue placeholder={selectedFilters.length > 0 ? `Filtered (${selectedFilters.length})` : "All transactions"} />
-                        </SelectTrigger>
-                        <SelectContent position="popper">
-                          <SelectItem value="all">All transactions</SelectItem>
-                          <SelectItem value="sent">Sent</SelectItem>
-                          <SelectItem value="received">Received</SelectItem>
-                          <SelectItem value="mint">Mint</SelectItem>
-                          <SelectItem value="dapps">dApps</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    
-                    <div className="flex items-center space-x-2">
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={() => setAscending(!ascending)}
-                        className="h-8 text-xs flex items-center justify-center rounded-md bg-background border-none"
-                        style={inactiveButtonStyle}
-                      >
-                        {ascending ? (
-                          <ChevronUp className="h-4 w-4 mr-1" />
-                        ) : (
-                          <ChevronDown className="h-4 w-4 mr-1" />
-                        )}
-                        {ascending ? "Oldest first" : "Newest first"}
-                      </Button>
-                      
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={() => fetchTransactions(1)}
-                        className="h-8 w-8 flex items-center justify-center rounded-md bg-background border-none p-0"
-                        style={inactiveButtonStyle}
-                      >
-                        <RotateCw className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                  
-                  <div className="flex flex-wrap gap-2 mb-6">
-                    <Button
-                      variant={selectedFilters.length === 0 ? "default" : "outline"}
-                      size="sm"
-                      className={`h-8 text-xs flex items-center justify-center rounded-md 
-                        ${selectedFilters.length === 0 
-                          ? "bg-primary text-primary-foreground font-medium" 
-                          : "bg-muted/30 hover:bg-muted/50 text-muted-foreground"}`}
-                      onClick={() => handleFilterChange("all")}
-                    >
-                      All types
-                    </Button>
-                    
-                    <Button
-                      variant={selectedFilters.includes('sent') ? "default" : "outline"}
-                      size="sm"
-                      className={`h-8 text-xs flex items-center justify-center rounded-md 
-                        ${selectedFilters.includes('sent') 
-                          ? "bg-primary text-primary-foreground font-medium" 
-                          : "bg-muted/30 hover:bg-muted/50 text-muted-foreground"}`}
-                      onClick={() => handleFilterChange("sent")}
-                    >
-                      <ArrowUpRight className="h-3 w-3 mr-1 text-orange-500" />
-                      Sent
-                      {(availableTags.find(t => t.tag === 'sent')?.count || 0) > 0 && (
-                        <span className={`ml-1.5 px-1.5 py-0.5 rounded-full text-[10px] 
-                          ${selectedFilters.includes('sent') 
-                            ? "bg-white/20 text-white" 
-                            : "bg-muted/50 text-muted-foreground"}`}>
-                          {availableTags.find(t => t.tag === 'sent')?.count || 0}
-                        </span>
-                      )}
-                    </Button>
-                    
-                    <Button
-                      variant={selectedFilters.includes('received') ? "default" : "outline"}
-                      size="sm"
-                      className={`h-8 text-xs flex items-center justify-center rounded-md 
-                        ${selectedFilters.includes('received') 
-                          ? "bg-primary text-primary-foreground font-medium" 
-                          : "bg-muted/30 hover:bg-muted/50 text-muted-foreground"}`}
-                      onClick={() => handleFilterChange("received")}
-                    >
-                      <ArrowDownLeft className="h-3 w-3 mr-1 text-green-500" />
-                      Received
-                      {(availableTags.find(t => t.tag === 'received')?.count || 0) > 0 && (
-                        <span className={`ml-1.5 px-1.5 py-0.5 rounded-full text-[10px] 
-                          ${selectedFilters.includes('received') 
-                            ? "bg-white/20 text-white" 
-                            : "bg-muted/50 text-muted-foreground"}`}>
-                          {availableTags.find(t => t.tag === 'received')?.count || 0}
-                        </span>
-                      )}
-                    </Button>
-                    
-                    <Button
-                      variant={selectedFilters.includes('mint') ? "default" : "outline"}
-                      size="sm"
-                      className={`h-8 text-xs flex items-center justify-center rounded-md 
-                        ${selectedFilters.includes('mint') 
-                          ? "bg-primary text-primary-foreground font-medium" 
-                          : "bg-muted/30 hover:bg-muted/50 text-muted-foreground"}`}
-                      onClick={() => handleFilterChange("mint")}
-                    >
-                      <Plus className="h-3 w-3 mr-1 text-emerald-500" />
-                      Mint
-                      {(availableTags.find(t => t.tag === 'mint')?.count || 0) > 0 && (
-                        <span className={`ml-1.5 px-1.5 py-0.5 rounded-full text-[10px] 
-                          ${selectedFilters.includes('mint') 
-                            ? "bg-white/20 text-white" 
-                            : "bg-muted/50 text-muted-foreground"}`}>
-                          {availableTags.find(t => t.tag === 'mint')?.count || 0}
-                        </span>
-                      )}
-                    </Button>
-                    
-                    <Button
-                      variant={selectedFilters.includes('interacted') ? "default" : "outline"}
-                      size="sm"
-                      className={`h-8 text-xs flex items-center justify-center rounded-md 
-                        ${selectedFilters.includes('interacted') 
-                          ? "bg-primary text-primary-foreground font-medium" 
-                          : "bg-muted/30 hover:bg-muted/50 text-muted-foreground"}`}
-                      onClick={() => handleFilterChange("dapps")}
-                    >
-                      <AppWindow className="h-3 w-3 mr-1 text-slate-500" />
-                      dApps
-                      {(availableTags.find(t => t.tag === 'interacted')?.count || 0) > 0 && (
-                        <span className={`ml-1.5 px-1.5 py-0.5 rounded-full text-[10px] 
-                          ${selectedFilters.includes('interacted') 
-                            ? "bg-white/20 text-white" 
-                            : "bg-muted/50 text-muted-foreground"}`}>
-                          {availableTags.find(t => t.tag === 'interacted')?.count || 0}
-                        </span>
-                      )}
-                    </Button>
-                  </div>
-                </div>
-                
                 {/* Transaction List */}
                 <div className="rounded-lg border border-border/50 overflow-hidden">
                   {loading && page === 1 ? (
@@ -1336,6 +1197,7 @@ export function DetailedTransactionHistory({
                             ...prev,
                             [tx.id]: !prev[tx.id]
                           }))}
+                          showAdvanced={advancedView}
                         />
                       ))}
                     </div>

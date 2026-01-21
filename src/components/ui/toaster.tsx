@@ -39,7 +39,7 @@ export function Toaster() {
         },
         success: {
           iconTheme: {
-            primary: '#10b981', // green
+            primary: '#f5a623', // brand gold (logo-color-2)
             secondary: isDark ? '#1f2937' : '#ffffff',
           },
         },

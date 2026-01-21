@@ -156,11 +156,11 @@ export function WalletBalances({ address }: WalletBalancesProps) {
   }, [address, jsonRpcNode]);
 
   return (
-    <Card className="bg-gradient-to-br from-green-500/5 via-emerald-500/5 to-transparent">
+    <Card className="bg-gradient-to-br from-[hsl(var(--logo-color-2))]/5 via-[hsl(var(--logo-color-2))]/3 to-transparent">
       <CardHeader className="pb-3">
         <CardTitle className="text-lg flex items-center gap-2">
-          <div className="p-2 rounded-lg bg-green-500/10">
-            <svg className="h-4 w-4 text-green-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <div className="p-2 rounded-lg bg-[hsl(var(--logo-color-2))]/10">
+            <svg className="h-4 w-4 text-[hsl(var(--logo-color-2))]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1" />
               <path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4" />
             </svg>

@@ -67,7 +67,7 @@ export default function AddressPage() {
                   className="h-8 px-2"
                 >
                   {copied ? (
-                    <Check className="h-4 w-4 text-green-500" />
+                    <Check className="h-4 w-4 text-[hsl(var(--logo-color-2))]" />
                   ) : (
                     <Copy className="h-4 w-4" />
                   )}

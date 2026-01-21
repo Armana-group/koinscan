@@ -932,7 +932,7 @@ export function DetailedTransactionHistory({
                 {sent?.formattedAmount} {sent?.token.symbol}
               </span>
               <ArrowRight className="h-3 w-3 text-zinc-600 dark:text-zinc-500 flex-shrink-0" />
-              <span className="text-emerald-600 dark:text-emerald-400">
+              <span className="text-[hsl(var(--logo-color-2))]">
                 {received?.formattedAmount} {received?.token.symbol}
               </span>
             </div>
@@ -955,9 +955,9 @@ export function DetailedTransactionHistory({
         : null;
       const counterpartyLabel = isReceive ? 'from' : 'to';
 
-      // Get amount color class - simplified: green for incoming, muted for outgoing
+      // Get amount color class - brand gold for incoming, muted for outgoing
       const getAmountColor = () => {
-        if (primaryAction.type === 'token_mint' || isReceive) return 'text-emerald-600 dark:text-emerald-400';
+        if (primaryAction.type === 'token_mint' || isReceive) return 'text-[hsl(var(--logo-color-2))]';
         if (primaryAction.type === 'token_burn' || isSend) return 'text-zinc-500 dark:text-zinc-400';
         return 'text-foreground';
       };
@@ -1039,7 +1039,7 @@ export function DetailedTransactionHistory({
               {/* All token transfers - always visible */}
               {allTransfers.map((transfer, i) => (
                 <div key={i} className="flex items-center gap-2">
-                  <span className={`font-medium ${transfer.isPositive ? 'text-emerald-600 dark:text-emerald-400' : 'text-zinc-500 dark:text-zinc-400'}`}>
+                  <span className={`font-medium ${transfer.isPositive ? 'text-[hsl(var(--logo-color-2))]' : 'text-zinc-500 dark:text-zinc-400'}`}>
                     {transfer.isPositive ? '+' : ''}{transfer.formattedAmount} {transfer.token.symbol}
                   </span>
                   <span className="text-zinc-500 dark:text-zinc-600 text-xs">

@@ -838,13 +838,33 @@ export function DetailedTransactionHistory({
     const actions = tx.actions || [];
     const primaryAction = actions[0] || { type: 'other', description: 'Transaction' };
 
-    // Get the primary token transfer for display
+    // Collect all transfers across all actions
+    const allTransfers = actions.flatMap(action => action.tokenTransfers || []);
+    const sentTransfers = allTransfers.filter(t => !t.isPositive);
+    const receivedTransfers = allTransfers.filter(t => t.isPositive);
+
+    // Detect if this is a swap (has both sent and received transfers with different tokens)
+    const isSwap = sentTransfers.length > 0 && receivedTransfers.length > 0 &&
+      sentTransfers[0]?.token.address !== receivedTransfers[0]?.token.address;
+
+    // Get the primary token transfer for display (used for non-swap transactions)
     const primaryTransfer = primaryAction.tokenTransfers?.[0];
     const isReceive = primaryTransfer?.isPositive;
     const isSend = primaryTransfer && !primaryTransfer.isPositive;
 
+    // Helper to get token image URL
+    const getTokenImageUrl = (transfer: any) => {
+      if (transfer?.token.logoURI) return transfer.token.logoURI;
+      if (transfer?.token.address) {
+        // Try KoinDX image path
+        return `https://raw.githubusercontent.com/koindx/token-list/main/src/images/mainnet/${transfer.token.address}.png`;
+      }
+      return null;
+    };
+
     // Determine transaction type icon and styling
     const getTypeIcon = () => {
+      if (isSwap) return Repeat;
       switch(primaryAction.type) {
         case 'token_transfer':
           return isReceive ? ArrowDownLeft : ArrowUpRight;
@@ -865,15 +885,9 @@ export function DetailedTransactionHistory({
 
     const TypeIcon = getTypeIcon();
 
-    // Get amount color class
-    const getAmountColor = () => {
-      if (primaryAction.type === 'token_mint' || isReceive) return 'text-green-600 dark:text-green-400';
-      if (primaryAction.type === 'token_burn' || isSend) return 'text-orange-600 dark:text-orange-400';
-      return 'text-foreground';
-    };
-
     // Get icon color class
     const getIconColor = () => {
+      if (isSwap) return 'text-indigo-500';
       if (primaryAction.type === 'token_mint' || isReceive) return 'text-green-600 dark:text-green-400';
       if (primaryAction.type === 'token_burn') return 'text-red-500';
       if (isSend) return 'text-orange-600 dark:text-orange-400';
@@ -881,44 +895,6 @@ export function DetailedTransactionHistory({
       if (primaryAction.type === 'governance') return 'text-indigo-600 dark:text-indigo-400';
       return 'text-muted-foreground';
     };
-
-    // Format amount with +/- prefix
-    const formatAmount = () => {
-      if (!primaryTransfer) return null;
-      const prefix = isReceive ? '+' : '-';
-      return `${prefix}${primaryTransfer.formattedAmount} ${primaryTransfer.token.symbol}`;
-    };
-
-    // Get counterparty address
-    const getCounterparty = () => {
-      if (!primaryTransfer) return null;
-      if (isReceive) return primaryTransfer.from;
-      return primaryTransfer.to;
-    };
-
-    // Get counterparty label
-    const getCounterpartyLabel = () => {
-      if (!primaryTransfer) return null;
-      return isReceive ? 'from' : 'to';
-    };
-
-    // Get token image URL
-    const getTokenImage = () => {
-      if (primaryTransfer?.token.logoURI) return primaryTransfer.token.logoURI;
-      if (primaryTransfer?.token.address) {
-        const symbol = primaryTransfer.token.symbol?.toLowerCase();
-        if (symbol === 'koin' || symbol === 'vhp') {
-          return `https://raw.githubusercontent.com/koindx/token-list/main/src/images/mainnet/${symbol}.png`;
-        }
-      }
-      return null;
-    };
-
-    const tokenImage = getTokenImage();
-    const counterparty = getCounterparty();
-    const counterpartyLabel = getCounterpartyLabel();
-    const amount = formatAmount();
-    const relativeTime = tx.timestamp ? formatRelativeTime(tx.timestamp) : '...';
 
     // Get action label for non-transfer transactions
     const getActionLabel = () => {
@@ -930,6 +906,116 @@ export function DetailedTransactionHistory({
         case 'governance': return 'Governance';
         default: return primaryAction.description || 'Transaction';
       }
+    };
+
+    const relativeTime = tx.timestamp ? formatRelativeTime(tx.timestamp) : '...';
+
+    // Render swap transaction
+    const renderSwapContent = () => {
+      const sent = sentTransfers[0];
+      const received = receivedTransfers[0];
+      const sentImage = getTokenImageUrl(sent);
+      const receivedImage = getTokenImageUrl(received);
+
+      return (
+        <>
+          {/* Token icons for swap */}
+          <div className="flex items-center gap-1 flex-shrink-0">
+            {sentImage && (
+              <div className="w-5 h-5 rounded-full overflow-hidden bg-muted">
+                <img
+                  src={sentImage}
+                  alt={sent?.token.symbol || 'token'}
+                  className="w-full h-full object-cover"
+                  onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                />
+              </div>
+            )}
+            <ArrowRight className="h-3 w-3 text-muted-foreground" />
+            {receivedImage && (
+              <div className="w-5 h-5 rounded-full overflow-hidden bg-muted">
+                <img
+                  src={receivedImage}
+                  alt={received?.token.symbol || 'token'}
+                  className="w-full h-full object-cover"
+                  onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Swap amounts */}
+          <div className="min-w-0 flex-1">
+            <div className="font-semibold text-base flex items-center gap-2 flex-wrap">
+              <span className="text-orange-600 dark:text-orange-400">
+                -{sent?.formattedAmount} {sent?.token.symbol}
+              </span>
+              <ArrowRight className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+              <span className="text-green-600 dark:text-green-400">
+                +{received?.formattedAmount} {received?.token.symbol}
+              </span>
+            </div>
+            <div className="text-xs text-muted-foreground">
+              Swap
+            </div>
+          </div>
+        </>
+      );
+    };
+
+    // Render regular transfer content
+    const renderTransferContent = () => {
+      const tokenImage = getTokenImageUrl(primaryTransfer);
+      const amount = primaryTransfer
+        ? `${isReceive ? '+' : '-'}${primaryTransfer.formattedAmount} ${primaryTransfer.token.symbol}`
+        : null;
+      const counterparty = primaryTransfer
+        ? (isReceive ? primaryTransfer.from : primaryTransfer.to)
+        : null;
+      const counterpartyLabel = isReceive ? 'from' : 'to';
+
+      // Get amount color class
+      const getAmountColor = () => {
+        if (primaryAction.type === 'token_mint' || isReceive) return 'text-green-600 dark:text-green-400';
+        if (primaryAction.type === 'token_burn' || isSend) return 'text-orange-600 dark:text-orange-400';
+        return 'text-foreground';
+      };
+
+      return (
+        <>
+          {/* Token Icon (if available) */}
+          {tokenImage && (
+            <div className="flex-shrink-0 w-6 h-6 rounded-full overflow-hidden bg-muted">
+              <img
+                src={tokenImage}
+                alt={primaryTransfer?.token.symbol || 'token'}
+                className="w-full h-full object-cover"
+                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+              />
+            </div>
+          )}
+
+          {/* Amount or Action */}
+          <div className="min-w-0 flex-1">
+            {amount ? (
+              <div className={`font-semibold text-base ${getAmountColor()}`}>
+                {amount}
+              </div>
+            ) : (
+              <div className="font-medium text-base">
+                {getActionLabel()}
+              </div>
+            )}
+
+            {/* Counterparty */}
+            {counterparty && (
+              <div className="text-xs text-muted-foreground truncate">
+                {counterpartyLabel} {shortenAddress(counterparty)}
+              </div>
+            )}
+          </div>
+        </>
+      );
     };
 
     return (
@@ -946,37 +1032,8 @@ export function DetailedTransactionHistory({
               <TypeIcon className={`h-5 w-5 ${getIconColor()}`} />
             </div>
 
-            {/* Token Icon (if available) */}
-            {tokenImage && (
-              <div className="flex-shrink-0 w-6 h-6 rounded-full overflow-hidden bg-muted">
-                <img
-                  src={tokenImage}
-                  alt={primaryTransfer?.token.symbol || 'token'}
-                  className="w-full h-full object-cover"
-                  onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                />
-              </div>
-            )}
-
-            {/* Amount or Action */}
-            <div className="min-w-0 flex-1">
-              {amount ? (
-                <div className={`font-semibold text-base ${getAmountColor()}`}>
-                  {amount}
-                </div>
-              ) : (
-                <div className="font-medium text-base">
-                  {getActionLabel()}
-                </div>
-              )}
-
-              {/* Counterparty */}
-              {counterparty && (
-                <div className="text-xs text-muted-foreground truncate">
-                  {counterpartyLabel} {shortenAddress(counterparty)}
-                </div>
-              )}
-            </div>
+            {/* Render swap or regular content */}
+            {isSwap ? renderSwapContent() : renderTransferContent()}
           </div>
 
           {/* Right: Time + Expand */}
@@ -999,18 +1056,16 @@ export function DetailedTransactionHistory({
               )}
 
               {/* All token transfers - always visible */}
-              {actions.map((action, i) =>
-                action.tokenTransfers?.map((transfer, j) => (
-                  <div key={`${i}-${j}`} className="flex items-center gap-2">
-                    <span className={`font-medium ${transfer.isPositive ? 'text-green-600 dark:text-green-400' : 'text-orange-600 dark:text-orange-400'}`}>
-                      {transfer.isPositive ? '+' : '-'}{transfer.formattedAmount} {transfer.token.symbol}
-                    </span>
-                    <span className="text-muted-foreground text-xs">
-                      {transfer.isPositive ? 'from' : 'to'} {shortenAddress(transfer.isPositive ? transfer.from : transfer.to)}
-                    </span>
-                  </div>
-                ))
-              )}
+              {allTransfers.map((transfer, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <span className={`font-medium ${transfer.isPositive ? 'text-green-600 dark:text-green-400' : 'text-orange-600 dark:text-orange-400'}`}>
+                    {transfer.isPositive ? '+' : '-'}{transfer.formattedAmount} {transfer.token.symbol}
+                  </span>
+                  <span className="text-muted-foreground text-xs">
+                    {transfer.isPositive ? 'from' : 'to'} {shortenAddress(transfer.isPositive ? transfer.from : transfer.to)}
+                  </span>
+                </div>
+              ))}
 
               {/* Mana used - only in advanced mode */}
               {showAdvanced && (

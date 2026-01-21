@@ -56,7 +56,7 @@ export function WalletBalances({ address }: WalletBalancesProps) {
           try {
             // Fetch the token balance
             const response = await fetch(
-              `${rpcNode}/v1/account/${address}/balance/${token.address.toLowerCase()}`
+              `${rpcNode}/v1/account/${address}/balance/${token.address}`
             );
             
             if (!response.ok) {

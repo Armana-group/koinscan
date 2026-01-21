@@ -1230,10 +1230,8 @@ export async function getTokenBalance(restNode: string, address: string, tokenCo
   try {
     // The REST API expects short names like 'koin', 'vhp' - not full contract addresses
     // If given a full address, try to convert it to the API name
-    let apiTokenName = tokenContract.toLowerCase();
-    if (CONTRACT_TO_API_NAME[tokenContract]) {
-      apiTokenName = CONTRACT_TO_API_NAME[tokenContract];
-    }
+    // Note: Koinos addresses are case-sensitive (Base58Check), so don't lowercase them
+    let apiTokenName = CONTRACT_TO_API_NAME[tokenContract] || tokenContract;
     const url = `${restNode}/v1/account/${address}/balance/${apiTokenName}`;
     
     const response = await fetch(url);

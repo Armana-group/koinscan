@@ -762,49 +762,35 @@ export function DetailedTransactionHistory({
     });
   }, [formattedTransactions, selectedFilters]);
 
-  // New helper function to get the appropriate icon for a transaction type
+  // Helper function to get the appropriate icon for a transaction type - minimal neutral icons
   const getTransactionIcon = (actionType: string) => {
+    const iconClass = "h-5 w-5 text-zinc-400 dark:text-zinc-500";
     switch (actionType) {
       case 'sent':
-        return <ArrowUpRight className="h-5 w-5 text-orange-500" />;
+        return <ArrowUpRight className={iconClass} />;
       case 'received':
-        return <ArrowDownLeft className="h-5 w-5 text-green-500" />;
+        return <ArrowDownLeft className={iconClass} />;
       case 'staked':
-        return <Lock className="h-5 w-5 text-blue-500" />;
+        return <Lock className={iconClass} />;
       case 'unstaked':
-        return <Unlock className="h-5 w-5 text-blue-500" />;
+        return <Unlock className={iconClass} />;
       case 'minted':
-        return <Plus className="h-5 w-5 text-purple-500" />;
+        return <Plus className={iconClass} />;
       case 'burned':
-        return <Flame className="h-5 w-5 text-red-500" />;
+        return <Flame className={iconClass} />;
       case 'swapped':
-        return <Repeat className="h-5 w-5 text-indigo-500" />;
+        return <Repeat className={iconClass} />;
       case 'interacted':
-        return <AppWindow className="h-5 w-5 text-slate-500" />;
+        return <AppWindow className={iconClass} />;
       default:
-        return <Layers className="h-5 w-5 text-slate-500" />;
+        return <Layers className={iconClass} />;
     }
   };
 
-  // Helper to get appropriate color classes based on transaction type
+  // Helper to get appropriate color classes based on transaction type - simplified borders
   const getTransactionColorClasses = (actionType: string) => {
-    switch (actionType) {
-      case 'sent':
-        return 'border-orange-200 dark:border-orange-900';
-      case 'received':
-        return 'border-green-200 dark:border-green-900';
-      case 'staked':
-      case 'unstaked':
-        return 'border-blue-200 dark:border-blue-900';
-      case 'minted':
-        return 'border-purple-200 dark:border-purple-900';
-      case 'burned':
-        return 'border-red-200 dark:border-red-900';
-      case 'swapped':
-        return 'border-indigo-200 dark:border-indigo-900';
-      default:
-        return 'border-slate-200 dark:border-slate-800';
-    }
+    // Use consistent neutral borders for clean minimal look
+    return 'border-zinc-200 dark:border-zinc-800';
   };
 
   // Format relative time like "2 hours ago" or "Yesterday"
@@ -885,15 +871,10 @@ export function DetailedTransactionHistory({
 
     const TypeIcon = getTypeIcon();
 
-    // Get icon color class
+    // Get icon color class - minimal palette: neutral icons, let token images provide color
     const getIconColor = () => {
-      if (isSwap) return 'text-indigo-500';
-      if (primaryAction.type === 'token_mint' || isReceive) return 'text-green-600 dark:text-green-400';
-      if (primaryAction.type === 'token_burn') return 'text-red-500';
-      if (isSend) return 'text-orange-600 dark:text-orange-400';
-      if (primaryAction.type === 'contract_interaction') return 'text-purple-600 dark:text-purple-400';
-      if (primaryAction.type === 'governance') return 'text-indigo-600 dark:text-indigo-400';
-      return 'text-muted-foreground';
+      // All icons use the same neutral color for a clean, minimal look
+      return 'text-zinc-400 dark:text-zinc-500';
     };
 
     // Get action label for non-transfer transactions
@@ -946,16 +927,16 @@ export function DetailedTransactionHistory({
 
           {/* Swap amounts */}
           <div className="min-w-0 flex-1">
-            <div className="font-semibold text-base flex items-center gap-2 flex-wrap">
-              <span className="text-orange-600 dark:text-orange-400">
-                -{sent?.formattedAmount} {sent?.token.symbol}
+            <div className="font-medium text-sm flex items-center gap-2 flex-wrap">
+              <span className="text-zinc-500 dark:text-zinc-400">
+                {sent?.formattedAmount} {sent?.token.symbol}
               </span>
-              <ArrowRight className="h-3 w-3 text-muted-foreground flex-shrink-0" />
-              <span className="text-green-600 dark:text-green-400">
-                +{received?.formattedAmount} {received?.token.symbol}
+              <ArrowRight className="h-3 w-3 text-zinc-600 dark:text-zinc-500 flex-shrink-0" />
+              <span className="text-emerald-600 dark:text-emerald-400">
+                {received?.formattedAmount} {received?.token.symbol}
               </span>
             </div>
-            <div className="text-xs text-muted-foreground">
+            <div className="text-xs text-zinc-500 dark:text-zinc-600">
               Swap
             </div>
           </div>
@@ -974,10 +955,10 @@ export function DetailedTransactionHistory({
         : null;
       const counterpartyLabel = isReceive ? 'from' : 'to';
 
-      // Get amount color class
+      // Get amount color class - simplified: green for incoming, muted for outgoing
       const getAmountColor = () => {
-        if (primaryAction.type === 'token_mint' || isReceive) return 'text-green-600 dark:text-green-400';
-        if (primaryAction.type === 'token_burn' || isSend) return 'text-orange-600 dark:text-orange-400';
+        if (primaryAction.type === 'token_mint' || isReceive) return 'text-emerald-600 dark:text-emerald-400';
+        if (primaryAction.type === 'token_burn' || isSend) return 'text-zinc-500 dark:text-zinc-400';
         return 'text-foreground';
       };
 
@@ -1058,10 +1039,10 @@ export function DetailedTransactionHistory({
               {/* All token transfers - always visible */}
               {allTransfers.map((transfer, i) => (
                 <div key={i} className="flex items-center gap-2">
-                  <span className={`font-medium ${transfer.isPositive ? 'text-green-600 dark:text-green-400' : 'text-orange-600 dark:text-orange-400'}`}>
-                    {transfer.isPositive ? '+' : '-'}{transfer.formattedAmount} {transfer.token.symbol}
+                  <span className={`font-medium ${transfer.isPositive ? 'text-emerald-600 dark:text-emerald-400' : 'text-zinc-500 dark:text-zinc-400'}`}>
+                    {transfer.isPositive ? '+' : ''}{transfer.formattedAmount} {transfer.token.symbol}
                   </span>
-                  <span className="text-muted-foreground text-xs">
+                  <span className="text-zinc-500 dark:text-zinc-600 text-xs">
                     {transfer.isPositive ? 'from' : 'to'} {shortenAddress(transfer.isPositive ? transfer.from : transfer.to)}
                   </span>
                 </div>

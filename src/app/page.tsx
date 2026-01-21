@@ -177,9 +177,16 @@ export default function Home() {
         console.log(`[isTokenContract] Decimals call succeeded:`, result);
         // If we get a result (even if it's 0), it's a token contract
         return result !== undefined;
-      } catch (error) {
-        console.error(`[isTokenContract] Error with RPC ${rpcNode}:`, error);
-        // Try the next RPC node
+      } catch (error: unknown) {
+        // "contract does not exist" is expected for wallet addresses - not an error
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        const errorObj = error as { error?: string };
+        if (errorObj?.error === 'contract does not exist' || errorMessage.includes('contract does not exist')) {
+          console.log(`[isTokenContract] Address ${addressOrName} is not a contract (expected for wallet addresses)`);
+          return false;
+        }
+        // For other errors, try the next RPC node
+        console.log(`[isTokenContract] RPC ${rpcNode} failed, trying next:`, errorMessage);
         continue;
       }
     }

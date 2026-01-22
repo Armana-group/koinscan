@@ -145,7 +145,7 @@ export function WalletButton() {
                   />
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <div className={`w-2 h-2 rounded-full flex-shrink-0 ${isConnected ? 'bg-green-500' : 'bg-amber-500'}`}></div>
+                  <div className={`w-2 h-2 rounded-full flex-shrink-0 ${isConnected ? 'bg-[hsl(var(--logo-color-2))]' : 'bg-amber-500'}`}></div>
                   <span className="text-sm font-medium truncate">{shortAddress(displayAddress)}</span>
                 </div>
               </div>
@@ -216,7 +216,7 @@ export function WalletButton() {
             <div className="px-4 py-3 mb-3 bg-muted/40 rounded-lg border border-border/60">
               <div className="flex flex-col gap-1.5">
                 <div className="flex items-center gap-2">
-                  <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-amber-500'}`}></div>
+                  <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-[hsl(var(--logo-color-2))]' : 'bg-amber-500'}`}></div>
                   <span className="text-xs font-medium text-muted-foreground">
                     {isConnected 
                       ? 'Wallet Connected' 

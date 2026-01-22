@@ -10,13 +10,13 @@ import Image from "next/image";
 import Link from "next/link";
 import { motion } from "framer-motion";
 
-// Category colors for gradients
+// Category colors for gradients - using brand colors
 const categoryGradients: Record<string, string> = {
   native: "from-amber-500/10 via-yellow-500/5 to-transparent",
   wrapped: "from-blue-500/10 via-cyan-500/5 to-transparent",
   meme: "from-pink-500/10 via-rose-500/5 to-transparent",
   gaming: "from-purple-500/10 via-violet-500/5 to-transparent",
-  defi: "from-green-500/10 via-emerald-500/5 to-transparent",
+  defi: "from-[hsl(var(--logo-color-2))]/10 via-[hsl(var(--logo-color-2))]/5 to-transparent",
   other: "from-slate-500/10 via-gray-500/5 to-transparent",
 };
 
@@ -25,7 +25,7 @@ const categoryBadgeColors: Record<string, string> = {
   wrapped: "bg-blue-500/20 text-blue-600 dark:text-blue-400 border-blue-500/30",
   meme: "bg-pink-500/20 text-pink-600 dark:text-pink-400 border-pink-500/30",
   gaming: "bg-purple-500/20 text-purple-600 dark:text-purple-400 border-purple-500/30",
-  defi: "bg-green-500/20 text-green-600 dark:text-green-400 border-green-500/30",
+  defi: "bg-[hsl(var(--logo-color-2))]/20 text-[hsl(var(--logo-color-2))] border-[hsl(var(--logo-color-2))]/30",
   other: "bg-slate-500/20 text-slate-600 dark:text-slate-400 border-slate-500/30",
 };
 import { Button } from "@/components/ui/button";

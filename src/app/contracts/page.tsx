@@ -31,13 +31,13 @@ const contractIcons: Record<string, React.ReactNode> = {
   bytestorage: <Server className="h-6 w-6" />,
 };
 
-// Gradient colors for contract cards
+// Gradient colors for contract cards - using brand colors
 const contractGradients: Record<string, string> = {
   koin: "from-amber-500/20 to-yellow-500/5",
   vhp: "from-purple-500/20 to-violet-500/5",
   pob: "from-orange-500/20 to-red-500/5",
   governance: "from-blue-500/20 to-cyan-500/5",
-  claim: "from-green-500/20 to-emerald-500/5",
+  claim: "from-[hsl(var(--logo-color-2))]/20 to-[hsl(var(--logo-color-2))]/5",
   name_service: "from-pink-500/20 to-rose-500/5",
   resources: "from-slate-500/20 to-gray-500/5",
   "koinos-fund": "from-indigo-500/20 to-blue-500/5",
@@ -50,7 +50,7 @@ const iconColors: Record<string, string> = {
   vhp: "text-purple-500",
   pob: "text-orange-500",
   governance: "text-blue-500",
-  claim: "text-green-500",
+  claim: "text-[hsl(var(--logo-color-2))]",
   name_service: "text-pink-500",
   resources: "text-slate-400",
   "koinos-fund": "text-indigo-500",

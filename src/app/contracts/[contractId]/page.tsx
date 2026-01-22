@@ -646,7 +646,7 @@ export default function ContractPage() {
                             </div>
                             {!method.readOnly && signer ? (
                               <div className="mt-3 text-sm text-muted-foreground flex items-center gap-2">
-                                <div className="w-2 h-2 rounded-full bg-green-500" />
+                                <div className="w-2 h-2 rounded-full bg-[hsl(var(--logo-color-2))]" />
                                 <span>Signing as: {signer.getAddress()}</span>
                               </div>
                             ) : !method.readOnly ? (

@@ -10,4 +10,5 @@ explorer-base/
 .env.production
 .env.test
 .env.test.local
+koinosblocks/
     

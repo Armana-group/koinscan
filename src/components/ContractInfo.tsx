@@ -205,8 +205,8 @@ export const ContractInfo = (props: {
                 
                 {/* Wallet Status */}
                 <div className={`flex items-center gap-2 px-4 py-2 rounded-xl ${
-                  props.signer 
-                    ? "bg-green-500/10 text-green-700 dark:text-green-400" 
+                  props.signer
+                    ? "bg-[hsl(var(--logo-color-2))]/10 text-[hsl(var(--logo-color-2))]"
                     : "bg-muted text-muted-foreground"
                 }`}>
                   <Wallet className="w-4 h-4" />
@@ -215,7 +215,7 @@ export const ContractInfo = (props: {
                       <div className="flex items-center gap-2">
                         <span>Connected</span>
                         {isToken === true && balance && (
-                          <span className="px-2 py-0.5 bg-green-500/20 rounded-full text-xs">
+                          <span className="px-2 py-0.5 bg-[hsl(var(--logo-color-2))]/20 rounded-full text-xs">
                             {formatBalance(balance, decimals)}
                           </span>
                         )}

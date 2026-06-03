@@ -49,11 +49,14 @@
     "eslint-config-next": "^16.1.0",
     "postcss": "^8.4.31",
     "prettier": "^3.2.5",
-    "protobufjs": "^7.2.4",
+    "protobufjs": "^7.6.2",
     "pwa-asset-generator": "^6.4.0",
     "tailwindcss": "^3.4.1",
     "tailwindcss-animate": "^1.0.7",
     "typescript": "^5"
+  },
+  "resolutions": {
+    "protobufjs": "7.6.2"
   },
   "packageManager": "yarn@1.22.19+sha1.4ba7fc5c6e704fce2066ecbfb0b0d8976fe62447"
 }

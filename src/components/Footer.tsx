@@ -13,8 +13,8 @@ export function Footer() {
   return (
     <footer className="w-full py-4 text-sm text-muted-foreground">
       <div className="container mx-auto px-4 flex flex-col md:flex-row justify-between items-center gap-4">
-        <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1">
-          <p>
+        <div className="flex flex-wrap items-baseline justify-center gap-x-3 gap-y-1">
+          <p className="leading-none">
             © 2025{' '}
             <Link
               href="https://armana.io"
@@ -26,7 +26,7 @@ export function Footer() {
             </Link>
           </p>
           {buildLabel && (
-            <span className="text-xs text-muted-foreground/60" aria-label={`Build ${buildLabel}`}>
+            <span className="text-xs leading-none text-muted-foreground/60" aria-label={`Build ${buildLabel}`}>
               {buildLabel}
             </span>
           )}

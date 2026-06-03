@@ -41,8 +41,153 @@ export interface TransactionEvent {
   sequence: number;
   source: string;
   name: string;
-  data: Record<string, any>;
+  data: Record<string, any> | string;
   impacted: string[];
+}
+
+interface TokenTransferEventData {
+  from: string;
+  to: string;
+  value: string;
+}
+
+function isTokenTransferEventData(data: unknown): data is TokenTransferEventData {
+  return (
+    !!data &&
+    typeof data === 'object' &&
+    typeof (data as TokenTransferEventData).from === 'string' &&
+    typeof (data as TokenTransferEventData).to === 'string' &&
+    typeof (data as TokenTransferEventData).value === 'string'
+  );
+}
+
+function readVarint(bytes: Uint8Array, start: number): { value: bigint; next: number } {
+  let value = BigInt(0);
+  let shift = BigInt(0);
+
+  for (let index = start; index < bytes.length; index += 1) {
+    const byte = bytes[index];
+    value |= BigInt(byte & 0x7f) << shift;
+
+    if ((byte & 0x80) === 0) {
+      return { value, next: index + 1 };
+    }
+
+    shift += BigInt(7);
+    if (shift > BigInt(70)) {
+      throw new Error('Invalid protobuf varint');
+    }
+  }
+
+  throw new Error('Truncated protobuf varint');
+}
+
+export function decodeTokenTransferEventData(data: unknown): TokenTransferEventData | null {
+  if (isTokenTransferEventData(data)) {
+    return data;
+  }
+
+  if (typeof data !== 'string' || data.length === 0) {
+    return null;
+  }
+
+  try {
+    const bytes = utils.decodeBase64url(data);
+    const decoded: Partial<TokenTransferEventData> = {};
+    let offset = 0;
+
+    while (offset < bytes.length) {
+      const key = readVarint(bytes, offset);
+      offset = key.next;
+
+      const fieldNumber = Number(key.value >> BigInt(3));
+      const wireType = Number(key.value & BigInt(0x07));
+
+      if (fieldNumber === 1 || fieldNumber === 2) {
+        if (wireType !== 2) {
+          return null;
+        }
+
+        const length = readVarint(bytes, offset);
+        offset = length.next;
+        const end = offset + Number(length.value);
+
+        if (end > bytes.length) {
+          return null;
+        }
+
+        const address = utils.encodeBase58(bytes.slice(offset, end));
+        if (fieldNumber === 1) {
+          decoded.from = address;
+        } else {
+          decoded.to = address;
+        }
+
+        offset = end;
+      } else if (fieldNumber === 3) {
+        if (wireType !== 0) {
+          return null;
+        }
+
+        const value = readVarint(bytes, offset);
+        decoded.value = value.value.toString();
+        offset = value.next;
+      } else if (wireType === 0) {
+        offset = readVarint(bytes, offset).next;
+      } else if (wireType === 2) {
+        const length = readVarint(bytes, offset);
+        offset = length.next + Number(length.value);
+        if (offset > bytes.length) {
+          return null;
+        }
+      } else {
+        return null;
+      }
+    }
+
+    if (decoded.from && decoded.to && decoded.value) {
+      return decoded as TokenTransferEventData;
+    }
+  } catch (error) {
+    console.warn('[decodeTokenTransferEventData] Unable to decode transfer event data:', error);
+  }
+
+  return null;
+}
+
+function normalizeTransactionEvent(event: TransactionEvent): TransactionEvent {
+  if (!event.name?.includes('transfer_event')) {
+    return event;
+  }
+
+  const data = decodeTokenTransferEventData(event.data);
+  return data ? { ...event, data } : event;
+}
+
+function formatExactTokenAmount(amount: string, decimals: number): string {
+  if (!amount) return '0';
+  if (amount.includes('.')) return amount;
+
+  try {
+    const normalizedDecimals = Number.isFinite(decimals) ? decimals : 8;
+    const rawValue = BigInt(amount);
+    const divisor = BigInt(10) ** BigInt(normalizedDecimals);
+    const whole = rawValue / divisor;
+    const remainder = rawValue % divisor;
+
+    if (remainder === BigInt(0)) {
+      return whole.toString();
+    }
+
+    const fractional = remainder
+      .toString()
+      .padStart(normalizedDecimals, '0')
+      .replace(/0+$/, '');
+
+    return `${whole.toString()}.${fractional}`;
+  } catch {
+    return formatTokenAmount(amount, decimals);
+  }
 }
 
 export interface TransactionReceipt {
@@ -186,10 +331,14 @@ export function extractTransactionActions(tx: any, userAddress?: string): Transa
   // First pass: collect all token transfers grouped by token
   for (const event of tx.events || []) {
     const eventName = event.name?.toLowerCase() || '';
-    const eventData = event.data || {};
     
     // Process transfer events - check various formats (koinos.contracts.token.transfer_event, transfer_event, etc.)
     if (eventName.includes('transfer')) {
+      const eventData = decodeTokenTransferEventData(event.data);
+      if (!eventData) {
+        continue;
+      }
+
       const { from, to, value } = eventData;
       console.log('[extractTransactionActions] Found transfer event:', eventName, 'from:', from, 'to:', to, 'value:', value);
 
@@ -235,7 +384,8 @@ export function extractTransactionActions(tx: any, userAddress?: string): Transa
           return;
         }
 
-        const formattedAmount = formatTokenAmount(value, typeof decimals === 'number' ? decimals : parseInt(decimals.toString()));
+        const decimalPlaces = typeof decimals === 'number' ? decimals : parseInt(decimals.toString());
+        const formattedAmount = formatExactTokenAmount(value, decimalPlaces);
 
         actions.push({
           type: 'token_transfer',
@@ -616,7 +766,7 @@ function analyzeAndTagTransaction(tx: any): { tags: string[], primaryTag: string
       tags.add('transfer');
       
       // Check the transfer direction
-      const { from, to } = event.data || {};
+      const { from, to } = decodeTokenTransferEventData(event.data) || {};
       if (from && to) {
         // If the user's address is the recipient, tag as received
         if (tx.associatedAddress && to.toLowerCase() === tx.associatedAddress.toLowerCase()) {
@@ -706,7 +856,7 @@ export function generateUserFriendlyInfo(tx: any): UserFriendlyTransactionInfo {
     
     if (transferEvents.length > 0) {
       const transfer = transferEvents[0];
-      const { from, to, value } = transfer.data || {};
+      const { from, to, value } = decodeTokenTransferEventData(transfer.data) || {};
       
       // Skip if missing critical data
       if (!from || !to || !value) {
@@ -882,6 +1032,7 @@ export function formatDetailedTransactions(transactions: DetailedTransaction[], 
   }
   return transactions.map((tx) => {
     const { call_contract, upload_contract, set_system_call, set_system_contract } = tx.trx.transaction.operations[0] || {};
+    const events = (tx.trx.receipt.events || []).map(normalizeTransactionEvent);
     
     // Process token info from transfer events if available
     let tokenSymbol = 'KOIN';
@@ -890,20 +1041,21 @@ export function formatDetailedTransactions(transactions: DetailedTransaction[], 
     // Track transfers for multiple tokens
     const tokenTransfers: Record<string, string> = {};
     
-    if (tx.trx.receipt && tx.trx.receipt.events) {
-      const transferEvents = tx.trx.receipt.events.filter(event => event.name.includes('transfer_event'));
+    if (tx.trx.receipt && events) {
+      const transferEvents = events.filter(event => event.name.includes('transfer_event'));
       
       // Process each transfer event
       if (transferEvents.length > 0) {
         transferEvents.forEach(event => {
-          if (event.source && event.data && event.data.value) {
+          const transferData = decodeTokenTransferEventData(event.data);
+          if (event.source && transferData?.value) {
             try {
               // Identify the token
               let eventTokenSymbol = 'Unknown';
               eventTokenSymbol = getTokenSymbolSync(event.source);
               
               // Add to the token's total
-              const value = BigInt(event.data.value);
+              const value = BigInt(transferData.value);
               if (tokenTransfers[eventTokenSymbol]) {
                 // Convert existing value to BigInt, add the new value, and store back as string
                 const currentTotal = BigInt(tokenTransfers[eventTokenSymbol]);
@@ -925,17 +1077,18 @@ export function formatDetailedTransactions(transactions: DetailedTransaction[], 
       }
       
       // Also check for mint events
-      const mintEvents = tx.trx.receipt.events.filter(event => event.name.includes('mint_event'));
+      const mintEvents = events.filter(event => event.name.includes('mint_event'));
       if (mintEvents.length > 0) {
         mintEvents.forEach(event => {
-          if (event.source && event.data && event.data.value) {
+          const eventData = typeof event.data === 'string' ? null : event.data;
+          if (event.source && eventData?.value) {
             try {
               // Identify the token
               let eventTokenSymbol = 'Unknown';
               eventTokenSymbol = getTokenSymbolSync(event.source);
               
               // Add to the token's total
-              const value = BigInt(event.data.value);
+              const value = BigInt(eventData.value);
               if (tokenTransfers[eventTokenSymbol]) {
                 // Convert existing value to BigInt, add the new value, and store back as string
                 const currentTotal = BigInt(tokenTransfers[eventTokenSymbol]);
@@ -962,7 +1115,7 @@ export function formatDetailedTransactions(transactions: DetailedTransaction[], 
       id: tx.trx.transaction.id,
       payer: tx.trx.transaction.header.payer,
       operations: [],
-      events: tx.trx.receipt.events || [],
+      events,
       rc_used: tx.trx.receipt.rc_used,
       signatures: tx.trx.transaction.signatures,
       totalValueTransferred,

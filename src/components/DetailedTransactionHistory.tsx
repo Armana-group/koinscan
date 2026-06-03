@@ -10,7 +10,8 @@ import {
   TransactionEvent,
   getTokenBalance,
   shortenAddress,
-  TransactionAction
+  TransactionAction,
+  decodeTokenTransferEventData
 } from '@/lib/api';
 import { 
   Card,
@@ -569,14 +570,19 @@ export function DetailedTransactionHistory({
 
   const renderEventSummary = (event: TransactionEvent) => {
     if (event.name.includes('transfer_event') && event.data) {
-      const { from, to, value } = event.data;
-      const contract = shortenAddress(event.source || '');
+      const { from, to, value } = decodeTokenTransferEventData(event.data) || {};
+
+      if (!from || !to || !value) {
+        return <span>Token transfer</span>;
+      }
       
       // Try to determine token symbol
       let tokenSymbol = 'tokens';
       if (event.source) {
         const tokenContracts: Record<string, string> = {
+          '19GYjDBVXU7keLbYvMLazsGQn3GTWHjHkK': 'KOIN',
           '15DJN4a8SgrbGhhGksSBASiSYjGnMU8dGL': 'KOIN',
+          '12Y5vW6gk8GceH53YfRkRre2Rrcsgw7Naq': 'VHP',
           '1FaSvLjQJsCJKq5ybmGsMMQs8RQYyVv8ju': 'VHP',
           // Add more token contracts as needed
         };
@@ -595,7 +601,8 @@ export function DetailedTransactionHistory({
     
     // Handle mint events
     if (event.name.includes('mint_event') && event.data) {
-      const { to, value } = event.data;
+      const eventData = typeof event.data === 'string' ? null : event.data;
+      const { to, value } = eventData || {};
       const contract = shortenAddress(event.source || '');
       return (
         <span>
@@ -606,7 +613,8 @@ export function DetailedTransactionHistory({
     
     // Handle burn events
     if (event.name.includes('burn_event') && event.data) {
-      const { from, value } = event.data;
+      const eventData = typeof event.data === 'string' ? null : event.data;
+      const { from, value } = eventData || {};
       const contract = shortenAddress(event.source || '');
       return (
         <span>

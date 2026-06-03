@@ -206,7 +206,7 @@ export interface TransactionReceipt {
 export interface TransactionOperation {
   call_contract?: {
     contract_id: string;
-    entry_point: string;
+    entry_point: string | number;
     args: Record<string, any>;
   };
   upload_contract?: any;
@@ -618,11 +618,13 @@ export function formatTransactions(transactions: BlockchainTransaction[]): Forma
 }
 
 // Add a helper function to decode entry points to human-readable method names
-function decodeEntryPoint(entryPoint: string): string {
+function decodeEntryPoint(entryPoint: string | number): string {
+  const entryPointValue = entryPoint.toString();
+
   // Convert the entry point to a more consistent format for comparison
-  const entryPointHex = entryPoint.startsWith('0x') 
-    ? entryPoint.toLowerCase() 
-    : `0x${parseInt(entryPoint).toString(16).padStart(8, '0')}`.toLowerCase();
+  const entryPointHex = entryPointValue.startsWith('0x')
+    ? entryPointValue.toLowerCase()
+    : `0x${parseInt(entryPointValue).toString(16).padStart(8, '0')}`.toLowerCase();
   
   // Common entry points for Koinos token contracts and other contracts
   const entryPoints: Record<string, string> = {
@@ -1165,6 +1167,87 @@ export function formatDetailedTransactions(transactions: DetailedTransaction[], 
   });
 }
 
+function getAccountHistoryRpcNode(restNode: string): string {
+  try {
+    const url = new URL(restNode);
+
+    if (url.hostname === 'rest.koinos.io') {
+      return `${url.protocol}//api.koinos.io`;
+    }
+
+    if (url.hostname.startsWith('rest.')) {
+      url.hostname = url.hostname.replace(/^rest\./, 'api.');
+      url.pathname = '';
+      url.search = '';
+      url.hash = '';
+      return url.toString().replace(/\/$/, '');
+    }
+  } catch (error) {
+    console.warn('Unable to derive JSON-RPC fallback node from REST node:', error);
+  }
+
+  return 'https://api.koinos.io';
+}
+
+function extractHistoryTransactions(data: unknown): DetailedTransaction[] | null {
+  if (Array.isArray(data)) {
+    return data as DetailedTransaction[];
+  }
+
+  if (!data || typeof data !== 'object') {
+    return null;
+  }
+
+  const response = data as {
+    values?: unknown;
+    transactions?: unknown;
+    error?: unknown;
+  };
+
+  if (Array.isArray(response.values)) {
+    return response.values as DetailedTransaction[];
+  }
+
+  if (Array.isArray(response.transactions)) {
+    return response.transactions as DetailedTransaction[];
+  }
+
+  if (response.error) {
+    return null;
+  }
+
+  return null;
+}
+
+async function getDetailedAccountHistoryViaRpc(
+  restNode: string,
+  address: string,
+  limit: number,
+  ascending: boolean,
+  irreversible: boolean,
+  sequenceNumber?: string
+): Promise<DetailedTransaction[]> {
+  const rpcNode = getAccountHistoryRpcNode(restNode);
+  const provider = new Provider([rpcNode]);
+  const params: Record<string, string | number | boolean> = {
+    address,
+    ascending,
+    limit,
+    irreversible,
+    decode_operations: true,
+    decode_events: true,
+  };
+
+  if (sequenceNumber) {
+    params.sequence_number = sequenceNumber;
+  }
+
+  console.warn(`Falling back to JSON-RPC account history at ${rpcNode}`);
+
+  const result = await provider.call('account_history.get_account_history', params);
+  return extractHistoryTransactions(result) || [];
+}
+
 /**
  * Fetches detailed transaction history for an account
  * @param address Account address
@@ -1196,22 +1279,31 @@ export async function getDetailedAccountHistory(
     const response = await fetch(url);
     
     if (!response.ok) {
-      throw new Error(`API request failed with status ${response.status}`);
+      console.warn(`REST account history failed with status ${response.status}; trying JSON-RPC fallback`);
+      return getDetailedAccountHistoryViaRpc(
+        restNode,
+        address,
+        limit,
+        ascending,
+        irreversible,
+        sequenceNumber
+      );
     }
     
     const data = await response.json();
 
     // Handle different response formats - API might return array directly or wrapped in an object
-    let transactions: DetailedTransaction[];
-    if (Array.isArray(data)) {
-      transactions = data;
-    } else if (data && Array.isArray(data.values)) {
-      transactions = data.values;
-    } else if (data && Array.isArray(data.transactions)) {
-      transactions = data.transactions;
-    } else {
+    const transactions = extractHistoryTransactions(data);
+    if (!transactions) {
       console.warn('Unexpected API response format:', data);
-      transactions = [];
+      return getDetailedAccountHistoryViaRpc(
+        restNode,
+        address,
+        limit,
+        ascending,
+        irreversible,
+        sequenceNumber
+      );
     }
 
     console.log(`API returned ${transactions.length} transactions`);

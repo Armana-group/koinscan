@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -10,7 +10,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { useWallet } from '@/contexts/WalletContext';
 
 interface WhitelistData {
   whitelisted: string[];
@@ -20,25 +19,33 @@ interface WhitelistData {
 export default function WhitelistAdmin() {
   const [whitelistData, setWhitelistData] = useState<WhitelistData>({ whitelisted: [], dev: [] });
   const [newWallet, setNewWallet] = useState('');
+  const [adminToken, setAdminToken] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-  const { savedAddress } = useWallet();
 
-  useEffect(() => {
-    fetchWhitelist();
-  }, []);
+  const adminHeaders = () => ({
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${adminToken}`,
+  });
 
   const fetchWhitelist = async () => {
+    if (!adminToken) {
+      setError('Enter the admin token to load the whitelist');
+      return;
+    }
+
     try {
       setIsLoading(true);
       setError('');
-      const response = await fetch('/api/admin/whitelist');
+      const response = await fetch('/api/admin/whitelist', {
+        headers: adminHeaders(),
+      });
       const data = await response.json();
-      
+
       if (!response.ok) {
         throw new Error(data.error || 'Failed to fetch whitelist');
       }
-      
+
       setWhitelistData(data);
     } catch (err) {
       console.error('Error fetching whitelist:', err);
@@ -50,8 +57,8 @@ export default function WhitelistAdmin() {
 
   const addWallet = async () => {
     if (!newWallet) return;
-    if (!savedAddress) {
-      setError('Please connect your wallet first');
+    if (!adminToken) {
+      setError('Enter the admin token first');
       return;
     }
 
@@ -61,19 +68,16 @@ export default function WhitelistAdmin() {
     try {
       const response = await fetch('/api/admin/whitelist', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${savedAddress}`,
-        },
+        headers: adminHeaders(),
         body: JSON.stringify({ wallet: newWallet, action: 'add' }),
       });
 
       const data = await response.json();
-      
+
       if (!response.ok) {
         throw new Error(data.error || 'Failed to add wallet');
       }
-      
+
       setWhitelistData(data);
       setNewWallet('');
     } catch (err) {
@@ -85,8 +89,8 @@ export default function WhitelistAdmin() {
   };
 
   const removeWallet = async (wallet: string) => {
-    if (!savedAddress) {
-      setError('Please connect your wallet first');
+    if (!adminToken) {
+      setError('Enter the admin token first');
       return;
     }
 
@@ -96,19 +100,16 @@ export default function WhitelistAdmin() {
     try {
       const response = await fetch('/api/admin/whitelist', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${savedAddress}`,
-        },
+        headers: adminHeaders(),
         body: JSON.stringify({ wallet, action: 'remove' }),
       });
 
       const data = await response.json();
-      
+
       if (!response.ok) {
         throw new Error(data.error || 'Failed to remove wallet');
       }
-      
+
       setWhitelistData(data);
     } catch (err) {
       console.error('Error removing wallet:', err);
@@ -121,12 +122,30 @@ export default function WhitelistAdmin() {
   return (
     <div className="container mx-auto py-8">
       <h1 className="text-2xl font-bold mb-6">Whitelist Management</h1>
-      
-      {!savedAddress && (
+
+      {!adminToken && (
         <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded mb-4">
-          Please connect your wallet to manage the whitelist
+          Enter the server admin token to manage the whitelist.
         </div>
       )}
+
+      <div className="flex gap-4 mb-6">
+        <Input
+          type="password"
+          placeholder="Admin token"
+          value={adminToken}
+          onChange={(e) => setAdminToken(e.target.value)}
+          className="max-w-md"
+          disabled={isLoading}
+        />
+        <Button
+          onClick={fetchWhitelist}
+          disabled={isLoading || !adminToken}
+          variant="outline"
+        >
+          {isLoading ? 'Loading...' : 'Load Whitelist'}
+        </Button>
+      </div>
 
       <div className="flex gap-4 mb-6">
         <Input
@@ -134,11 +153,11 @@ export default function WhitelistAdmin() {
           value={newWallet}
           onChange={(e) => setNewWallet(e.target.value)}
           className="max-w-md"
-          disabled={isLoading || !savedAddress}
+          disabled={isLoading || !adminToken}
         />
-        <Button 
-          onClick={addWallet} 
-          disabled={isLoading || !savedAddress || !newWallet}
+        <Button
+          onClick={addWallet}
+          disabled={isLoading || !adminToken || !newWallet}
         >
           {isLoading ? 'Adding...' : 'Add Wallet'}
         </Button>
@@ -164,10 +183,10 @@ export default function WhitelistAdmin() {
                   <span className="font-mono">{wallet}</span>
                   <Dialog>
                     <DialogTrigger asChild>
-                      <Button 
-                        variant="destructive" 
+                      <Button
+                        variant="destructive"
                         size="sm"
-                        disabled={isLoading || !savedAddress}
+                        disabled={isLoading || !adminToken}
                       >
                         Remove
                       </Button>
@@ -182,8 +201,8 @@ export default function WhitelistAdmin() {
                       </div>
                       <div className="flex justify-end gap-4">
                         <Button variant="outline" onClick={() => {}}>Cancel</Button>
-                        <Button 
-                          variant="destructive" 
+                        <Button
+                          variant="destructive"
                           onClick={() => removeWallet(wallet)}
                           disabled={isLoading}
                         >
@@ -200,4 +219,4 @@ export default function WhitelistAdmin() {
       </div>
     </div>
   );
-} 
+}

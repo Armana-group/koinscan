@@ -1,7 +1,11 @@
 node_modules/
 .next/
 next-env.d.ts
-docs/
+docs/*
+!docs/security/
+docs/security/*
+!docs/security/dependency-log.md
+local-docs/
 explorer-base/
 **/.DS_Store
 .env

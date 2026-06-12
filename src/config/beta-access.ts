@@ -35,32 +35,3 @@ export function getNicknameForWallet(walletAddress: string): string | null {
 
 // Local storage key for storing beta access state
 export const BETA_ACCESS_KEY = "koinos-explorer-beta-access";
-
-// Functions to manage whitelist
-export async function addWalletToWhitelist(wallet: string): Promise<void> {
-  const response = await fetch('/api/admin/whitelist', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ wallet, action: 'add' }),
-  });
-  
-  if (!response.ok) {
-    throw new Error('Failed to add wallet to whitelist');
-  }
-}
-
-export async function removeWalletFromWhitelist(wallet: string): Promise<void> {
-  const response = await fetch('/api/admin/whitelist', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ wallet, action: 'remove' }),
-  });
-  
-  if (!response.ok) {
-    throw new Error('Failed to remove wallet from whitelist');
-  }
-} 

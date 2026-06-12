@@ -34,4 +34,4 @@ jobs:
           docker run --rm \
             -v "$PWD:/repo" \
             ghcr.io/gitleaks/gitleaks:latest \
-            detect --source="/repo" --verbose --redact
+            detect --source="/repo" --config="/repo/.gitleaks.toml" --verbose --redact

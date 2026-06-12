@@ -14,6 +14,7 @@ const betaAccessLib = read('src/lib/beta-access.ts');
 const nextConfig = read('next.config.mjs');
 const eslintConfig = read('eslint.config.mjs');
 const securityWorkflow = read('.github/workflows/security.yml');
+const gitleaksConfig = existsSync('.gitleaks.toml') ? read('.gitleaks.toml') : '';
 const tsconfig = JSON.parse(read('tsconfig.json'));
 const yarnrc = existsSync('.yarnrc') ? read('.yarnrc') : '';
 const packageJson = JSON.parse(read('package.json'));
@@ -95,7 +96,20 @@ assert(
   'security workflow uses open-source Gitleaks CLI instead of licensed action wrapper',
   !securityWorkflow.includes('gitleaks/gitleaks-action') &&
     securityWorkflow.includes('ghcr.io/gitleaks/gitleaks') &&
-    securityWorkflow.includes('detect --source="/repo" --verbose --redact'),
+    securityWorkflow.includes('detect --source="/repo"') &&
+    securityWorkflow.includes('--verbose --redact'),
+);
+
+assert(
+  'security workflow uses the repo Gitleaks config',
+  securityWorkflow.includes('--config="/repo/.gitleaks.toml"'),
+);
+
+assert(
+  'Gitleaks config allowlists local investigation logs',
+  existsSync('.gitleaks.toml') &&
+    gitleaksConfig.includes('[[allowlists]]') &&
+    gitleaksConfig.includes('local-docs/'),
 );
 
 assert(

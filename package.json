@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "security:regression": "node scripts/regression-security-hardening.mjs"
   },
   "dependencies": {
     "@armana/walletconnect-koinos-sdk-js": "^0.1.4",

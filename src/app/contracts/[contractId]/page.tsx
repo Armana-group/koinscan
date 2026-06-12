@@ -54,6 +54,13 @@ export default function ContractPage() {
   });
 
   useEffect(() => {
+    if (!provider) {
+      setContract(null);
+      setLoading(false);
+      setError("Provider unavailable");
+      return;
+    }
+
     (async () => {
       try {
         setLoading(true);

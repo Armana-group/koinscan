@@ -1189,6 +1189,37 @@ function getAccountHistoryRpcNode(restNode: string): string {
   return 'https://api.koinos.io';
 }
 
+function encodePathSegment(value: string | number | boolean): string {
+  return encodeURIComponent(String(value));
+}
+
+function buildRestApiUrl(
+  restNode: string,
+  path: string,
+  params: Record<string, string | number | boolean | undefined> = {}
+): string {
+  const searchParams = new URLSearchParams();
+
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined) {
+      searchParams.append(key, String(value));
+    }
+  });
+
+  if (typeof window !== 'undefined') {
+    searchParams.set('restNode', restNode);
+    searchParams.set('path', path);
+    return `/api/koinos-rest?${searchParams.toString()}`;
+  }
+
+  const url = new URL(path, restNode);
+  searchParams.forEach((value, key) => {
+    url.searchParams.append(key, value);
+  });
+
+  return url.toString();
+}
+
 function extractHistoryTransactions(data: unknown): DetailedTransaction[] | null {
   if (Array.isArray(data)) {
     return data as DetailedTransaction[];
@@ -1266,13 +1297,18 @@ export async function getDetailedAccountHistory(
   sequenceNumber?: string
 ): Promise<DetailedTransaction[]> {
   try {
-    let url = `${restNode}/v1/account/${address}/history?limit=${limit}&ascending=${ascending}&irreversible=${irreversible}&decode_operations=true&decode_events=true`;
-    
-    // Add sequence_number parameter if provided
-    if (sequenceNumber) {
-      console.log('Using sequence number for pagination:', sequenceNumber);
-      url += `&sequence_number=${sequenceNumber}`;
-    }
+    const url = buildRestApiUrl(
+      restNode,
+      `/v1/account/${encodePathSegment(address)}/history`,
+      {
+        limit,
+        ascending,
+        irreversible,
+        decode_operations: true,
+        decode_events: true,
+        sequence_number: sequenceNumber,
+      }
+    );
     
     console.log('API Request URL:', url);
     
@@ -1322,7 +1358,15 @@ export async function getDetailedAccountHistory(
  */
 export async function getTransactionDetails(restNode: string, transactionId: string): Promise<any> {
   try {
-    const url = `${restNode}/v1/transaction/${transactionId}?return_receipt=true&decode_operations=true&decode_events=true`;
+    const url = buildRestApiUrl(
+      restNode,
+      `/v1/transaction/${encodePathSegment(transactionId)}`,
+      {
+        return_receipt: true,
+        decode_operations: true,
+        decode_events: true,
+      }
+    );
     
     const response = await fetch(url);
     
@@ -1345,7 +1389,7 @@ export async function getTransactionDetails(restNode: string, transactionId: str
  */
 export async function getBlockInfo(restNode: string, blockId: string): Promise<any> {
   try {
-    const url = `${restNode}/v1/chain/blocks/${blockId}`;
+    const url = buildRestApiUrl(restNode, `/v1/chain/blocks/${encodePathSegment(blockId)}`);
     
     const response = await fetch(url);
     
@@ -1367,7 +1411,7 @@ export async function getBlockInfo(restNode: string, blockId: string): Promise<a
  */
 export async function getHeadBlockInfo(restNode: string): Promise<any> {
   try {
-    const url = `${restNode}/v1/chain/head_info`;
+    const url = buildRestApiUrl(restNode, '/v1/chain/head_info');
     
     const response = await fetch(url);
     
@@ -1393,7 +1437,16 @@ export const headBlockInfo = getHeadBlockInfo;
  */
 export async function getBlockByHeight(restNode: string, height: string): Promise<any> {
   try {
-    const url = `${restNode}/v1/block/${height}?return_block=true&return_receipt=true&decode_operations=true&decode_events=true`;
+    const url = buildRestApiUrl(
+      restNode,
+      `/v1/block/${encodePathSegment(height)}`,
+      {
+        return_block: true,
+        return_receipt: true,
+        decode_operations: true,
+        decode_events: true,
+      }
+    );
     
     const response = await fetch(url);
     
@@ -1479,7 +1532,10 @@ export async function getTokenBalance(restNode: string, address: string, tokenCo
     if (CONTRACT_TO_API_NAME[tokenContract]) {
       apiTokenName = CONTRACT_TO_API_NAME[tokenContract];
     }
-    const url = `${restNode}/v1/account/${address}/balance/${apiTokenName}`;
+    const url = buildRestApiUrl(
+      restNode,
+      `/v1/account/${encodePathSegment(address)}/balance/${encodePathSegment(apiTokenName)}`
+    );
     
     const response = await fetch(url);
 

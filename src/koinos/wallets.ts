@@ -186,7 +186,7 @@ export function getWalletSigner(
       return kondor.getSigner(address) as any as SignerInterface;
     }
     case "walletConnect": {
-      return getWalletConnectKoinos().getSigner(address);
+      return getWalletConnectKoinos().getSigner(address) as unknown as SignerInterface;
     }
     default: {
       throw new Error(`"${walletName}" not implemented`);

@@ -2,6 +2,7 @@ import { Copy, ChevronDown, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import * as toast from "@/lib/toast";
 import { useState } from "react";
+import type { ReactElement } from "react";
 
 interface JsonDisplayProps {
   data: unknown;
@@ -10,12 +11,12 @@ interface JsonDisplayProps {
 export const JsonDisplay = ({ data }: JsonDisplayProps) => {
   const [copied, setCopied] = useState(false);
   const [expanded, setExpanded] = useState(true);
-  
+
   const copyToClipboard = () => {
     navigator.clipboard.writeText(JSON.stringify(data, null, 2));
     setCopied(true);
     toast.success("Copied to clipboard");
-    
+
     setTimeout(() => {
       setCopied(false);
     }, 2000);
@@ -38,13 +39,13 @@ export const JsonDisplay = ({ data }: JsonDisplayProps) => {
   };
 
   // Traditional JSON rendering matching KoinosBlocks style
-  const renderExpandedJson = (obj: unknown, level = 0): JSX.Element => {
+  const renderExpandedJson = (obj: unknown, level = 0): ReactElement => {
     // Use two spaces for indentation
     const indent = " ".repeat(level);
-    
+
     if (Array.isArray(obj)) {
       if (obj.length === 0) return <span>[]</span>;
-      
+
       return (
         <span>
           <span>[</span>
@@ -68,7 +69,7 @@ export const JsonDisplay = ({ data }: JsonDisplayProps) => {
     if (obj && typeof obj === "object") {
       const entries = Object.entries(obj);
       if (entries.length === 0) return <span>{"{}"}</span>;
-      
+
       return (
         <span>
           <span>{"{"}</span>
@@ -95,7 +96,7 @@ export const JsonDisplay = ({ data }: JsonDisplayProps) => {
       // Break long strings with a CSS class for better readability
       // Max length for strings before they're broken into multiple lines
       const maxInlineLength = 80;
-      
+
       if (obj.length > maxInlineLength) {
         return (
           <span className={`${getValueClass(obj)} break-all`}>
@@ -103,7 +104,7 @@ export const JsonDisplay = ({ data }: JsonDisplayProps) => {
           </span>
         );
       }
-      
+
       return <span className={getValueClass(obj)}>&quot;{obj}&quot;</span>;
     }
 
@@ -111,23 +112,23 @@ export const JsonDisplay = ({ data }: JsonDisplayProps) => {
   };
 
   // Simplified view for collapsed state
-  const renderCollapsedPreview = (obj: unknown): JSX.Element => {
+  const renderCollapsedPreview = (obj: unknown): ReactElement => {
     if (Array.isArray(obj)) {
       return <span>Array [{obj.length} items]</span>;
     }
-    
+
     if (obj && typeof obj === "object") {
       const entries = Object.entries(obj);
       return <span>Object {`{${entries.length} ${entries.length === 1 ? 'key' : 'keys'}}`}</span>;
     }
-    
+
     if (typeof obj === "string") {
       if (obj.length > 50) {
         return <span>&quot;{obj.substring(0, 50)}...&quot;</span>;
       }
       return <span>&quot;{obj}&quot;</span>;
     }
-    
+
     return <span>{JSON.stringify(obj)}</span>;
   };
 
@@ -135,10 +136,10 @@ export const JsonDisplay = ({ data }: JsonDisplayProps) => {
     <div className="w-full rounded-md bg-slate-950 border-stone-800 dark:bg-slate-950 dark:border-stone-800">
       <div className="flex items-center justify-between p-2 border-b border-stone-800 bg-stone-900 dark:bg-slate-950 dark:border-stone-800">
         <div className="flex items-center gap-2">
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            className="h-6 w-6 p-0" 
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 w-6 p-0"
             onClick={() => setExpanded(!expanded)}
           >
             {expanded ? (
@@ -179,4 +180,4 @@ export const JsonDisplay = ({ data }: JsonDisplayProps) => {
       )}
     </div>
   );
-}; 
+};

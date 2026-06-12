@@ -1,10 +1,14 @@
 import { NextResponse } from 'next/server';
 import fs from 'fs/promises';
 import path from 'path';
-import { hasWalletAccess } from '@/lib/beta-access';
+import { timingSafeEqual } from 'crypto';
 
 // Update the path to be relative to the project root
 const whitelistPath = path.join(process.cwd(), 'src', 'config', 'whitelist.json');
+const ADMIN_TOKEN_ENV = 'KOISCAN_ADMIN_API_TOKEN';
+const VALID_ACTIONS = new Set(['add', 'remove']);
+const KOINOS_ADDRESS_PATTERN = /^[1-9A-HJ-NP-Za-km-z]{26,35}$/;
+const NICKNAME_PATTERN = /^@?[a-zA-Z0-9_-]{2,32}$/;
 
 interface WhitelistData {
   whitelisted: string[];
@@ -50,7 +54,55 @@ async function ensureWhitelistFile() {
   }
 }
 
-export async function GET() {
+function constantTimeEqual(value: string, expected: string): boolean {
+  const valueBuffer = Buffer.from(value);
+  const expectedBuffer = Buffer.from(expected);
+
+  if (valueBuffer.length !== expectedBuffer.length) {
+    return false;
+  }
+
+  return timingSafeEqual(valueBuffer, expectedBuffer);
+}
+
+function extractBearerToken(request: Request): string {
+  const authHeader = request.headers.get('Authorization') || '';
+  if (!authHeader.startsWith('Bearer ')) {
+    return '';
+  }
+
+  return authHeader.slice('Bearer '.length).trim();
+}
+
+function requireAdminAccess(request: Request): NextResponse | null {
+  const expectedToken = process.env[ADMIN_TOKEN_ENV];
+  if (!expectedToken) {
+    return NextResponse.json(
+      { error: 'Admin whitelist API is not configured' },
+      { status: 503 }
+    );
+  }
+
+  const providedToken = extractBearerToken(request);
+  if (!providedToken || !constantTimeEqual(providedToken, expectedToken)) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  return null;
+}
+
+function normalizeWalletEntry(value: unknown): string {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+function isValidWhitelistEntry(value: string): boolean {
+  return KOINOS_ADDRESS_PATTERN.test(value) || NICKNAME_PATTERN.test(value);
+}
+
+export async function GET(request: Request) {
+  const unauthorized = requireAdminAccess(request);
+  if (unauthorized) return unauthorized;
+
   try {
     const whitelist = await ensureWhitelistFile();
     return NextResponse.json(whitelist);
@@ -62,21 +114,24 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  try {
-    // Verify admin access
-    const authHeader = request.headers.get('Authorization');
-    if (!authHeader) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-    
-    const adminWallet = authHeader.replace('Bearer ', '');
-    if (!hasWalletAccess(adminWallet)) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+  const unauthorized = requireAdminAccess(request);
+  if (unauthorized) return unauthorized;
 
-    const { wallet, action } = await request.json();
+  try {
+    const body = await request.json();
+    const wallet = normalizeWalletEntry(body.wallet);
+    const action = normalizeWalletEntry(body.action);
+
     if (!wallet || !action) {
       return NextResponse.json({ error: 'Missing wallet or action' }, { status: 400 });
+    }
+
+    if (!VALID_ACTIONS.has(action)) {
+      return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
+    }
+
+    if (!isValidWhitelistEntry(wallet)) {
+      return NextResponse.json({ error: 'Invalid wallet identifier' }, { status: 400 });
     }
 
     const whitelist = await ensureWhitelistFile();
@@ -87,8 +142,6 @@ export async function POST(request: Request) {
       }
     } else if (action === 'remove') {
       whitelist.whitelisted = whitelist.whitelisted.filter((w: string) => w !== wallet);
-    } else {
-      return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
     }
 
     await fs.writeFile(whitelistPath, JSON.stringify(whitelist, null, 2));
@@ -97,4 +150,4 @@ export async function POST(request: Request) {
     console.error('Error managing whitelist:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
-} 
+}

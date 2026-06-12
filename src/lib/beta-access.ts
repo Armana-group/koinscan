@@ -19,23 +19,20 @@ export function hasWalletAccess(walletAddress: string): boolean {
  */
 export function saveBetaAccess(walletAddress: string): void {
   if (!walletAddress) return;
-  
+
   const isAllowed = hasWalletAccess(walletAddress);
-  
+
   if (isAllowed) {
     const nickname = getNicknameForWallet(walletAddress);
-    
+
     const accessState: BetaAccessState = {
       hasAccess: true,
       walletAddress,
       nickname
     };
-    
-    // Save to localStorage (for client-side checks)
+
+    // Save only to localStorage. Server authorization must come from a server-issued token.
     localStorage.setItem(BETA_ACCESS_KEY, JSON.stringify(accessState));
-    
-    // Also set a cookie for server-side middleware checks
-    document.cookie = `${BETA_ACCESS_KEY}=${JSON.stringify(accessState)}; path=/; max-age=86400`;
   }
 }
 
@@ -44,29 +41,29 @@ export function saveBetaAccess(walletAddress: string): void {
  */
 export function getSavedBetaAccess(): BetaAccessState | null {
   if (typeof window === 'undefined') return null;
-  
+
   const savedAccess = localStorage.getItem(BETA_ACCESS_KEY);
   if (!savedAccess) return null;
-  
+
   try {
     const accessState = JSON.parse(savedAccess) as BetaAccessState;
-    
+
     // Verify the access is still valid
-    if (accessState.hasAccess && 
-        accessState.walletAddress && 
+    if (accessState.hasAccess &&
+        accessState.walletAddress &&
         ALLOWED_WALLETS.includes(accessState.walletAddress)) {
-      
+
       // If nickname wasn't saved before, check if it exists now
       if (!accessState.nickname) {
         accessState.nickname = getNicknameForWallet(accessState.walletAddress);
       }
-      
+
       return accessState;
     }
   } catch (error) {
     console.error('Error parsing beta access state:', error);
   }
-  
+
   return null;
 }
 
@@ -75,7 +72,7 @@ export function getSavedBetaAccess(): BetaAccessState | null {
  */
 export function clearBetaAccess(): void {
   if (typeof window === 'undefined') return;
-  
+
   localStorage.removeItem(BETA_ACCESS_KEY);
   document.cookie = `${BETA_ACCESS_KEY}=; path=/; max-age=0`;
-} 
+}

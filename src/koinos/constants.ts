@@ -15,11 +15,11 @@ export const WALLET_CONNECT_MODAL_SIGN_OPTIONS = {
   // cloud project at https://cloud.walletconnect.com
   projectId: "d148ec2da7b4b498893e582c0c36dfb5",
   metadata: {
-    name: "My-dApp1",
-    description: "my dapp description",
-    url: "https://example.com",
+    name: "Koinscan",
+    description: "Koinos blockchain explorer",
+    url: "https://koinscan.com",
     icons: [
-      "https://walletconnect.com/_next/static/media/logo_mark.84dd8525.svg",
+      "https://koinscan.com/koinscan-logo.png",
     ],
   },
   modalOptions: {

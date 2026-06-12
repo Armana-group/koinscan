@@ -13,6 +13,7 @@ const betaAccessConfig = read('src/config/beta-access.ts');
 const betaAccessLib = read('src/lib/beta-access.ts');
 const nextConfig = read('next.config.mjs');
 const eslintConfig = read('eslint.config.mjs');
+const securityWorkflow = read('.github/workflows/security.yml');
 const tsconfig = JSON.parse(read('tsconfig.json'));
 const yarnrc = existsSync('.yarnrc') ? read('.yarnrc') : '';
 const packageJson = JSON.parse(read('package.json'));
@@ -89,6 +90,13 @@ assert('Node runtime is pinned', existsSync('.nvmrc') || existsSync('.node-versi
 assert('Yarn install scripts are disabled by default', yarnrc.includes('ignore-scripts true'));
 assert('security dependency log exists', existsSync('docs/security/dependency-log.md'));
 assert('GitHub security workflow exists', existsSync('.github/workflows/security.yml'));
+
+assert(
+  'security workflow uses open-source Gitleaks CLI instead of licensed action wrapper',
+  !securityWorkflow.includes('gitleaks/gitleaks-action') &&
+    securityWorkflow.includes('ghcr.io/gitleaks/gitleaks') &&
+    securityWorkflow.includes('detect --source="/repo" --verbose --redact'),
+);
 
 assert(
   'gitignored nested koinosblocks project is excluded from TypeScript checks',

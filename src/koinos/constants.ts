@@ -9,6 +9,8 @@ export const BLOCK_EXPLORER = "";  // Empty string means relative URLs
 export const NETWORK_NAME = "mainnet";
 export const NICKNAMES_CONTRACT_ID = "1KD9Es7LBBjA1FY3ViCgQJ7e6WH1ipKbhz";
 export const GOVERNANCE_CONTRACT_ID = "19qj51eTbSFJYU7ZagudkpxPgNSzPMfdPX";
+export const KOIN_CONTRACT_ID = "19GYjDBVXU7keLbYvMLazsGQn3GTWHjHkK";
+export const VHP_CONTRACT_ID = "12Y5vW6gk8GceH53YfRkRre2Rrcsgw7Naq";
 
 export const WALLET_CONNECT_MODAL_SIGN_OPTIONS = {
   // Get your projectId by creating a free WalletConnect

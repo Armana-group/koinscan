@@ -26,7 +26,7 @@
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
     "framer-motion": "^12.4.2",
-    "koilib": "^9.1.1",
+    "koilib": "^9.3.1",
     "kondor-js": "^1.2.0",
     "lucide-react": "^0.475.0",
     "motion": "^12.4.2",

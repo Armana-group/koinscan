@@ -14,8 +14,10 @@ import { FooterComponent } from "@/components/FooterComponent";
 import {
   BLOCK_EXPLORER,
   GOVERNANCE_CONTRACT_ID,
+  KOIN_CONTRACT_ID,
   NICKNAMES_CONTRACT_ID,
   RPC_NODE,
+  VHP_CONTRACT_ID,
 } from "@/koinos/constants";
 import { ContractInfo } from "@/components/ContractInfo";
 import { JsonDisplay } from "@/components/JsonDisplay";
@@ -165,7 +167,7 @@ export default function ContractPage() {
           throw new Error("No contract address found");
         }
 
-        let image = "https://upload.wikimedia.org/wikipedia/commons/b/bc/Unknown_person.jpg";
+        const image = getTokenImageUrl(contractId, nickname);
         let description = "";
         
         // Try to fetch metadata if nickname exists
@@ -176,8 +178,6 @@ export default function ContractPage() {
             });
             if (result && result.value) {
               const metadata = JSON.parse(result.value);
-              // Use our token image utility, falling back to metadata.image if provided
-              image = getTokenImageUrl(contractId, nickname);
               if (metadata.image) {
                 // If metadata has an image and it's a full URL, use it as a secondary option
                 if (metadata.image.startsWith('http')) {
@@ -203,6 +203,8 @@ export default function ContractPage() {
         if (contractId === GOVERNANCE_CONTRACT_ID) {
           // special case to fix the abi of governance
           abi = abiGovernance;
+        } else if (contractId === KOIN_CONTRACT_ID || contractId === VHP_CONTRACT_ID) {
+          abi = utils.tokenAbi;
         } else {
           abi = await c.fetchAbi({
             updateFunctions: false,
@@ -234,11 +236,9 @@ export default function ContractPage() {
         try {
           if (c.abi.koilib_types) {
             const serializer = new Serializer(c.abi.koilib_types);
-            serializer.root.resolveAll();
             c.serializer = serializer;
           } else if (c.abi.types) {
             const serializer = new Serializer(c.abi.types);
-            serializer.root.resolveAll();
             c.serializer = serializer;
           }
         } catch (serializerError) {

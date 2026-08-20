@@ -6,7 +6,6 @@ import { useEffect, useState } from "react";
 import { Contract, Provider } from "koilib";
 import { BLOCK_EXPLORER, RPC_NODE } from "@/koinos/constants";
 import tokenAbi from "@/koinos/abi";
-import { getTokenImageUrl } from "@/koinos/utils";
 import Image from "next/image";
 
 export const ContractInfo = (props: {
@@ -163,7 +162,7 @@ export const ContractInfo = (props: {
             <div className="relative w-16 h-16 md:w-16 md:h-16 rounded-full overflow-hidden bg-gradient-to-br from-blue-500/5 to-purple-500/5">
               <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 to-purple-500/10 backdrop-blur-xl" />
               <Image 
-                src={getTokenImageUrl(props.address, props.nickname)} 
+                src={props.image} 
                 alt={props.nickname || "Contract"} 
                 className="relative z-10 object-contain"
                 fill

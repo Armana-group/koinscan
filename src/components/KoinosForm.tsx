@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState } from "react";
 import { Enum } from "protobufjs";
 import { Contract, Serializer } from "koilib";
 import { Button } from "@/components/ui/button";
@@ -427,21 +427,14 @@ const RecursiveFormField = ({
 
 export const KoinosForm = (props: KoinosFormProps) => {
   const [value, setValue] = useState<Record<string, unknown>>({});
-  const [serializerError, setSerializerError] = useState<string | null>(null);
 
   const serializer = useMemo(() => {
-    if (!props.contract?.serializer && !props.serializer) {
-      setSerializerError("No serializer available for this contract. Form input is disabled.");
-      return null;
-    }
-    return props.contract?.serializer || props.serializer;
+    return props.contract?.serializer || props.serializer || null;
   }, [props.contract?.serializer, props.serializer]);
 
-  useEffect(() => {
-    if (!serializer && props.onChange) {
-      props.onChange({});
-    }
-  }, [serializer, props.onChange, props]);
+  const serializerError = serializer
+    ? null
+    : "No serializer available for this contract. Form input is disabled.";
 
   const fields = useMemo(() => {
     if (!serializer) {

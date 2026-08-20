@@ -15,4 +15,4 @@ explorer-base/
 .env.test
 .env.test.local
 koinosblocks/
-    
+yarn-error.log

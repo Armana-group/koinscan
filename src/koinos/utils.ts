@@ -58,9 +58,9 @@ export function getTokenImageUrl(address: string, nickname?: string): string {
   // Known contract address mappings - these need to match the filenames in the token-list repo
   const knownContracts: Record<string, string> = {
     // Koin contract address
-    "15DJN4a8SgrbGhhGksSBASiSYjGnMU8dGL": "koin",
+    "19GYjDBVXU7keLbYvMLazsGQn3GTWHjHkK": "koin",
     // VHP contract address
-    "18tWNU7EdyUrzr7NMVyqa9YImzaKLgz2r7MVdpqR9LepWL": "vhp",
+    "12Y5vW6gk8GceH53YfRkRre2Rrcsgw7Naq": "vhp",
     // Add more mappings as needed
   };
   

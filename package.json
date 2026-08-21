@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "eslint .",
+    "security:regression": "node scripts/regression-security-hardening.mjs"
   },
   "dependencies": {
     "@armana/walletconnect-koinos-sdk-js": "^0.1.4",
@@ -25,34 +26,38 @@
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
     "framer-motion": "^12.4.2",
-    "koilib": "^9.1.0",
+    "koilib": "^9.3.1",
     "kondor-js": "^1.2.0",
     "lucide-react": "^0.475.0",
     "motion": "^12.4.2",
-    "next": "14.1.4",
+    "next": "^16.1.0",
     "next-themes": "^0.4.4",
-    "react": "^18",
+    "react": "^19.2.3",
     "react-chartjs-2": "^5.3.0",
-    "react-dom": "^18",
+    "react-dom": "^19.2.3",
     "react-hot-toast": "^2.5.2",
     "sharp": "^0.33.5",
     "tailwind-merge": "^3.0.1"
   },
   "devDependencies": {
+    "@eslint/eslintrc": "^3.3.3",
     "@types/node": "^20",
-    "@types/react": "^18",
-    "@types/react-dom": "^18",
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3",
     "autoprefixer": "^10.4.20",
     "class-variance-authority": "^0.7.1",
-    "eslint": "^8",
-    "eslint-config-next": "14.1.4",
+    "eslint": "^9.39.2",
+    "eslint-config-next": "^16.1.0",
     "postcss": "^8.4.31",
     "prettier": "^3.2.5",
-    "protobufjs": "^7.2.4",
+    "protobufjs": "^7.6.2",
     "pwa-asset-generator": "^6.4.0",
     "tailwindcss": "^3.4.1",
     "tailwindcss-animate": "^1.0.7",
     "typescript": "^5"
+  },
+  "resolutions": {
+    "protobufjs": "7.6.2"
   },
   "packageManager": "yarn@1.22.19+sha1.4ba7fc5c6e704fce2066ecbfb0b0d8976fe62447"
 }

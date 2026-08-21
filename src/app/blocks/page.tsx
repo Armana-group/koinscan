@@ -46,10 +46,12 @@ export default function BlocksPage() {
 
   useEffect(() => {
     async function fetchHeadBlock() {
+      if (!rpcNode) return;
+
       try {
         setLoading(true);
         setError(null);
-        
+
         const headData = await getHeadBlockInfo(rpcNode);
         setHeadBlock(headData);
 
@@ -57,7 +59,7 @@ export default function BlocksPage() {
           const blockData = await getBlockByHeight(rpcNode, headData.head_topology.height);
           setBlockDetail(blockData);
         }
-        
+
         setLoading(false);
       } catch (err) {
         console.error("Error fetching block data:", err);
@@ -67,7 +69,7 @@ export default function BlocksPage() {
     }
 
     fetchHeadBlock();
-  }, []);
+  }, [rpcNode]);
 
   function formatTimestamp(timestamp: string) {
     if (!timestamp) return "Unknown";

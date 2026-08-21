@@ -1,24 +1,29 @@
 export const CONTRACT_ID = "1FaSvLjQJsCJKq5ybmGsMMQs8RQYyVv8ju";
-export const RPC_NODE = "https://api.koinos.io";
+// REST API endpoint for account history, balances, etc.
+export const RPC_NODE = "https://rest.koinos.io";
+// JSON-RPC endpoints (for koilib Provider):
+// export const RPC_NODE = "https://api.koinos.io";
 // export const RPC_NODE = "https://api.koinosblocks.com";
 // Use our own explorer instead of external service
 export const BLOCK_EXPLORER = "";  // Empty string means relative URLs
 export const NETWORK_NAME = "mainnet";
 export const NICKNAMES_CONTRACT_ID = "1KD9Es7LBBjA1FY3ViCgQJ7e6WH1ipKbhz";
 export const GOVERNANCE_CONTRACT_ID = "19qj51eTbSFJYU7ZagudkpxPgNSzPMfdPX";
-export const FOGATA1_LIST_POOLS_CONTRACT_ID = "1MmV5nzSBVGnBrjTr3B8XtA4yPs8wcSpr";
+export const KOIN_CONTRACT_ID = "19GYjDBVXU7keLbYvMLazsGQn3GTWHjHkK";
+export const VHP_CONTRACT_ID = "12Y5vW6gk8GceH53YfRkRre2Rrcsgw7Naq";
 export const MULTICALL_CONTRACT_ID = "18dVCqPG3gwgL7DWQAciKYNuXfzEg5LW7";
+export const FOGATA1_LIST_POOLS_CONTRACT_ID = "1MmV5nzSBVGnBrjTr3B8XtA4yPs8wcSpr";
 
 export const WALLET_CONNECT_MODAL_SIGN_OPTIONS = {
   // Get your projectId by creating a free WalletConnect
   // cloud project at https://cloud.walletconnect.com
   projectId: "d148ec2da7b4b498893e582c0c36dfb5",
   metadata: {
-    name: "My-dApp1",
-    description: "my dapp description",
-    url: "https://example.com",
+    name: "Koinscan",
+    description: "Koinos blockchain explorer",
+    url: "https://koinscan.com",
     icons: [
-      "https://walletconnect.com/_next/static/media/logo_mark.84dd8525.svg",
+      "https://koinscan.com/koinscan-logo.png",
     ],
   },
   modalOptions: {

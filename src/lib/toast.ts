@@ -7,13 +7,13 @@ const defaultOptions: ToastOptions = {
   duration: 3000,
 };
 
-// Success toast with green styling
+// Success toast with brand gold styling
 export const success = (message: string, options?: ToastOptions) => {
   return toast.success(message, {
     ...defaultOptions,
     ...options,
     style: {
-      borderLeft: '4px solid #10b981', // Green border for success
+      borderLeft: '4px solid #f5a623', // Brand gold border for success
       ...options?.style,
     },
   });

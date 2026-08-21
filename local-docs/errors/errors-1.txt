@@ -1,0 +1,455 @@
+ [Kondor Content] Script loaded
+ [Kondor Content] window.kondor exposed: Array(5)
+ [Kondor Content] Messenger initialized
+  content: background > inpage: {"id":"tallyHo","jsonrpc":"2.0","result":{"method":"tally_getConfig","defaultWallet":false}}
+  content: background > inpage: {"id":"tallyHo","jsonrpc":"2.0","result":{"method":"tally_getConfig","defaultWallet":false,"chainId":"0x1"}}
+ [HMR] connected
+ A tree hydrated but some attributes of the server rendered HTML didn't match the client properties. This won't be patched up. This can happen if a SSR-ed Client Component used:
+
+- A server/client branch `if (typeof window !== 'undefined')`.
+- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
+- Date formatting in a user's locale which doesn't match the server.
+- External changing data without sending a snapshot of it along with the HTML.
+- Invalid HTML tag nesting.
+
+It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
+
+https://react.dev/link/hydration-mismatch
+
+  ...
+    <HotReload globalError={[...]} webSocket={WebSocket} staticIndicatorState={{pathname:null, ...}}>
+      <AppDevOverlayErrorBoundary globalError={[...]}>
+        <ReplaySsrOnlyErrors>
+        <DevRootHTTPAccessFallbackBoundary>
+          <HTTPAccessFallbackBoundary notFound={<NotAllowedRootHTTPFallbackError>}>
+            <HTTPAccessFallbackErrorBoundary pathname="/" notFound={<NotAllowedRootHTTPFallbackError>} ...>
+              <RedirectBoundary>
+                <RedirectErrorBoundary router={{...}}>
+                  <Head>
+                  <__next_root_layout_boundary__>
+                    <SegmentViewNode type="layout" pagePath="layout.tsx">
+                      <SegmentTrieNode>
+                      <link>
+                      <script>
+                      <script>
+                      <script>
+                      <script>
+                      <script>
+                      <script>
+                      <script>
+                      <script>
+                      <script>
+                      <script>
+                      <script>
+                      <script>
+                      <script>
+                      <RootLayout>
+                        <html lang="en" suppressHydrationWarning={true}>
+                          <body
+                            className="poppins_2024bc9-module__OvfM1W__className poppins_2024bc9-module__OvfM1W__varia..."
+-                           cz-shortcut-listen="true"
+                          >
+                  ...
+
+overrideMethod @ installHook.js:1
+ [TokenCache] Loaded 34 tokens from KoinDX
+ [TokenList] Loaded 30 token addresses
+ [TokenList] Loaded 30 token addresses
+ [handleSearch] Searching for: 1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU
+ [handleSearch] Has address format, checking if it's a token...
+ [handleSearch] Checking if it's a token contract via API
+ [isTokenContract] Checking if 1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU is a token contract
+ [isTokenContract] Trying RPC node: https://api.koinos.io
+ [isTokenContract] Calling decimals function for 1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU
+ [isTokenContract] Address 1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU is not a contract (expected for wallet addresses)
+ [handleSearch] isToken result: false
+ [handleSearch] Not a token contract, treating as wallet address
+ Calculating filtered transactions with selectedFilters: Array(0)
+ Calculating filtered transactions with selectedFilters: Array(0)
+ [DetailedTransactionHistory] useEffect triggered: Object
+ [DetailedTransactionHistory] Starting fetch for address: 1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU
+ Fetching transactions for 1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU, page 1, items per page: 10, ascending: false
+ Making API request with limit=10
+ API Request URL: https://rest.koinos.io/v1/account/1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU/history?limit=10&ascending=false&irreversible=true&decode_operations=true&decode_events=true
+ Page state changed to: 1
+ [DetailedTransactionHistory] useEffect triggered: Object
+ [DetailedTransactionHistory] Skipping fetch - conditions not met: Object
+ Page state changed to: 1
+ API returned 10 transactions
+ Received 10 transactions for page 1
+ First transaction has seq_num 12, using as total count
+ [extractTransactionActions] tx.events count: 1
+ [extractTransactionActions] userAddress: 1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU
+ [extractTransactionActions] First event: {
+  "sequence": 3,
+  "source": "1DdERbxQte8XCwLQT8KVDyq1NJo5EGhpdg",
+  "name": "token.transfer_event",
+  "data": {
+    "from": "13jqmvK2NF9yGCqUWSKjVH4msTqhRM96ac",
+    "to": "1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU",
+    "value": "1000000000"
+  },
+  "impacted": [
+    "1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU",
+    "13jqmvK2NF9yGCqUWSKjVH4msTqhRM96ac"
+  ]
+}
+ [extractTransactionActions] Found transfer event: token.transfer_event from: 13jqmvK2NF9yGCqUWSKjVH4msTqhRM96ac to: 1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU value: 1000000000
+ [extractTransactionActions] Actions found: 1 Array(1)
+ Transaction 0x1220c14da3797f75eadefa77a1ca2bfec2b5d77c406960cc25cb67d62bbe9a535716: to=1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU, associatedAddress=1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU, userIsRecipient=true
+ [extractTransactionActions] tx.events count: 1
+ [extractTransactionActions] userAddress: 1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU
+ [extractTransactionActions] First event: {
+  "sequence": 3,
+  "source": "1DdERbxQte8XCwLQT8KVDyq1NJo5EGhpdg",
+  "name": "token.transfer_event",
+  "data": {
+    "from": "13jqmvK2NF9yGCqUWSKjVH4msTqhRM96ac",
+    "to": "1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU",
+    "value": "1000000000"
+  },
+  "impacted": [
+    "1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU",
+    "13jqmvK2NF9yGCqUWSKjVH4msTqhRM96ac"
+  ]
+}
+ [extractTransactionActions] Found transfer event: token.transfer_event from: 13jqmvK2NF9yGCqUWSKjVH4msTqhRM96ac to: 1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU value: 1000000000
+ [extractTransactionActions] Actions found: 1 Array(1)
+ Transaction 0x1220e14346cf229e6dd8b74bb4774b292512fe5a2bd6e890c14375010e6e93bb880d: to=1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU, associatedAddress=1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU, userIsRecipient=true
+ [extractTransactionActions] tx.events count: 5
+ [extractTransactionActions] userAddress: 1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU
+ [extractTransactionActions] First event: {
+  "sequence": 3,
+  "source": "19GYjDBVXU7keLbYvMLazsGQn3GTWHjHkK",
+  "name": "token.approve_event",
+  "data": {
+    "owner": "1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU",
+    "spender": "17e1q6Fh5RgnuA8K7v4KvXXH4k9qHgsT5s",
+    "value": "40000000"
+  },
+  "impacted": [
+    "1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU",
+    "17e1q6Fh5RgnuA8K7v4KvXXH4k9qHgsT5s"
+  ]
+}
+ [extractTransactionActions] Found transfer event: token.transfer_event from: 1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU to: 1E8AjPZxKLJGFouXtNNkPcYxAgsTh4AUTN value: 40000000
+ [extractTransactionActions] Found transfer event: token.transfer_event from: 1E8AjPZxKLJGFouXtNNkPcYxAgsTh4AUTN to: 1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU value: 304575
+ [extractTransactionActions] Actions found: 2 Array(2)
+ Transaction 0x122095a72b28b10493b0d23c870199ee1748e0cfb95dd342d0d252a0d61b55dbab55: to=1E8AjPZxKLJGFouXtNNkPcYxAgsTh4AUTN, associatedAddress=1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU, userIsRecipient=false
+ [extractTransactionActions] tx.events count: 5
+ [extractTransactionActions] userAddress: 1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU
+ [extractTransactionActions] First event: {
+  "sequence": 3,
+  "source": "19GYjDBVXU7keLbYvMLazsGQn3GTWHjHkK",
+  "name": "token.approve_event",
+  "data": {
+    "owner": "1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU",
+    "spender": "17e1q6Fh5RgnuA8K7v4KvXXH4k9qHgsT5s",
+    "value": "100000000"
+  },
+  "impacted": [
+    "1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU",
+    "17e1q6Fh5RgnuA8K7v4KvXXH4k9qHgsT5s"
+  ]
+}
+ [extractTransactionActions] Found transfer event: token.transfer_event from: 1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU to: 19ygpmxRiM9zU7yiVc9wnbtHEK4Aa6s2gL value: 100000000
+ [extractTransactionActions] Found transfer event: token.transfer_event from: 19ygpmxRiM9zU7yiVc9wnbtHEK4Aa6s2gL to: 1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU value: 1059764
+ [extractTransactionActions] Actions found: 2 Array(2)
+ Transaction 0x1220406113101dd2f03b628a48df7e6461eca101fc533b7efd34db19140353eb678c: to=19ygpmxRiM9zU7yiVc9wnbtHEK4Aa6s2gL, associatedAddress=1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU, userIsRecipient=false
+ [extractTransactionActions] tx.events count: 5
+ [extractTransactionActions] userAddress: 1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU
+ [extractTransactionActions] First event: {
+  "sequence": 3,
+  "source": "19GYjDBVXU7keLbYvMLazsGQn3GTWHjHkK",
+  "name": "token.approve_event",
+  "data": {
+    "owner": "1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU",
+    "spender": "17e1q6Fh5RgnuA8K7v4KvXXH4k9qHgsT5s",
+    "value": "100000000"
+  },
+  "impacted": [
+    "1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU",
+    "17e1q6Fh5RgnuA8K7v4KvXXH4k9qHgsT5s"
+  ]
+}
+ [extractTransactionActions] Found transfer event: token.transfer_event from: 1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU to: 1DMSDo8hmZN2Cui6eMM6tKjpjkBCTmrRR4 value: 100000000
+ [extractTransactionActions] Found transfer event: kanvascontract.transfer_event from: 1DMSDo8hmZN2Cui6eMM6tKjpjkBCTmrRR4 to: 1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU value: 3987600141
+ [extractTransactionActions] Actions found: 2 Array(2)
+ Transaction 0x12208d41488bb3b598b74db1ea5449c692ff82f3e81c300ceb2990cf4a35a03d33e9: to=1DMSDo8hmZN2Cui6eMM6tKjpjkBCTmrRR4, associatedAddress=1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU, userIsRecipient=false
+ [extractTransactionActions] tx.events count: 5
+ [extractTransactionActions] userAddress: 1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU
+ [extractTransactionActions] First event: {
+  "sequence": 3,
+  "source": "19GYjDBVXU7keLbYvMLazsGQn3GTWHjHkK",
+  "name": "token.approve_event",
+  "data": {
+    "owner": "1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU",
+    "spender": "17e1q6Fh5RgnuA8K7v4KvXXH4k9qHgsT5s",
+    "value": "100000000"
+  },
+  "impacted": [
+    "1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU",
+    "17e1q6Fh5RgnuA8K7v4KvXXH4k9qHgsT5s"
+  ]
+}
+ [extractTransactionActions] Found transfer event: token.transfer_event from: 1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU to: 1NqLghiFRwkXZR7NBFHHiCJkF5gLHyJap1 value: 100000000
+ [extractTransactionActions] Found transfer event: token.transfer_event from: 1NqLghiFRwkXZR7NBFHHiCJkF5gLHyJap1 to: 1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU value: 102625220
+ [extractTransactionActions] Actions found: 2 Array(2)
+ Transaction 0x122008a95206ba6d3f42279db1d1f50a908ea61bc9256459cc88405caaa759b72be2: to=1NqLghiFRwkXZR7NBFHHiCJkF5gLHyJap1, associatedAddress=1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU, userIsRecipient=false
+ [extractTransactionActions] tx.events count: 44
+ [extractTransactionActions] userAddress: 1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU
+ [extractTransactionActions] First event: {
+  "sequence": 2,
+  "source": "1HpqHhCQPqeJf15MwAGF6RmhJ9aet8Hd5k",
+  "name": "token.transfer_event",
+  "data": {
+    "from": "12BBLerZEYBrFd2RsrfwAH7BJ9iwMv7mEU",
+    "to": "1CcJCZaAJPYYVfYChnSe3hf9zkX5UAGHdV",
+    "value": "45000000000"
+  },
+  "impacted": [
+    "1CcJCZaAJPYYVfYChnSe3hf9zkX5UAGHdV",
+    "12BBLerZEYBrFd2RsrfwAH7BJ9iwMv7mEU"
+  ]
+}
+ [extractTransactionActions] Found transfer event: token.transfer_event from: 12BBLerZEYBrFd2RsrfwAH7BJ9iwMv7mEU to: 1CcJCZaAJPYYVfYChnSe3hf9zkX5UAGHdV value: 45000000000
+ [extractTransactionActions] Found transfer event: token.transfer_event from: 12BBLerZEYBrFd2RsrfwAH7BJ9iwMv7mEU to: 18nBACXEovzhRtazzuqFyDr3anwLJfqXGH value: 45000000000
+ [extractTransactionActions] Found transfer event: token.transfer_event from: 12BBLerZEYBrFd2RsrfwAH7BJ9iwMv7mEU to: 1Mr2tYCuRcABnbMf5CZU5RqhdZfHfbCz1Z value: 45000000000
+ [extractTransactionActions] Found transfer event: token.transfer_event from: 12BBLerZEYBrFd2RsrfwAH7BJ9iwMv7mEU to: 14kkMsCaffRPt6XRiGnFw38U1i3xfa7syu value: 45000000000
+ [extractTransactionActions] Found transfer event: token.transfer_event from: 12BBLerZEYBrFd2RsrfwAH7BJ9iwMv7mEU to: 1NwTHuJBZm44H8eaPysFT1iGQYHesj9Nve value: 45000000000
+ [extractTransactionActions] Found transfer event: token.transfer_event from: 12BBLerZEYBrFd2RsrfwAH7BJ9iwMv7mEU to: 16uPbWebEvvkoxg3WxxN76aajLrztfg5ZL value: 45000000000
+ [extractTransactionActions] Found transfer event: token.transfer_event from: 12BBLerZEYBrFd2RsrfwAH7BJ9iwMv7mEU to: 1PbdBPA4pTsiDF9TeGR7ovLKu6wseVBa3m value: 45000000000
+ [extractTransactionActions] Found transfer event: token.transfer_event from: 12BBLerZEYBrFd2RsrfwAH7BJ9iwMv7mEU to: 1Q8JJ5NUHsEq2YTAXvmA1VocWxKvCHAB71 value: 45000000000
+ [extractTransactionActions] Found transfer event: token.transfer_event from: 12BBLerZEYBrFd2RsrfwAH7BJ9iwMv7mEU to: 1KkwxP3RN2YEzCH9BFNyRsBRYJGu2ZHdLU value: 45000000000
+ [extractTransactionActions] Found transfer event: token.transfer_event from: 12BBLerZEYBrFd2RsrfwAH7BJ9iwMv7mEU to: 1ETiKexv711fSZup9NQ4bC9nJSd4ighhca value: 45000000000
+ [extractTransactionActions] Found transfer event: token.transfer_event from: 12BBLerZEYBrFd2RsrfwAH7BJ9iwMv7mEU to: 1Mz44qxqVcfc8gLN4YMF58EKTFiAgwp2Uf value: 45000000000
+ [extractTransactionActions] Found transfer event: token.transfer_event from: 12BBLerZEYBrFd2RsrfwAH7BJ9iwMv7mEU to: 1AAaBNhiRf57CKkZjjfeRxj1AN1gQmdmdB value: 45000000000
+ [extractTransactionActions] Found transfer event: token.transfer_event from: 12BBLerZEYBrFd2RsrfwAH7BJ9iwMv7mEU to: 1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU value: 45000000000
+ [extractTransactionActions] Found transfer event: token.transfer_event from: 12BBLerZEYBrFd2RsrfwAH7BJ9iwMv7mEU to: 17fSBBPoniui4uJEyutbcCML5VP1NUXEok value: 45000000000
+ [extractTransactionActions] Found transfer event: token.transfer_event from: 12BBLerZEYBrFd2RsrfwAH7BJ9iwMv7mEU to: 19ubfroXheaddugRDt5ZW5ZjR3zacKCWT6 value: 45000000000
+ [extractTransactionActions] Found transfer event: token.transfer_event from: 12BBLerZEYBrFd2RsrfwAH7BJ9iwMv7mEU to: 16nKV5zcgCHb5Gw6H5zAyxtGTcmNfNsuEX value: 45000000000
+ [extractTransactionActions] Found transfer event: token.transfer_event from: 12BBLerZEYBrFd2RsrfwAH7BJ9iwMv7mEU to: 14dyP3RXkCJpkAK6eReCzRnHGed3TSG3Vc value: 45000000000
+ [extractTransactionActions] Found transfer event: token.transfer_event from: 12BBLerZEYBrFd2RsrfwAH7BJ9iwMv7mEU to: 18e4JoUChQAP2Cjh33cbVHZioTPvFmyvrb value: 45000000000
+ [extractTransactionActions] Found transfer event: token.transfer_event from: 12BBLerZEYBrFd2RsrfwAH7BJ9iwMv7mEU to: 1GosrdeA3WhtyiEpnoNLHvkcWhyCbvHRAJ value: 45000000000
+ [extractTransactionActions] Found transfer event: token.transfer_event from: 12BBLerZEYBrFd2RsrfwAH7BJ9iwMv7mEU to: 1BuAb7rG5ACeq4bTM67ZLbRJnjFAScJSPw value: 45000000000
+ [extractTransactionActions] Found transfer event: token.transfer_event from: 12BBLerZEYBrFd2RsrfwAH7BJ9iwMv7mEU to: 1HcsqNaAvJGqvJjpj69uTBfj72rvRnyUvt value: 45000000000
+ [extractTransactionActions] Found transfer event: token.transfer_event from: 12BBLerZEYBrFd2RsrfwAH7BJ9iwMv7mEU to: 1FgQBBi4GAEeombia9Qfqi1RZXnh3w4m6N value: 45000000000
+ [extractTransactionActions] Found transfer event: token.transfer_event from: 12BBLerZEYBrFd2RsrfwAH7BJ9iwMv7mEU to: 1Cn5G8qTRkvwzpGehmPQ6BYCKz632WcHg7 value: 45000000000
+ [extractTransactionActions] Found transfer event: token.transfer_event from: 12BBLerZEYBrFd2RsrfwAH7BJ9iwMv7mEU to: 1Hdu3PFw5BBZk71j3ukYiQBe8rWjPwbP7b value: 45000000000
+ [extractTransactionActions] Found transfer event: token.transfer_event from: 12BBLerZEYBrFd2RsrfwAH7BJ9iwMv7mEU to: 15EuGtgXXZQBNuXxhLAnQT4XSEKdB3GSwa value: 45000000000
+ [extractTransactionActions] Found transfer event: token.transfer_event from: 12BBLerZEYBrFd2RsrfwAH7BJ9iwMv7mEU to: 1AYjoz85vRsyaYxrao7pV46cdETgAj3aPD value: 45000000000
+ [extractTransactionActions] Found transfer event: token.transfer_event from: 12BBLerZEYBrFd2RsrfwAH7BJ9iwMv7mEU to: 1CGQ8dT6JvPpNkRdQiQ3nGfTjXLCcivXcg value: 45000000000
+ [extractTransactionActions] Found transfer event: token.transfer_event from: 12BBLerZEYBrFd2RsrfwAH7BJ9iwMv7mEU to: 1GJBu1trZtGdypbUg1j25w8Fhdde7B3uJU value: 45000000000
+ [extractTransactionActions] Found transfer event: token.transfer_event from: 12BBLerZEYBrFd2RsrfwAH7BJ9iwMv7mEU to: 1JfehNTZJHEbvG4iHiDJR2Bj8HiVPywkT5 value: 45000000000
+ [extractTransactionActions] Found transfer event: token.transfer_event from: 12BBLerZEYBrFd2RsrfwAH7BJ9iwMv7mEU to: 1DrJJQgvfoY3R5VyuBotJpaXhRFtMSfzei value: 45000000000
+ [extractTransactionActions] Found transfer event: token.transfer_event from: 12BBLerZEYBrFd2RsrfwAH7BJ9iwMv7mEU to: 1KUEFaychFNMtb6PHappan5Dsm19L9nyzK value: 45000000000
+ [extractTransactionActions] Found transfer event: token.transfer_event from: 12BBLerZEYBrFd2RsrfwAH7BJ9iwMv7mEU to: 18czZfVX4MmRdhP1GLi2sAY1aUakiWNJ8V value: 45000000000
+ [extractTransactionActions] Found transfer event: token.transfer_event from: 12BBLerZEYBrFd2RsrfwAH7BJ9iwMv7mEU to: 1ArCbp2dV3HPURu6quiZaSmo4mafpGctm8 value: 45000000000
+ [extractTransactionActions] Found transfer event: token.transfer_event from: 12BBLerZEYBrFd2RsrfwAH7BJ9iwMv7mEU to: 129vREPaqUhxYJGRFmGDjKh5cMPTfYAXdK value: 45000000000
+ [extractTransactionActions] Found transfer event: token.transfer_event from: 12BBLerZEYBrFd2RsrfwAH7BJ9iwMv7mEU to: 1EAk2cUknWvmnWiSuK5gtCLyuZhcruB3wD value: 45000000000
+ [extractTransactionActions] Found transfer event: token.transfer_event from: 12BBLerZEYBrFd2RsrfwAH7BJ9iwMv7mEU to: 15dD87hzEzr98o1rB8LojsvHfUvwAW6MBf value: 45000000000
+ [extractTransactionActions] Found transfer event: token.transfer_event from: 12BBLerZEYBrFd2RsrfwAH7BJ9iwMv7mEU to: 1LCy5bRDfuXymJWSjkqBmnRU6e222zoGak value: 45000000000
+ [extractTransactionActions] Found transfer event: token.transfer_event from: 12BBLerZEYBrFd2RsrfwAH7BJ9iwMv7mEU to: 1CLtKNLYdBkMFwv2L4JV1BdcPPLCVDiSi7 value: 45000000000
+ [extractTransactionActions] Found transfer event: token.transfer_event from: 12BBLerZEYBrFd2RsrfwAH7BJ9iwMv7mEU to: 19CdbHHutDcUzvr9VQbzgvHJRG7bu2uX22 value: 45000000000
+ [extractTransactionActions] Found transfer event: token.transfer_event from: 12BBLerZEYBrFd2RsrfwAH7BJ9iwMv7mEU to: 1CxSUJncitbCnmptP9Fy2LEBTWiMifCQev value: 45000000000
+ [extractTransactionActions] Found transfer event: token.transfer_event from: 12BBLerZEYBrFd2RsrfwAH7BJ9iwMv7mEU to: 13hP2E6mqZQAMJvX4r8UrCUHhzm58EjpuA value: 45000000000
+ [extractTransactionActions] Found transfer event: token.transfer_event from: 12BBLerZEYBrFd2RsrfwAH7BJ9iwMv7mEU to: 1D1FyMxuMX1TTfwZAtZJMNRpUwor9bSyFu value: 45000000000
+ [extractTransactionActions] Found transfer event: token.transfer_event from: 12BBLerZEYBrFd2RsrfwAH7BJ9iwMv7mEU to: 17vqdREK4fu8msi7ZhZ9Acy7CR9a85L8GP value: 45000000000
+forward-logs-shared.ts:95 [extractTransactionActions] Found transfer event: token.transfer_event from: 12BBLerZEYBrFd2RsrfwAH7BJ9iwMv7mEU to: 14dK53orvijoZTo5FACeRTHy1wYGsBPqzG value: 45000000000
+forward-logs-shared.ts:95 [extractTransactionActions] Actions found: 1 Array(1)
+forward-logs-shared.ts:95 Transaction 0x1220d44e91fcab054d9f516c7decbeac1083d7234c3a1d62ced17ba451275ec14484: to=1CcJCZaAJPYYVfYChnSe3hf9zkX5UAGHdV, associatedAddress=1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU, userIsRecipient=false
+forward-logs-shared.ts:95 [getTokenSymbolSync] Unknown token address: 1MfeJh5PwWTeFAoTEX4yyPY6AMbjZbF9Qm
+forward-logs-shared.ts:95 [getTokenSymbolSync] Unknown token address: 1MfeJh5PwWTeFAoTEX4yyPY6AMbjZbF9Qm
+forward-logs-shared.ts:95 [getTokenSymbolSync] Unknown token address: 1MfeJh5PwWTeFAoTEX4yyPY6AMbjZbF9Qm
+forward-logs-shared.ts:95 [getTokenSymbolSync] Unknown token address: 1MfeJh5PwWTeFAoTEX4yyPY6AMbjZbF9Qm
+forward-logs-shared.ts:95 [getTokenSymbolSync] Unknown token address: 1MfeJh5PwWTeFAoTEX4yyPY6AMbjZbF9Qm
+forward-logs-shared.ts:95 [getTokenSymbolSync] Unknown token address: 1MfeJh5PwWTeFAoTEX4yyPY6AMbjZbF9Qm
+forward-logs-shared.ts:95 [getTokenSymbolSync] Unknown token address: 1MfeJh5PwWTeFAoTEX4yyPY6AMbjZbF9Qm
+forward-logs-shared.ts:95 [getTokenSymbolSync] Unknown token address: 1MfeJh5PwWTeFAoTEX4yyPY6AMbjZbF9Qm
+forward-logs-shared.ts:95 [extractTransactionActions] tx.events count: 8
+forward-logs-shared.ts:95 [extractTransactionActions] userAddress: 1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU
+forward-logs-shared.ts:95 [extractTransactionActions] First event: {
+  "sequence": 2,
+  "source": "1MfeJh5PwWTeFAoTEX4yyPY6AMbjZbF9Qm",
+  "name": "token.transfer_event",
+  "data": {
+    "from": "1LfBGFrEzEdm7GCDzufzJC41DNjgy8qFhZ",
+    "to": "1Q8JJ5NUHsEq2YTAXvmA1VocWxKvCHAB71",
+    "value": "7000000000000"
+  },
+  "impacted": [
+    "1Q8JJ5NUHsEq2YTAXvmA1VocWxKvCHAB71",
+    "1LfBGFrEzEdm7GCDzufzJC41DNjgy8qFhZ"
+  ]
+}
+forward-logs-shared.ts:95 [extractTransactionActions] Found transfer event: token.transfer_event from: 1LfBGFrEzEdm7GCDzufzJC41DNjgy8qFhZ to: 1Q8JJ5NUHsEq2YTAXvmA1VocWxKvCHAB71 value: 7000000000000
+forward-logs-shared.ts:95 [getTokenSymbolSync] Unknown token address: 1MfeJh5PwWTeFAoTEX4yyPY6AMbjZbF9Qm
+forward-logs-shared.ts:95 [extractTransactionActions] Found transfer event: token.transfer_event from: 1LfBGFrEzEdm7GCDzufzJC41DNjgy8qFhZ to: 1KkwxP3RN2YEzCH9BFNyRsBRYJGu2ZHdLU value: 7000000000000
+forward-logs-shared.ts:95 [getTokenSymbolSync] Unknown token address: 1MfeJh5PwWTeFAoTEX4yyPY6AMbjZbF9Qm
+forward-logs-shared.ts:95 [extractTransactionActions] Found transfer event: token.transfer_event from: 1LfBGFrEzEdm7GCDzufzJC41DNjgy8qFhZ to: 1ETiKexv711fSZup9NQ4bC9nJSd4ighhca value: 7000000000000
+forward-logs-shared.ts:95 [getTokenSymbolSync] Unknown token address: 1MfeJh5PwWTeFAoTEX4yyPY6AMbjZbF9Qm
+forward-logs-shared.ts:95 [extractTransactionActions] Found transfer event: token.transfer_event from: 1LfBGFrEzEdm7GCDzufzJC41DNjgy8qFhZ to: 1Mz44qxqVcfc8gLN4YMF58EKTFiAgwp2Uf value: 7000000000000
+forward-logs-shared.ts:95 [getTokenSymbolSync] Unknown token address: 1MfeJh5PwWTeFAoTEX4yyPY6AMbjZbF9Qm
+forward-logs-shared.ts:95 [extractTransactionActions] Found transfer event: token.transfer_event from: 1LfBGFrEzEdm7GCDzufzJC41DNjgy8qFhZ to: 1AAaBNhiRf57CKkZjjfeRxj1AN1gQmdmdB value: 7000000000000
+forward-logs-shared.ts:95 [getTokenSymbolSync] Unknown token address: 1MfeJh5PwWTeFAoTEX4yyPY6AMbjZbF9Qm
+forward-logs-shared.ts:95 [extractTransactionActions] Found transfer event: token.transfer_event from: 1LfBGFrEzEdm7GCDzufzJC41DNjgy8qFhZ to: 1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU value: 7000000000000
+forward-logs-shared.ts:95 [getTokenSymbolSync] Unknown token address: 1MfeJh5PwWTeFAoTEX4yyPY6AMbjZbF9Qm
+forward-logs-shared.ts:95 [extractTransactionActions] Found transfer event: token.transfer_event from: 1LfBGFrEzEdm7GCDzufzJC41DNjgy8qFhZ to: 17fSBBPoniui4uJEyutbcCML5VP1NUXEok value: 7000000000000
+forward-logs-shared.ts:95 [getTokenSymbolSync] Unknown token address: 1MfeJh5PwWTeFAoTEX4yyPY6AMbjZbF9Qm
+forward-logs-shared.ts:95 [extractTransactionActions] Found transfer event: token.transfer_event from: 1LfBGFrEzEdm7GCDzufzJC41DNjgy8qFhZ to: 19ubfroXheaddugRDt5ZW5ZjR3zacKCWT6 value: 7000000000000
+forward-logs-shared.ts:95 [getTokenSymbolSync] Unknown token address: 1MfeJh5PwWTeFAoTEX4yyPY6AMbjZbF9Qm
+forward-logs-shared.ts:95 [extractTransactionActions] Actions found: 1 Array(1)
+forward-logs-shared.ts:95 Transaction 0x1220312a4a7098f20ad28f65db298813201a43eead2a41cfc0ce98f66871c65244c2: to=1Q8JJ5NUHsEq2YTAXvmA1VocWxKvCHAB71, associatedAddress=1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU, userIsRecipient=false
+forward-logs-shared.ts:95 [getTokenSymbolSync] Unknown token address: 18GEmTCppSsm1s6jLqwPuxKNhK1Zjmmp7S
+forward-logs-shared.ts:95 [getTokenSymbolSync] Unknown token address: 18GEmTCppSsm1s6jLqwPuxKNhK1Zjmmp7S
+forward-logs-shared.ts:95 [getTokenSymbolSync] Unknown token address: 18GEmTCppSsm1s6jLqwPuxKNhK1Zjmmp7S
+forward-logs-shared.ts:95 [getTokenSymbolSync] Unknown token address: 18GEmTCppSsm1s6jLqwPuxKNhK1Zjmmp7S
+forward-logs-shared.ts:95 [getTokenSymbolSync] Unknown token address: 18GEmTCppSsm1s6jLqwPuxKNhK1Zjmmp7S
+forward-logs-shared.ts:95 [getTokenSymbolSync] Unknown token address: 18GEmTCppSsm1s6jLqwPuxKNhK1Zjmmp7S
+forward-logs-shared.ts:95 [getTokenSymbolSync] Unknown token address: 18GEmTCppSsm1s6jLqwPuxKNhK1Zjmmp7S
+forward-logs-shared.ts:95 [getTokenSymbolSync] Unknown token address: 18GEmTCppSsm1s6jLqwPuxKNhK1Zjmmp7S
+forward-logs-shared.ts:95 [extractTransactionActions] tx.events count: 8
+forward-logs-shared.ts:95 [extractTransactionActions] userAddress: 1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU
+forward-logs-shared.ts:95 [extractTransactionActions] First event: {
+  "sequence": 2,
+  "source": "18GEmTCppSsm1s6jLqwPuxKNhK1Zjmmp7S",
+  "name": "token.transfer_event",
+  "data": {
+    "from": "1CVAq2ourSdXPcPvYefX7LNjkQkXoXp1CF",
+    "to": "1Q8JJ5NUHsEq2YTAXvmA1VocWxKvCHAB71",
+    "value": "12500000000000"
+  },
+  "impacted": [
+    "1Q8JJ5NUHsEq2YTAXvmA1VocWxKvCHAB71",
+    "1CVAq2ourSdXPcPvYefX7LNjkQkXoXp1CF"
+  ]
+}
+forward-logs-shared.ts:95 [extractTransactionActions] Found transfer event: token.transfer_event from: 1CVAq2ourSdXPcPvYefX7LNjkQkXoXp1CF to: 1Q8JJ5NUHsEq2YTAXvmA1VocWxKvCHAB71 value: 12500000000000
+forward-logs-shared.ts:95 [getTokenSymbolSync] Unknown token address: 18GEmTCppSsm1s6jLqwPuxKNhK1Zjmmp7S
+forward-logs-shared.ts:95 [extractTransactionActions] Found transfer event: token.transfer_event from: 1CVAq2ourSdXPcPvYefX7LNjkQkXoXp1CF to: 1KkwxP3RN2YEzCH9BFNyRsBRYJGu2ZHdLU value: 12500000000000
+forward-logs-shared.ts:95 [getTokenSymbolSync] Unknown token address: 18GEmTCppSsm1s6jLqwPuxKNhK1Zjmmp7S
+forward-logs-shared.ts:95 [extractTransactionActions] Found transfer event: token.transfer_event from: 1CVAq2ourSdXPcPvYefX7LNjkQkXoXp1CF to: 1ETiKexv711fSZup9NQ4bC9nJSd4ighhca value: 12500000000000
+forward-logs-shared.ts:95 [getTokenSymbolSync] Unknown token address: 18GEmTCppSsm1s6jLqwPuxKNhK1Zjmmp7S
+forward-logs-shared.ts:95 [extractTransactionActions] Found transfer event: token.transfer_event from: 1CVAq2ourSdXPcPvYefX7LNjkQkXoXp1CF to: 1Mz44qxqVcfc8gLN4YMF58EKTFiAgwp2Uf value: 12500000000000
+forward-logs-shared.ts:95 [getTokenSymbolSync] Unknown token address: 18GEmTCppSsm1s6jLqwPuxKNhK1Zjmmp7S
+forward-logs-shared.ts:95 [extractTransactionActions] Found transfer event: token.transfer_event from: 1CVAq2ourSdXPcPvYefX7LNjkQkXoXp1CF to: 1AAaBNhiRf57CKkZjjfeRxj1AN1gQmdmdB value: 12500000000000
+forward-logs-shared.ts:95 [getTokenSymbolSync] Unknown token address: 18GEmTCppSsm1s6jLqwPuxKNhK1Zjmmp7S
+forward-logs-shared.ts:95 [extractTransactionActions] Found transfer event: token.transfer_event from: 1CVAq2ourSdXPcPvYefX7LNjkQkXoXp1CF to: 1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU value: 12500000000000
+forward-logs-shared.ts:95 [getTokenSymbolSync] Unknown token address: 18GEmTCppSsm1s6jLqwPuxKNhK1Zjmmp7S
+forward-logs-shared.ts:95 [extractTransactionActions] Found transfer event: token.transfer_event from: 1CVAq2ourSdXPcPvYefX7LNjkQkXoXp1CF to: 17fSBBPoniui4uJEyutbcCML5VP1NUXEok value: 12500000000000
+forward-logs-shared.ts:95 [getTokenSymbolSync] Unknown token address: 18GEmTCppSsm1s6jLqwPuxKNhK1Zjmmp7S
+forward-logs-shared.ts:95 [extractTransactionActions] Found transfer event: token.transfer_event from: 1CVAq2ourSdXPcPvYefX7LNjkQkXoXp1CF to: 19ubfroXheaddugRDt5ZW5ZjR3zacKCWT6 value: 12500000000000
+forward-logs-shared.ts:95 [getTokenSymbolSync] Unknown token address: 18GEmTCppSsm1s6jLqwPuxKNhK1Zjmmp7S
+forward-logs-shared.ts:95 [extractTransactionActions] Actions found: 1 Array(1)
+forward-logs-shared.ts:95 Transaction 0x1220724f8af5ac68166400320be24e7bd8e84492c53b4eb20121914394f4667aaeea: to=1Q8JJ5NUHsEq2YTAXvmA1VocWxKvCHAB71, associatedAddress=1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU, userIsRecipient=false
+forward-logs-shared.ts:95 [extractTransactionActions] tx.events count: 18
+forward-logs-shared.ts:95 [extractTransactionActions] userAddress: 1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU
+forward-logs-shared.ts:95 [extractTransactionActions] First event: {
+  "sequence": 2,
+  "source": "1MKWW9dJXVUcJU9PHF1zDnzRTFQJ6q4NKy",
+  "name": "token.transfer_event",
+  "data": {
+    "from": "1CVAq2ourSdXPcPvYefX7LNjkQkXoXp1CF",
+    "to": "16CdV6CPyg5jJyqPqMi58xu7BKJow72g31",
+    "value": "6942000000000"
+  },
+  "impacted": [
+    "16CdV6CPyg5jJyqPqMi58xu7BKJow72g31",
+    "1CVAq2ourSdXPcPvYefX7LNjkQkXoXp1CF"
+  ]
+}
+forward-logs-shared.ts:95 [extractTransactionActions] Found transfer event: token.transfer_event from: 1CVAq2ourSdXPcPvYefX7LNjkQkXoXp1CF to: 16CdV6CPyg5jJyqPqMi58xu7BKJow72g31 value: 6942000000000
+forward-logs-shared.ts:95 [extractTransactionActions] Found transfer event: token.transfer_event from: 1CVAq2ourSdXPcPvYefX7LNjkQkXoXp1CF to: 1EcJSqzpRK8vP2X4zufBGy3sZDWBvs8GnN value: 6942000000000
+forward-logs-shared.ts:95 [extractTransactionActions] Found transfer event: token.transfer_event from: 1CVAq2ourSdXPcPvYefX7LNjkQkXoXp1CF to: 15JWZrp8XZ3wPgNMLcfcojkEF9kWzf6CYN value: 6942000000000
+forward-logs-shared.ts:95 [extractTransactionActions] Found transfer event: token.transfer_event from: 1CVAq2ourSdXPcPvYefX7LNjkQkXoXp1CF to: 1CcJCZaAJPYYVfYChnSe3hf9zkX5UAGHdV value: 6942000000000
+forward-logs-shared.ts:95 [extractTransactionActions] Found transfer event: token.transfer_event from: 1CVAq2ourSdXPcPvYefX7LNjkQkXoXp1CF to: 18nBACXEovzhRtazzuqFyDr3anwLJfqXGH value: 6942000000000
+forward-logs-shared.ts:95 [extractTransactionActions] Found transfer event: token.transfer_event from: 1CVAq2ourSdXPcPvYefX7LNjkQkXoXp1CF to: 1Mr2tYCuRcABnbMf5CZU5RqhdZfHfbCz1Z value: 6942000000000
+forward-logs-shared.ts:95 [extractTransactionActions] Found transfer event: token.transfer_event from: 1CVAq2ourSdXPcPvYefX7LNjkQkXoXp1CF to: 14kkMsCaffRPt6XRiGnFw38U1i3xfa7syu value: 6942000000000
+forward-logs-shared.ts:95 [extractTransactionActions] Found transfer event: token.transfer_event from: 1CVAq2ourSdXPcPvYefX7LNjkQkXoXp1CF to: 1NwTHuJBZm44H8eaPysFT1iGQYHesj9Nve value: 6942000000000
+forward-logs-shared.ts:95 [extractTransactionActions] Found transfer event: token.transfer_event from: 1CVAq2ourSdXPcPvYefX7LNjkQkXoXp1CF to: 16uPbWebEvvkoxg3WxxN76aajLrztfg5ZL value: 6942000000000
+forward-logs-shared.ts:95 [extractTransactionActions] Found transfer event: token.transfer_event from: 1CVAq2ourSdXPcPvYefX7LNjkQkXoXp1CF to: 1PbdBPA4pTsiDF9TeGR7ovLKu6wseVBa3m value: 6942000000000
+forward-logs-shared.ts:95 [extractTransactionActions] Found transfer event: token.transfer_event from: 1CVAq2ourSdXPcPvYefX7LNjkQkXoXp1CF to: 1Q8JJ5NUHsEq2YTAXvmA1VocWxKvCHAB71 value: 6942000000000
+forward-logs-shared.ts:95 [extractTransactionActions] Found transfer event: token.transfer_event from: 1CVAq2ourSdXPcPvYefX7LNjkQkXoXp1CF to: 1KkwxP3RN2YEzCH9BFNyRsBRYJGu2ZHdLU value: 6942000000000
+forward-logs-shared.ts:95 [extractTransactionActions] Found transfer event: token.transfer_event from: 1CVAq2ourSdXPcPvYefX7LNjkQkXoXp1CF to: 1ETiKexv711fSZup9NQ4bC9nJSd4ighhca value: 6942000000000
+forward-logs-shared.ts:95 [extractTransactionActions] Found transfer event: token.transfer_event from: 1CVAq2ourSdXPcPvYefX7LNjkQkXoXp1CF to: 1Mz44qxqVcfc8gLN4YMF58EKTFiAgwp2Uf value: 6942000000000
+forward-logs-shared.ts:95 [extractTransactionActions] Found transfer event: token.transfer_event from: 1CVAq2ourSdXPcPvYefX7LNjkQkXoXp1CF to: 1AAaBNhiRf57CKkZjjfeRxj1AN1gQmdmdB value: 6942000000000
+forward-logs-shared.ts:95 [extractTransactionActions] Found transfer event: token.transfer_event from: 1CVAq2ourSdXPcPvYefX7LNjkQkXoXp1CF to: 1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU value: 6942000000000
+forward-logs-shared.ts:95 [extractTransactionActions] Found transfer event: token.transfer_event from: 1CVAq2ourSdXPcPvYefX7LNjkQkXoXp1CF to: 17fSBBPoniui4uJEyutbcCML5VP1NUXEok value: 6942000000000
+forward-logs-shared.ts:95 [extractTransactionActions] Found transfer event: token.transfer_event from: 1CVAq2ourSdXPcPvYefX7LNjkQkXoXp1CF to: 19ubfroXheaddugRDt5ZW5ZjR3zacKCWT6 value: 6942000000000
+forward-logs-shared.ts:95 [extractTransactionActions] Actions found: 1 Array(1)
+forward-logs-shared.ts:95 Transaction 0x1220cbfab1a0bc230d28652643d39b6c33bcab1425548a8276e773a121df426ab764: to=16CdV6CPyg5jJyqPqMi58xu7BKJow72g31, associatedAddress=1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU, userIsRecipient=false
+forward-logs-shared.ts:95 Formatted transactions with address: 1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU Array(10)
+rest.koinos.io/v1/account/1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU/balance/1q9o3uta6l9xmfeum5yfzyyuygxn1ai2gx:1  Failed to load resource: the server responded with a status of 400 ()
+rest.koinos.io/v1/account/1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU/balance/1gnkfszp9ysg314qfvzaaew1vdbjgnzrzp:1  Failed to load resource: the server responded with a status of 400 ()
+rest.koinos.io/v1/account/1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU/balance/1kqhjundv3ptwvomjkcph95bx1w7wauhu7:1  Failed to load resource: the server responded with a status of 400 ()
+rest.koinos.io/v1/account/1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU/balance/143clkkmfqa6trcbjxdmkojjelq2q4rgd8:1  Failed to load resource: the server responded with a status of 400 ()
+rest.koinos.io/v1/account/1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU/balance/14dj8rjyqy8hq1garrjggeagu6aucwxcgy:1  Failed to load resource: the server responded with a status of 400 ()
+rest.koinos.io/v1/account/1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU/balance/1mkww9djxvucju9phf1zdnzrtfqj6q4nky:1  Failed to load resource: the server responded with a status of 400 ()
+rest.koinos.io/v1/account/1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU/balance/1eogf6wpb632judw1p12asbyljdenajwou:1  Failed to load resource: the server responded with a status of 400 ()
+rest.koinos.io/v1/account/1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU/balance/1krok111wvj8qu3ydfhqppnyvtfgv8n755:1  Failed to load resource: the server responded with a status of 400 ()
+rest.koinos.io/v1/account/1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU/balance/1lntv8avpnglcyltzuhuuevvuzcbhvpegf:1  Failed to load resource: the server responded with a status of 400 ()
+rest.koinos.io/v1/account/1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU/balance/18jrrbdnnqq99fav6sn6un1mbvu5szwgzf:1  Failed to load resource: the server responded with a status of 400 ()
+rest.koinos.io/v1/account/1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU/balance/19axvkzeetlugqx7xoznojoz4jnezdet3q:1  Failed to load resource: the server responded with a status of 400 ()
+rest.koinos.io/v1/account/1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU/balance/1afmfjbszpnk58xbwt6cyanhlf77qm5fec:1  Failed to load resource: the server responded with a status of 400 ()
+rest.koinos.io/v1/account/1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU/balance/1btqcposphjra7vatz4wvitdcqycvkwbcd:1  Failed to load resource: the server responded with a status of 400 ()
+rest.koinos.io/v1/account/1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU/balance/16ad3ax1kc8wkasnevafwyeazoyl9t7ays:1  Failed to load resource: the server responded with a status of 400 ()
+rest.koinos.io/v1/account/1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU/balance/1c4pgzs9obbls4vctehgnba7stxqyfrc16:1  Failed to load resource: the server responded with a status of 400 ()
+rest.koinos.io/v1/account/1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU/balance/1cxt6cuvq26grwdxlfpdhl1tvunr5vp2jb:1  Failed to load resource: the server responded with a status of 400 ()
+rest.koinos.io/v1/account/1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU/balance/1h1twd95hvl2wt25qpxrvmosgdgunprfia:1  Failed to load resource: the server responded with a status of 400 ()
+rest.koinos.io/v1/account/1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU/balance/169uynetfwxuvk2ex6mpphzutydxy1najv:1  Failed to load resource: the server responded with a status of 400 ()
+rest.koinos.io/v1/account/1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU/balance/1hpqhhcqpqejf15mwagf6rmhj9aet8hd5k:1  Failed to load resource: the server responded with a status of 400 ()
+rest.koinos.io/v1/account/1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU/balance/17t977jjz7dykpqsjqtstbpvmde1dditxw:1  Failed to load resource: the server responded with a status of 400 ()
+rest.koinos.io/v1/account/1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU/balance/1ku6cuy3twyqztrhakucviiymxneprkkhq:1  Failed to load resource: the server responded with a status of 400 ()
+rest.koinos.io/v1/account/1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU/balance/1a4nv58odxgvk91bfhgcfwpgiu7kfsxdvy:1  Failed to load resource: the server responded with a status of 400 ()
+rest.koinos.io/v1/account/1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU/balance/1lewghdvd8g5rgcl4adegef9fkytl1khss:1  Failed to load resource: the server responded with a status of 400 ()
+rest.koinos.io/v1/account/1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU/balance/1nhreq2apwsq6upbjnqcv3absj88ncimiy:1  Failed to load resource: the server responded with a status of 400 ()
+rest.koinos.io/v1/account/1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU/balance/1n8iyryejdcvk1rhbqv3qzuzhcpoekmfnj:1  Failed to load resource: the server responded with a status of 400 ()
+rest.koinos.io/v1/account/1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU/balance/1a7ix1dr77wuvd3xtcwbthbyst5leb1ceg:1  Failed to load resource: the server responded with a status of 400 ()
+rest.koinos.io/v1/account/1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU/balance/1f81upvbw4g2jflu5vubvopezffhl5fpqq:1  Failed to load resource: the server responded with a status of 400 ()
+rest.koinos.io/v1/account/1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU/balance/12vohz41a4htfiyhtwbg9rxqgmrbyk6pxh:1  Failed to load resource: the server responded with a status of 400 ()
+rest.koinos.io/v1/account/1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU/balance/1tf1qkv3gvyljq34yurshw5ertybfjqtg:1  Failed to load resource: the server responded with a status of 400 ()
+rest.koinos.io/v1/account/1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU/balance/1dderbxqte8xcwlqt8kvdyq1njo5eghpdg:1  Failed to load resource: the server responded with a status of 400 ()
+rest.koinos.io/v1/account/1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU/balance/1lntv8avpnglcyltzuhuuevvuzcbhvpegf:1  Failed to load resource: the server responded with a status of 400 ()
+rest.koinos.io/v1/account/1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU/balance/1btqcposphjra7vatz4wvitdcqycvkwbcd:1  Failed to load resource: the server responded with a status of 400 ()
+rest.koinos.io/v1/account/1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU/balance/1q9o3uta6l9xmfeum5yfzyyuygxn1ai2gx:1  Failed to load resource: the server responded with a status of 400 ()
+rest.koinos.io/v1/account/1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU/balance/14dj8rjyqy8hq1garrjggeagu6aucwxcgy:1  Failed to load resource: the server responded with a status of 400 ()
+rest.koinos.io/v1/account/1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU/balance/143clkkmfqa6trcbjxdmkojjelq2q4rgd8:1  Failed to load resource: the server responded with a status of 400 ()
+rest.koinos.io/v1/account/1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU/balance/1kqhjundv3ptwvomjkcph95bx1w7wauhu7:1  Failed to load resource: the server responded with a status of 400 ()
+rest.koinos.io/v1/account/1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU/balance/1gnkfszp9ysg314qfvzaaew1vdbjgnzrzp:1  Failed to load resource: the server responded with a status of 400 ()
+rest.koinos.io/v1/account/1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU/balance/1mkww9djxvucju9phf1zdnzrtfqj6q4nky:1  Failed to load resource: the server responded with a status of 400 ()
+rest.koinos.io/v1/account/1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU/balance/1eogf6wpb632judw1p12asbyljdenajwou:1  Failed to load resource: the server responded with a status of 400 ()
+rest.koinos.io/v1/account/1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU/balance/1afmfjbszpnk58xbwt6cyanhlf77qm5fec:1  Failed to load resource: the server responded with a status of 400 ()
+rest.koinos.io/v1/account/1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU/balance/19axvkzeetlugqx7xoznojoz4jnezdet3q:1  Failed to load resource: the server responded with a status of 400 ()
+rest.koinos.io/v1/account/1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU/balance/1h1twd95hvl2wt25qpxrvmosgdgunprfia:1  Failed to load resource: the server responded with a status of 400 ()
+rest.koinos.io/v1/account/1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU/balance/1hpqhhcqpqejf15mwagf6rmhj9aet8hd5k:1  Failed to load resource: the server responded with a status of 400 ()
+rest.koinos.io/v1/account/1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU/balance/1krok111wvj8qu3ydfhqppnyvtfgv8n755:1  Failed to load resource: the server responded with a status of 400 ()
+rest.koinos.io/v1/account/1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU/balance/1c4pgzs9obbls4vctehgnba7stxqyfrc16:1  Failed to load resource: the server responded with a status of 400 ()
+rest.koinos.io/v1/account/1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU/balance/16ad3ax1kc8wkasnevafwyeazoyl9t7ays:1  Failed to load resource: the server responded with a status of 400 ()
+rest.koinos.io/v1/account/1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU/balance/1lewghdvd8g5rgcl4adegef9fkytl1khss:1  Failed to load resource: the server responded with a status of 400 ()
+rest.koinos.io/v1/account/1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU/balance/18jrrbdnnqq99fav6sn6un1mbvu5szwgzf:1  Failed to load resource: the server responded with a status of 400 ()
+rest.koinos.io/v1/account/1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU/balance/169uynetfwxuvk2ex6mpphzutydxy1najv:1  Failed to load resource: the server responded with a status of 400 ()
+rest.koinos.io/v1/account/1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU/balance/1cxt6cuvq26grwdxlfpdhl1tvunr5vp2jb:1  Failed to load resource: the server responded with a status of 400 ()
+rest.koinos.io/v1/account/1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU/balance/1ku6cuy3twyqztrhakucviiymxneprkkhq:1  Failed to load resource: the server responded with a status of 400 ()
+rest.koinos.io/v1/account/1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU/balance/17t977jjz7dykpqsjqtstbpvmde1dditxw:1  Failed to load resource: the server responded with a status of 400 ()
+rest.koinos.io/v1/account/1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU/balance/1f81upvbw4g2jflu5vubvopezffhl5fpqq:1  Failed to load resource: the server responded with a status of 400 ()
+rest.koinos.io/v1/account/1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU/balance/1nhreq2apwsq6upbjnqcv3absj88ncimiy:1  Failed to load resource: the server responded with a status of 400 ()
+rest.koinos.io/v1/account/1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU/balance/1n8iyryejdcvk1rhbqv3qzuzhcpoekmfnj:1  Failed to load resource: the server responded with a status of 400 ()
+rest.koinos.io/v1/account/1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU/balance/1a7ix1dr77wuvd3xtcwbthbyst5leb1ceg:1  Failed to load resource: the server responded with a status of 400 ()
+rest.koinos.io/v1/account/1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU/balance/1tf1qkv3gvyljq34yurshw5ertybfjqtg:1  Failed to load resource: the server responded with a status of 400 ()
+rest.koinos.io/v1/account/1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU/balance/1a4nv58odxgvk91bfhgcfwpgiu7kfsxdvy:1  Failed to load resource: the server responded with a status of 400 ()
+rest.koinos.io/v1/account/1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU/balance/12vohz41a4htfiyhtwbg9rxqgmrbyk6pxh:1  Failed to load resource: the server responded with a status of 400 ()
+rest.koinos.io/v1/account/1Lx3imsZ9u98Qb6r2mJUse3twSBRdUBrjU/balance/1dderbxqte8xcwlqt8kvdyq1njo5eghpdg:1  Failed to load resource: the server responded with a status of 400 ()
+forward-logs-shared.ts:95 Enriched transactions with timestamps: Array(10)
+forward-logs-shared.ts:95 [DetailedTransactionHistory] Fetch completed
+forward-logs-shared.ts:95 Calculating filtered transactions with selectedFilters: Array(0)
+forward-logs-shared.ts:95 Calculating filtered transactions with selectedFilters: Array(0)
+provider-bridge.js:1147  Reconnecting port from contentScript
+forward-logs-shared.ts:95  Reconnecting window provider
+provider-bridge.js:1133  content: background > inpage: {"id":"tallyHo","jsonrpc":"2.0","result":{"method":"tally_getConfig","defaultWallet":false}}
+api.ts:1127 Fetch finished loading: GET "https://rest.koinos.io/v1/chain/head_info".
+getHeadBlockInfo @ api.ts:1127
+fetchLatestBlock @ useLatestBlock.ts:21
+api.ts:1127 Fetch finished loading: GET "https://rest.koinos.io/v1/chain/head_info".
+getHeadBlockInfo @ api.ts:1127
+fetchLatestBlock @ useLatestBlock.ts:21
+

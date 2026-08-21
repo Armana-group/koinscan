@@ -1,0 +1,37 @@
+name: security
+
+on:
+  pull_request:
+  push:
+    branches:
+      - master
+
+permissions:
+  contents: read
+
+jobs:
+  supply-chain:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: yarn
+
+      - run: yarn install --frozen-lockfile --ignore-scripts
+      - run: yarn security:regression
+      - run: yarn build
+      - run: yarn audit --groups dependencies --level high
+        continue-on-error: true
+
+      - name: lockfile-lint
+        run: npx --yes lockfile-lint --path yarn.lock --type yarn --allowed-hosts yarn npm --validate-https
+
+      - name: gitleaks
+        run: |
+          docker run --rm \
+            -v "$PWD:/repo" \
+            ghcr.io/gitleaks/gitleaks:latest \
+            detect --source="/repo" --config="/repo/.gitleaks.toml" --verbose --redact

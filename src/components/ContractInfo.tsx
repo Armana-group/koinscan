@@ -3,9 +3,9 @@ import { Button } from "@/components/ui/button";
 import { Copy, ExternalLink, Shield, Wallet, Coins } from "lucide-react";
 import * as toast from "@/lib/toast";
 import { useEffect, useState } from "react";
-import { Contract, Provider, utils } from "koilib";
+import { Contract, Provider } from "koilib";
 import { BLOCK_EXPLORER, RPC_NODE } from "@/koinos/constants";
-import { getTokenImageUrl } from "@/koinos/utils";
+import tokenAbi from "@/koinos/abi";
 import Image from "next/image";
 
 export const ContractInfo = (props: {
@@ -31,7 +31,7 @@ export const ContractInfo = (props: {
         const contract = new Contract({
           id: props.address,
           provider,
-          abi: utils.tokenAbi
+          abi: tokenAbi
         });
 
         // First try to fetch decimals to check if it's a token
@@ -162,7 +162,7 @@ export const ContractInfo = (props: {
             <div className="relative w-16 h-16 md:w-16 md:h-16 rounded-full overflow-hidden bg-gradient-to-br from-blue-500/5 to-purple-500/5">
               <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 to-purple-500/10 backdrop-blur-xl" />
               <Image 
-                src={getTokenImageUrl(props.address, props.nickname)} 
+                src={props.image} 
                 alt={props.nickname || "Contract"} 
                 className="relative z-10 object-contain"
                 fill
@@ -204,8 +204,8 @@ export const ContractInfo = (props: {
                 
                 {/* Wallet Status */}
                 <div className={`flex items-center gap-2 px-4 py-2 rounded-xl ${
-                  props.signer 
-                    ? "bg-green-500/10 text-green-700 dark:text-green-400" 
+                  props.signer
+                    ? "bg-[hsl(var(--logo-color-2))]/10 text-[hsl(var(--logo-color-2))]"
                     : "bg-muted text-muted-foreground"
                 }`}>
                   <Wallet className="w-4 h-4" />
@@ -214,7 +214,7 @@ export const ContractInfo = (props: {
                       <div className="flex items-center gap-2">
                         <span>Connected</span>
                         {isToken === true && balance && (
-                          <span className="px-2 py-0.5 bg-green-500/20 rounded-full text-xs">
+                          <span className="px-2 py-0.5 bg-[hsl(var(--logo-color-2))]/20 rounded-full text-xs">
                             {formatBalance(balance, decimals)}
                           </span>
                         )}

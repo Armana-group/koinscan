@@ -125,12 +125,17 @@ export async function getTokenDecimalsMapping(): Promise<Record<string, number>>
 export function formatTokenAmount(amount: string, decimals: number): string {
   try {
     if (!amount) return '0';
-    
+
+    // Guard against invalid decimals
+    if (decimals === undefined || decimals === null || isNaN(decimals)) {
+      decimals = 8; // Default to 8 decimals (common for most tokens)
+    }
+
     // If the amount is already in decimal format
     if (amount.includes('.')) {
       return amount;
     }
-    
+
     const rawNum = BigInt(amount);
     const divisor = BigInt(10 ** decimals);
     

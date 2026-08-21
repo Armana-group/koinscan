@@ -10,7 +10,8 @@ import {
   TransactionEvent,
   getTokenBalance,
   shortenAddress,
-  TransactionAction
+  TransactionAction,
+  decodeTokenTransferEventData
 } from '@/lib/api';
 import { 
   Card,
@@ -74,6 +75,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Alert,
@@ -217,11 +219,22 @@ export function DetailedTransactionHistory({
   // Constants
   const [limit, setLimit] = useState<number>(10);
   const [ascending, setAscending] = useState<boolean>(false); // Default to descending order (newest first)
+  const [advancedView, setAdvancedView] = useState<boolean>(false); // Toggle for showing technical details
   
   // Add state for token balances
   const [koinBalance, setKoinBalance] = useState<string>('0');
   const [vhpBalance, setVhpBalance] = useState<string>('0');
   const [loadingBalance, setLoadingBalance] = useState<boolean>(false);
+
+  // Format balance for display (REST API returns whole units, not satoshis)
+  const formatBalanceDisplay = (balance: string): string => {
+    const value = parseFloat(balance) || 0;
+    if (value === 0) return '0';
+    if (value < 0.01) return '< 0.01';
+    if (value < 1000) return value.toFixed(2);
+    if (value < 1000000) return `${(value / 1000).toFixed(2)}K`;
+    return `${(value / 1000000).toFixed(2)}M`;
+  };
   
   // Maintain tokenBalance and tokenSymbol for backward compatibility
   const [tokenBalance, setTokenBalance] = useState<string>('0');
@@ -349,7 +362,7 @@ export function DetailedTransactionHistory({
         return []; // Return empty array to allow promise chaining
       }
     },
-    [address, limit, ascending]
+    [address, limit, ascending, rpcNode]
   );
 
   // Update function to fetch both token balances
@@ -374,15 +387,24 @@ export function DetailedTransactionHistory({
 
   // Fetch transactions when address changes or when limit/ascending changes
   useEffect(() => {
-    if (address && !fetchingRef.current) {
+    console.log('[DetailedTransactionHistory] useEffect triggered:', { address, rpcNode, fetchingRef: fetchingRef.current });
+    if (address && rpcNode && !fetchingRef.current) {
+      console.log('[DetailedTransactionHistory] Starting fetch for address:', address);
       fetchingRef.current = true;
       // Reset pagination when address, limit, or ascending changes
       setPage(1);
       fetchTransactions(1).finally(() => {
         fetchingRef.current = false;
+        console.log('[DetailedTransactionHistory] Fetch completed');
+      });
+    } else {
+      console.log('[DetailedTransactionHistory] Skipping fetch - conditions not met:', {
+        hasAddress: !!address,
+        hasRpcNode: !!rpcNode,
+        isFetching: fetchingRef.current
       });
     }
-  }, [address, fetchTransactions, limit, ascending]);
+  }, [address, fetchTransactions, limit, ascending, rpcNode]);
 
   // Fetch transactions when page changes
   useEffect(() => {
@@ -452,10 +474,10 @@ export function DetailedTransactionHistory({
 
   // Replace fetchTokenBalance with fetchTokenBalances in useEffect
   useEffect(() => {
-    if (address) {
+    if (address && rpcNode) {
       fetchTokenBalances(address);
     }
-  }, [address]);
+  }, [address, rpcNode]);
 
   const formatDate = (timestamp: string) => {
     if (!timestamp) return 'Unknown';
@@ -548,14 +570,19 @@ export function DetailedTransactionHistory({
 
   const renderEventSummary = (event: TransactionEvent) => {
     if (event.name.includes('transfer_event') && event.data) {
-      const { from, to, value } = event.data;
-      const contract = shortenAddress(event.source || '');
+      const { from, to, value } = decodeTokenTransferEventData(event.data) || {};
+
+      if (!from || !to || !value) {
+        return <span>Token transfer</span>;
+      }
       
       // Try to determine token symbol
       let tokenSymbol = 'tokens';
       if (event.source) {
         const tokenContracts: Record<string, string> = {
+          '19GYjDBVXU7keLbYvMLazsGQn3GTWHjHkK': 'KOIN',
           '15DJN4a8SgrbGhhGksSBASiSYjGnMU8dGL': 'KOIN',
+          '12Y5vW6gk8GceH53YfRkRre2Rrcsgw7Naq': 'VHP',
           '1FaSvLjQJsCJKq5ybmGsMMQs8RQYyVv8ju': 'VHP',
           // Add more token contracts as needed
         };
@@ -574,7 +601,8 @@ export function DetailedTransactionHistory({
     
     // Handle mint events
     if (event.name.includes('mint_event') && event.data) {
-      const { to, value } = event.data;
+      const eventData = typeof event.data === 'string' ? null : event.data;
+      const { to, value } = eventData || {};
       const contract = shortenAddress(event.source || '');
       return (
         <span>
@@ -585,7 +613,8 @@ export function DetailedTransactionHistory({
     
     // Handle burn events
     if (event.name.includes('burn_event') && event.data) {
-      const { from, value } = event.data;
+      const eventData = typeof event.data === 'string' ? null : event.data;
+      const { from, value } = eventData || {};
       const contract = shortenAddress(event.source || '');
       return (
         <span>
@@ -741,49 +770,35 @@ export function DetailedTransactionHistory({
     });
   }, [formattedTransactions, selectedFilters]);
 
-  // New helper function to get the appropriate icon for a transaction type
+  // Helper function to get the appropriate icon for a transaction type - minimal neutral icons
   const getTransactionIcon = (actionType: string) => {
+    const iconClass = "h-5 w-5 text-zinc-400 dark:text-zinc-500";
     switch (actionType) {
       case 'sent':
-        return <ArrowUpRight className="h-5 w-5 text-orange-500" />;
+        return <ArrowUpRight className={iconClass} />;
       case 'received':
-        return <ArrowDownLeft className="h-5 w-5 text-green-500" />;
+        return <ArrowDownLeft className={iconClass} />;
       case 'staked':
-        return <Lock className="h-5 w-5 text-blue-500" />;
+        return <Lock className={iconClass} />;
       case 'unstaked':
-        return <Unlock className="h-5 w-5 text-blue-500" />;
+        return <Unlock className={iconClass} />;
       case 'minted':
-        return <Plus className="h-5 w-5 text-purple-500" />;
+        return <Plus className={iconClass} />;
       case 'burned':
-        return <Flame className="h-5 w-5 text-red-500" />;
+        return <Flame className={iconClass} />;
       case 'swapped':
-        return <Repeat className="h-5 w-5 text-indigo-500" />;
+        return <Repeat className={iconClass} />;
       case 'interacted':
-        return <AppWindow className="h-5 w-5 text-slate-500" />;
+        return <AppWindow className={iconClass} />;
       default:
-        return <Layers className="h-5 w-5 text-slate-500" />;
+        return <Layers className={iconClass} />;
     }
   };
 
-  // Helper to get appropriate color classes based on transaction type
+  // Helper to get appropriate color classes based on transaction type - simplified borders
   const getTransactionColorClasses = (actionType: string) => {
-    switch (actionType) {
-      case 'sent':
-        return 'border-orange-200 dark:border-orange-900';
-      case 'received':
-        return 'border-green-200 dark:border-green-900';
-      case 'staked':
-      case 'unstaked':
-        return 'border-blue-200 dark:border-blue-900';
-      case 'minted':
-        return 'border-purple-200 dark:border-purple-900';
-      case 'burned':
-        return 'border-red-200 dark:border-red-900';
-      case 'swapped':
-        return 'border-indigo-200 dark:border-indigo-900';
-      default:
-        return 'border-slate-200 dark:border-slate-800';
-    }
+    // Use consistent neutral borders for clean minimal look
+    return 'border-zinc-200 dark:border-zinc-800';
   };
 
   // Format relative time like "2 hours ago" or "Yesterday"
@@ -807,210 +822,255 @@ export function DetailedTransactionHistory({
     return formatDate(timestamp);
   };
 
-  // Update TransactionRow component to use the new model
-  const TransactionRow: React.FC<{ 
+  // Minimal TransactionRow component
+  const TransactionRow: React.FC<{
     tx: FormattedTransaction;
     isExpanded: boolean;
-    toggleExpand: () => void; 
-  }> = ({ tx, isExpanded, toggleExpand }) => {
-    // Extract transaction actions from the transaction if available
+    toggleExpand: () => void;
+    showAdvanced: boolean;
+  }> = ({ tx, isExpanded, toggleExpand, showAdvanced }) => {
     const actions = tx.actions || [];
-    
-    // Use the first action as the primary one for display
-    const primaryAction = actions[0] || {
-      type: 'other',
-      description: 'Transaction'
+    const primaryAction = actions[0] || { type: 'other', description: 'Transaction' };
+
+    // Collect all transfers across all actions
+    const allTransfers = actions.flatMap(action => action.tokenTransfers || []);
+    const sentTransfers = allTransfers.filter(t => !t.isPositive);
+    const receivedTransfers = allTransfers.filter(t => t.isPositive);
+
+    // Detect if this is a swap (has both sent and received transfers with different tokens)
+    const isSwap = sentTransfers.length > 0 && receivedTransfers.length > 0 &&
+      sentTransfers[0]?.token.address !== receivedTransfers[0]?.token.address;
+
+    // Get the primary token transfer for display (used for non-swap transactions)
+    const primaryTransfer = primaryAction.tokenTransfers?.[0];
+    const isReceive = primaryTransfer?.isPositive;
+    const isSend = primaryTransfer && !primaryTransfer.isPositive;
+
+    // Helper to get token image URL
+    const getTokenImageUrl = (transfer: any) => {
+      if (transfer?.token.logoURI) return transfer.token.logoURI;
+      if (transfer?.token.address) {
+        // Try KoinDX image path
+        return `https://raw.githubusercontent.com/koindx/token-list/main/src/images/mainnet/${transfer.token.address}.png`;
+      }
+      return null;
     };
-    
-    // Determine icon and color based on action type
-    let ActionIcon = ArrowRight;
-    let bgColorClass = "bg-muted";
-    let textColorClass = "text-muted-foreground";
-    
-    switch(primaryAction.type) {
-      case 'token_transfer':
-        if (primaryAction.tokenTransfers?.[0]?.isPositive) {
-          ActionIcon = ArrowDownLeft;
-          bgColorClass = "bg-green-100 dark:bg-green-900";
-          textColorClass = "text-green-800 dark:text-green-200";
-        } else {
-          ActionIcon = ArrowUpRight;
-          bgColorClass = "bg-blue-100 dark:bg-blue-900";
-          textColorClass = "text-blue-800 dark:text-blue-200";
-        }
-        break;
-      case 'token_mint':
-        ActionIcon = Plus;
-        bgColorClass = "bg-green-100 dark:bg-green-900";
-        textColorClass = "text-green-800 dark:text-green-200";
-        break;
-      case 'token_burn':
-        ActionIcon = Flame;
-        bgColorClass = "bg-red-100 dark:bg-red-900";
-        textColorClass = "text-red-800 dark:text-red-200";
-        break;
-      case 'contract_interaction':
-        ActionIcon = Component;
-        bgColorClass = "bg-purple-100 dark:bg-purple-900";
-        textColorClass = "text-purple-800 dark:text-purple-200";
-        break;
-      case 'contract_upload':
-        ActionIcon = FileUpIcon;
-        bgColorClass = "bg-amber-100 dark:bg-amber-900";
-        textColorClass = "text-amber-800 dark:text-amber-200";
-        break;
-      case 'governance':
-        ActionIcon = BarChart4;
-        bgColorClass = "bg-indigo-100 dark:bg-indigo-900";
-        textColorClass = "text-indigo-800 dark:text-indigo-200";
-        break;
-      default:
-        ActionIcon = ArrowRight;
-        break;
-    }
-    
-    // Format transaction date
-    const txDate = tx.timestamp ? formatDate(tx.timestamp) : '...';
-    
-    // Format transaction info for display
-    const txInfo = primaryAction.description || 'Transaction';
-    
-    // Determine if there are multiple token transfers
-    const hasMultipleTokenTransfers = actions.reduce((count, action) => {
-      return count + (action.tokenTransfers?.length || 0);
-    }, 0) > 1;
-    
+
+    // Determine transaction type icon and styling
+    const getTypeIcon = () => {
+      if (isSwap) return Repeat;
+      switch(primaryAction.type) {
+        case 'token_transfer':
+          return isReceive ? ArrowDownLeft : ArrowUpRight;
+        case 'token_mint':
+          return Plus;
+        case 'token_burn':
+          return Flame;
+        case 'contract_interaction':
+          return Component;
+        case 'contract_upload':
+          return FileUp;
+        case 'governance':
+          return BarChart4;
+        default:
+          return Layers;
+      }
+    };
+
+    const TypeIcon = getTypeIcon();
+
+    // Get icon color class - minimal palette: neutral icons, let token images provide color
+    const getIconColor = () => {
+      // All icons use the same neutral color for a clean, minimal look
+      return 'text-zinc-400 dark:text-zinc-500';
+    };
+
+    // Get action label for non-transfer transactions
+    const getActionLabel = () => {
+      switch(primaryAction.type) {
+        case 'token_mint': return 'Minted';
+        case 'token_burn': return 'Burned';
+        case 'contract_interaction': return primaryAction.dappName || 'Contract';
+        case 'contract_upload': return 'Deployed';
+        case 'governance': return 'Governance';
+        default: return primaryAction.description || 'Transaction';
+      }
+    };
+
+    const relativeTime = tx.timestamp ? formatRelativeTime(tx.timestamp) : '...';
+
+    // Render swap transaction
+    const renderSwapContent = () => {
+      const sent = sentTransfers[0];
+      const received = receivedTransfers[0];
+      const sentImage = getTokenImageUrl(sent);
+      const receivedImage = getTokenImageUrl(received);
+
+      return (
+        <>
+          {/* Token icons for swap */}
+          <div className="flex items-center gap-1 flex-shrink-0">
+            {sentImage && (
+              <div className="w-5 h-5 rounded-full overflow-hidden bg-muted">
+                <img
+                  src={sentImage}
+                  alt={sent?.token.symbol || 'token'}
+                  className="w-full h-full object-cover"
+                  onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                />
+              </div>
+            )}
+            <ArrowRight className="h-3 w-3 text-muted-foreground" />
+            {receivedImage && (
+              <div className="w-5 h-5 rounded-full overflow-hidden bg-muted">
+                <img
+                  src={receivedImage}
+                  alt={received?.token.symbol || 'token'}
+                  className="w-full h-full object-cover"
+                  onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Swap amounts */}
+          <div className="min-w-0 flex-1">
+            <div className="font-medium text-sm flex items-center gap-2 flex-wrap">
+              <span className="text-zinc-500 dark:text-zinc-400">
+                {sent?.formattedAmount} {sent?.token.symbol}
+              </span>
+              <ArrowRight className="h-3 w-3 text-zinc-600 dark:text-zinc-500 flex-shrink-0" />
+              <span className="text-[hsl(var(--logo-color-2))]">
+                {received?.formattedAmount} {received?.token.symbol}
+              </span>
+            </div>
+            <div className="text-xs text-zinc-500 dark:text-zinc-600">
+              Swap
+            </div>
+          </div>
+        </>
+      );
+    };
+
+    // Render regular transfer content
+    const renderTransferContent = () => {
+      const tokenImage = getTokenImageUrl(primaryTransfer);
+      const amount = primaryTransfer
+        ? `${isReceive ? '+' : '-'}${primaryTransfer.formattedAmount} ${primaryTransfer.token.symbol}`
+        : null;
+      const counterparty = primaryTransfer
+        ? (isReceive ? primaryTransfer.from : primaryTransfer.to)
+        : null;
+      const counterpartyLabel = isReceive ? 'from' : 'to';
+
+      // Get amount color class - brand gold for incoming, muted for outgoing
+      const getAmountColor = () => {
+        if (primaryAction.type === 'token_mint' || isReceive) return 'text-[hsl(var(--logo-color-2))]';
+        if (primaryAction.type === 'token_burn' || isSend) return 'text-zinc-500 dark:text-zinc-400';
+        return 'text-foreground';
+      };
+
+      return (
+        <>
+          {/* Token Icon (if available) */}
+          {tokenImage && (
+            <div className="flex-shrink-0 w-6 h-6 rounded-full overflow-hidden bg-muted">
+              <img
+                src={tokenImage}
+                alt={primaryTransfer?.token.symbol || 'token'}
+                className="w-full h-full object-cover"
+                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+              />
+            </div>
+          )}
+
+          {/* Amount or Action */}
+          <div className="min-w-0 flex-1">
+            {amount ? (
+              <div className={`font-semibold text-base ${getAmountColor()}`}>
+                {amount}
+              </div>
+            ) : (
+              <div className="font-medium text-base">
+                {getActionLabel()}
+              </div>
+            )}
+
+            {/* Counterparty */}
+            {counterparty && (
+              <div className="text-xs text-muted-foreground truncate">
+                {counterpartyLabel} {shortenAddress(counterparty)}
+              </div>
+            )}
+          </div>
+        </>
+      );
+    };
+
     return (
-      <div className={`border rounded-lg mb-3 overflow-hidden ${isExpanded ? 'border-primary' : ''}`}>
-        {/* Transaction summary row - clickable to expand */}
-        <div 
-          className="p-4 flex items-center justify-between cursor-pointer hover:bg-muted/50 transition-colors"
+      <div className={`border-b border-border/50 last:border-b-0 ${isExpanded ? 'bg-muted/30' : ''}`}>
+        {/* Main row - minimal design */}
+        <div
+          className="py-4 px-2 flex items-center justify-between cursor-pointer hover:bg-muted/20 transition-colors"
           onClick={toggleExpand}
         >
-          {/* Icon and type */}
-          <div className="flex items-center space-x-3">
-            <div className={`w-10 h-10 rounded-full flex items-center justify-center ${bgColorClass}`}>
-              <ActionIcon className={`h-5 w-5 ${textColorClass}`} />
+          {/* Left: Icon + Amount/Action */}
+          <div className="flex items-center gap-3 min-w-0 flex-1">
+            {/* Type Icon */}
+            <div className="flex-shrink-0">
+              <TypeIcon className={`h-5 w-5 ${getIconColor()}`} />
             </div>
-            <div>
-              <div className="font-medium">{txInfo}</div>
-              <div className="text-xs text-muted-foreground">
-                {tx.id ? shortenAddress(tx.id) : '...'}
-              </div>
-            </div>
+
+            {/* Render swap or regular content */}
+            {isSwap ? renderSwapContent() : renderTransferContent()}
           </div>
-          
-          {/* Date and expand indicator */}
-          <div className="flex items-center space-x-3">
-            <div className="text-right">
-              <div className="text-sm">{txDate}</div>
-              {hasMultipleTokenTransfers && (
-                <div className="text-xs text-muted-foreground">Multiple token transfers</div>
-              )}
-            </div>
-            <div className="text-muted-foreground">
-              {isExpanded ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
-            </div>
+
+          {/* Right: Time + Expand */}
+          <div className="flex items-center gap-2 flex-shrink-0 ml-4">
+            <span className="text-xs text-muted-foreground">{relativeTime}</span>
+            <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
           </div>
         </div>
-        
-        {/* Expanded details */}
+
+        {/* Expanded details - clean grid */}
         {isExpanded && (
-          <div className="p-4 border-t bg-muted/20">
-            <div className="grid gap-6">
-              <div>
-                <h4 className="text-sm font-medium mb-2">Transaction Details</h4>
-                <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-                  <div className="font-medium">Transaction ID:</div>
-                  <div className="font-mono break-all">
-                    {tx.id}
-                  </div>
-                  <div className="font-medium">Payer:</div>
-                  <div className="font-mono">
-                    {tx.payer}
-                  </div>
-                  <div className="font-medium">Block:</div>
-                  <div className="font-mono">
-                    {tx.blockId ? shortenAddress(tx.blockId) : 'Pending'}
-                  </div>
-                  <div className="font-medium">Timestamp:</div>
-                  <div className="font-mono">
-                    {txDate}
-                  </div>
-                  
-                  {/* Show token transfers if present */}
-                  {actions.map((action, actionIndex) => (
-                    action.tokenTransfers && action.tokenTransfers.length > 0 && (
-                      <React.Fragment key={`action-${actionIndex}`}>
-                        <div className="font-medium col-span-2 mt-2 pt-2 border-t">
-                          {action.type === 'token_transfer' ? 'Token Transfer' : 
-                           action.type === 'token_mint' ? 'Token Mint' : 
-                           action.type === 'token_burn' ? 'Token Burn' : 'Token Action'}:
-                        </div>
-                        {action.tokenTransfers.map((transfer, transferIndex) => (
-                          <React.Fragment key={`transfer-${actionIndex}-${transferIndex}`}>
-                            <div className="font-medium">Token:</div>
-                            <div className="font-mono">
-                              {transfer.token.symbol}
-                            </div>
-                            <div className="font-medium">Amount:</div>
-                            <div className="font-mono">
-                              {transfer.formattedAmount}
-                            </div>
-                            <div className="font-medium">From:</div>
-                            <div className="font-mono">
-                              {shortenAddress(transfer.from)}
-                            </div>
-                            <div className="font-medium">To:</div>
-                            <div className="font-mono">
-                              {shortenAddress(transfer.to)}
-                            </div>
-                          </React.Fragment>
-                        ))}
-                      </React.Fragment>
-                    )
-                  ))}
-                  
-                  <div className="font-medium">RC Used:</div>
-                  <div className="font-mono">
-                    {tx.rc_used}
-                  </div>
-                  <div className="font-medium">Signature Count:</div>
-                  <div className="font-mono">
-                    {tx.signatures.length}
-                  </div>
+          <div className="px-2 pb-4 pt-2 border-t border-border/30">
+            <div className="grid gap-3 text-sm">
+              {/* Transaction ID - only in advanced mode */}
+              {showAdvanced && (
+                <div className="flex items-start gap-2">
+                  <Hash className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+                  <span className="font-mono text-xs break-all text-muted-foreground">{tx.id}</span>
                 </div>
-              </div>
-              <div>
-                <h4 className="text-sm font-medium mb-2">Transaction Events</h4>
-                <div className="space-y-2">
-                  {tx.events.map((event: TransactionEvent, index: number) => (
-                    <div key={index} className="flex justify-between items-center">
-                      <div className="font-mono text-xs text-muted-foreground">
-                        {renderEventSummary(event)}
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        {tx.timestamp ? formatDate(tx.timestamp) : '...'}
-                      </div>
-                    </div>
-                  ))}
+              )}
+
+              {/* All token transfers - always visible */}
+              {allTransfers.map((transfer, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <span className={`font-medium ${transfer.isPositive ? 'text-[hsl(var(--logo-color-2))]' : 'text-zinc-500 dark:text-zinc-400'}`}>
+                    {transfer.isPositive ? '+' : ''}{transfer.formattedAmount} {transfer.token.symbol}
+                  </span>
+                  <span className="text-zinc-500 dark:text-zinc-600 text-xs">
+                    {transfer.isPositive ? 'from' : 'to'} {shortenAddress(transfer.isPositive ? transfer.from : transfer.to)}
+                  </span>
                 </div>
-              </div>
-              <div>
-                <h4 className="text-sm font-medium mb-2">Operations</h4>
-                <div className="space-y-2">
-                  {tx.operations.map((operation: any, index: number) => (
-                    <div key={index} className="flex justify-between items-center">
-                      <div className="font-mono text-xs text-muted-foreground">
-                        {renderOperationSummary(operation)}
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        {tx.timestamp ? formatDate(tx.timestamp) : '...'}
-                      </div>
-                    </div>
-                  ))}
+              ))}
+
+              {/* Mana used - only in advanced mode */}
+              {showAdvanced && (
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <Flame className="h-3 w-3" />
+                  <span>{formatTokenAmount(tx.rc_used, 8)} mana</span>
                 </div>
-              </div>
+              )}
+
+              {/* Block info - only in advanced mode */}
+              {showAdvanced && tx.blockId && (
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <Layers className="h-3 w-3" />
+                  <span>Block {shortenAddress(tx.blockId)}</span>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -1023,53 +1083,21 @@ export function DetailedTransactionHistory({
   return (
     <Card className="bg-transparent shadow-none border-none" style={{...noBorderStyles, ...cssVariables}}>
       <CardHeader className="px-0">
-        <CardTitle>Transaction History</CardTitle>
-        <CardDescription className="flex flex-col sm:flex-row justify-between items-start gap-3 text-muted-foreground">
-          <div>
-            <div className="flex items-center gap-1">
-              <span className="font-medium">KOIN balance:</span>
-              {loadingBalance ? (
-                <Skeleton className="h-4 w-20 bg-muted" />
-              ) : (
-                <span>{koinBalance} KOIN</span>
-              )}
-            </div>
-            <div className="flex items-center gap-1">
-              <span className="font-medium">VHP balance:</span>
-              {loadingBalance ? (
-                <Skeleton className="h-4 w-20 bg-muted" />
-              ) : (
-                <span>{vhpBalance} VHP</span>
-              )}
+        <div className="flex items-center justify-between">
+          <CardTitle>Transaction History</CardTitle>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <Switch
+                id="advanced-view"
+                checked={advancedView}
+                onCheckedChange={setAdvancedView}
+              />
+              <Label htmlFor="advanced-view" className="text-sm text-muted-foreground cursor-pointer">
+                Advanced
+              </Label>
             </div>
           </div>
-          
-          <div className="flex items-center gap-2">
-            <label htmlFor="per-page" className="text-sm">Items per page:</label>
-            <Select value={limit.toString()} onValueChange={(val) => handleLimitChange(parseInt(val))}>
-              <SelectTrigger 
-                id="per-page" 
-                className="h-7 w-16 text-xs bg-background rounded-md border-none flex items-center justify-between"
-                style={{
-                  ...noBorderStyles,
-                  height: "28px",
-                  borderRadius: "6px",
-                  backgroundColor: "transparent",
-                  padding: "0 8px",
-                  fontSize: "12px"
-                }}
-              >
-                <SelectValue placeholder={limit.toString()} />
-              </SelectTrigger>
-              <SelectContent position="popper">
-                <SelectItem value="5">5</SelectItem>
-                <SelectItem value="10">10</SelectItem>
-                <SelectItem value="25">25</SelectItem>
-                <SelectItem value="50">50</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </CardDescription>
+        </div>
       </CardHeader>
 
       <CardContent className="px-0 pb-2">
@@ -1115,235 +1143,109 @@ export function DetailedTransactionHistory({
               </div>
             ) : (
               <>
-                <div className="mb-6">
-                  <div className="flex items-center space-x-2 mb-2">
-                    <h3 className="text-lg font-semibold flex items-center">
-                      <span className="mr-2">Transaction Summary</span>
-                    </h3>
+                {/* Simplified Controls Bar */}
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <label htmlFor="per-page" className="text-sm text-muted-foreground">Show:</label>
+                    <Select value={limit.toString()} onValueChange={(val) => handleLimitChange(parseInt(val))}>
+                      <SelectTrigger
+                        id="per-page"
+                        className="h-7 w-16 text-xs bg-background rounded-md border-none"
+                        style={{
+                          ...noBorderStyles,
+                          height: "28px",
+                          borderRadius: "6px",
+                          backgroundColor: "transparent",
+                          padding: "0 8px",
+                          fontSize: "12px"
+                        }}
+                      >
+                        <SelectValue placeholder={limit.toString()} />
+                      </SelectTrigger>
+                      <SelectContent position="popper">
+                        <SelectItem value="5">5</SelectItem>
+                        <SelectItem value="10">10</SelectItem>
+                        <SelectItem value="25">25</SelectItem>
+                        <SelectItem value="50">50</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
-                  
-                  <p className="text-sm text-muted-foreground">
-                    {totalTransactionCount 
-                      ? `Showing ${formattedTransactions.length} of ${totalTransactionCount} transactions${formattedTransactions.filter(tx => tx.totalValueTransferred && parseFloat(tx.totalValueTransferred) > 0).length > 0 
-                          ? ` with ${formattedTransactions.filter(tx => tx.totalValueTransferred && parseFloat(tx.totalValueTransferred) > 0).length} transfers` 
-                          : ''}`
-                      : `Showing ${formattedTransactions.length} transactions${formattedTransactions.filter(tx => tx.totalValueTransferred && parseFloat(tx.totalValueTransferred) > 0).length > 0 
-                          ? ` with ${formattedTransactions.filter(tx => tx.totalValueTransferred && parseFloat(tx.totalValueTransferred) > 0).length} transfers` 
-                          : ''}`
-                    }
-                  </p>
+
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setAscending(!ascending)}
+                      className="h-8 text-xs flex items-center justify-center rounded-md bg-background border-none"
+                      style={inactiveButtonStyle}
+                    >
+                      {ascending ? (
+                        <ChevronUp className="h-4 w-4 mr-1" />
+                      ) : (
+                        <ChevronDown className="h-4 w-4 mr-1" />
+                      )}
+                      {ascending ? "Oldest" : "Newest"}
+                    </Button>
+
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => fetchTransactions(1)}
+                      className="h-8 w-8 flex items-center justify-center rounded-md bg-background border-none p-0"
+                      style={inactiveButtonStyle}
+                    >
+                      <RotateCw className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
 
-                <div className="flex flex-col space-y-4 mb-6">
-                  <div className="flex justify-between items-center">
-                    <div className="flex items-center space-x-2">
-                      <span className="text-sm font-medium">View:</span>
-                      <Select value={selectedFilters.length > 0 ? "filtered" : "all"} onValueChange={handleFilterChange}>
-                        <SelectTrigger 
-                          className="h-8 text-xs bg-background rounded-md border-none flex items-center justify-between"
-                          style={{
-                            ...noBorderStyles,
-                            height: "28px",
-                            borderRadius: "6px",
-                            backgroundColor: "transparent",
-                            padding: "0 8px",
-                            fontSize: "12px"
-                          }}
-                        >
-                          <SelectValue placeholder={selectedFilters.length > 0 ? `Filtered (${selectedFilters.length})` : "All transactions"} />
-                        </SelectTrigger>
-                        <SelectContent position="popper">
-                          <SelectItem value="all">All transactions</SelectItem>
-                          <SelectItem value="sent">Sent</SelectItem>
-                          <SelectItem value="received">Received</SelectItem>
-                          <SelectItem value="mint">Mint</SelectItem>
-                          <SelectItem value="dapps">dApps</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    
-                    <div className="flex items-center space-x-2">
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={() => setAscending(!ascending)}
-                        className="h-8 text-xs flex items-center justify-center rounded-md bg-background border-none"
-                        style={inactiveButtonStyle}
-                      >
-                        {ascending ? (
-                          <ChevronUp className="h-4 w-4 mr-1" />
-                        ) : (
-                          <ChevronDown className="h-4 w-4 mr-1" />
-                        )}
-                        {ascending ? "Oldest first" : "Newest first"}
-                      </Button>
-                      
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={() => fetchTransactions(1)}
-                        className="h-8 w-8 flex items-center justify-center rounded-md bg-background border-none p-0"
-                        style={inactiveButtonStyle}
-                      >
-                        <RotateCw className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                  
-                  <div className="flex flex-wrap gap-2 mb-6">
-                    <Button
-                      variant={selectedFilters.length === 0 ? "default" : "outline"}
-                      size="sm"
-                      className={`h-8 text-xs flex items-center justify-center rounded-md 
-                        ${selectedFilters.length === 0 
-                          ? "bg-primary text-primary-foreground font-medium" 
-                          : "bg-muted/30 hover:bg-muted/50 text-muted-foreground"}`}
-                      onClick={() => handleFilterChange("all")}
-                    >
-                      All types
-                    </Button>
-                    
-                    <Button
-                      variant={selectedFilters.includes('sent') ? "default" : "outline"}
-                      size="sm"
-                      className={`h-8 text-xs flex items-center justify-center rounded-md 
-                        ${selectedFilters.includes('sent') 
-                          ? "bg-primary text-primary-foreground font-medium" 
-                          : "bg-muted/30 hover:bg-muted/50 text-muted-foreground"}`}
-                      onClick={() => handleFilterChange("sent")}
-                    >
-                      <ArrowUpRight className="h-3 w-3 mr-1 text-orange-500" />
-                      Sent
-                      {(availableTags.find(t => t.tag === 'sent')?.count || 0) > 0 && (
-                        <span className={`ml-1.5 px-1.5 py-0.5 rounded-full text-[10px] 
-                          ${selectedFilters.includes('sent') 
-                            ? "bg-white/20 text-white" 
-                            : "bg-muted/50 text-muted-foreground"}`}>
-                          {availableTags.find(t => t.tag === 'sent')?.count || 0}
-                        </span>
-                      )}
-                    </Button>
-                    
-                    <Button
-                      variant={selectedFilters.includes('received') ? "default" : "outline"}
-                      size="sm"
-                      className={`h-8 text-xs flex items-center justify-center rounded-md 
-                        ${selectedFilters.includes('received') 
-                          ? "bg-primary text-primary-foreground font-medium" 
-                          : "bg-muted/30 hover:bg-muted/50 text-muted-foreground"}`}
-                      onClick={() => handleFilterChange("received")}
-                    >
-                      <ArrowDownLeft className="h-3 w-3 mr-1 text-green-500" />
-                      Received
-                      {(availableTags.find(t => t.tag === 'received')?.count || 0) > 0 && (
-                        <span className={`ml-1.5 px-1.5 py-0.5 rounded-full text-[10px] 
-                          ${selectedFilters.includes('received') 
-                            ? "bg-white/20 text-white" 
-                            : "bg-muted/50 text-muted-foreground"}`}>
-                          {availableTags.find(t => t.tag === 'received')?.count || 0}
-                        </span>
-                      )}
-                    </Button>
-                    
-                    <Button
-                      variant={selectedFilters.includes('mint') ? "default" : "outline"}
-                      size="sm"
-                      className={`h-8 text-xs flex items-center justify-center rounded-md 
-                        ${selectedFilters.includes('mint') 
-                          ? "bg-primary text-primary-foreground font-medium" 
-                          : "bg-muted/30 hover:bg-muted/50 text-muted-foreground"}`}
-                      onClick={() => handleFilterChange("mint")}
-                    >
-                      <Plus className="h-3 w-3 mr-1 text-emerald-500" />
-                      Mint
-                      {(availableTags.find(t => t.tag === 'mint')?.count || 0) > 0 && (
-                        <span className={`ml-1.5 px-1.5 py-0.5 rounded-full text-[10px] 
-                          ${selectedFilters.includes('mint') 
-                            ? "bg-white/20 text-white" 
-                            : "bg-muted/50 text-muted-foreground"}`}>
-                          {availableTags.find(t => t.tag === 'mint')?.count || 0}
-                        </span>
-                      )}
-                    </Button>
-                    
-                    <Button
-                      variant={selectedFilters.includes('interacted') ? "default" : "outline"}
-                      size="sm"
-                      className={`h-8 text-xs flex items-center justify-center rounded-md 
-                        ${selectedFilters.includes('interacted') 
-                          ? "bg-primary text-primary-foreground font-medium" 
-                          : "bg-muted/30 hover:bg-muted/50 text-muted-foreground"}`}
-                      onClick={() => handleFilterChange("dapps")}
-                    >
-                      <AppWindow className="h-3 w-3 mr-1 text-slate-500" />
-                      dApps
-                      {(availableTags.find(t => t.tag === 'interacted')?.count || 0) > 0 && (
-                        <span className={`ml-1.5 px-1.5 py-0.5 rounded-full text-[10px] 
-                          ${selectedFilters.includes('interacted') 
-                            ? "bg-white/20 text-white" 
-                            : "bg-muted/50 text-muted-foreground"}`}>
-                          {availableTags.find(t => t.tag === 'interacted')?.count || 0}
-                        </span>
-                      )}
-                    </Button>
-                  </div>
-                </div>
-                
-                <div>
-                  <Accordion
-                    type="single"
-                    collapsible
-                    className="w-full space-y-3 border-none"
-                    style={noBorderStyles}
-                  >
-                    {loading && page === 1 ? (
-                      <div className="space-y-3">
-                        {[...Array(3)].map((_, i) => (
-                          <div key={i} className="h-16 bg-muted/50 rounded-lg animate-pulse" />
-                        ))}
-                      </div>
-                    ) : (
-                      <>
-                        {filteredTransactions.length === 0 && transactions.length > 0 ? (
-                          <div className="text-center py-8 bg-muted/10 rounded-lg">
-                            <div className="mb-4">
-                              <Filter className="h-12 w-12 mx-auto text-muted-foreground/60" />
-                            </div>
-                            <h3 className="text-lg font-medium mb-2">No matching transactions</h3>
-                            <p className="text-muted-foreground max-w-md mx-auto mb-6">
-                              There are no transactions matching your current filter criteria. Try adjusting your filters or viewing all transactions.
-                            </p>
-                            <div className="flex justify-center">
-                              <Button 
-                                variant="outline" 
-                                size="sm" 
-                                onClick={() => {
-                                  setSelectedFilters(["all"]);
-                                  fetchTransactions(1);
-                                }}
-                                className="h-8 text-xs flex items-center justify-center rounded-md hover:bg-opacity-80 hover:border-opacity-50"
-                                style={inactiveButtonStyle}
-                              >
-                                View All Transactions
-                              </Button>
-                            </div>
+                {/* Transaction List */}
+                <div className="rounded-lg border border-border/50 overflow-hidden">
+                  {loading && page === 1 ? (
+                    <div className="divide-y divide-border/50">
+                      {[...Array(3)].map((_, i) => (
+                        <div key={i} className="py-4 px-2 flex items-center gap-3">
+                          <div className="w-5 h-5 bg-muted rounded animate-pulse" />
+                          <div className="flex-1 space-y-2">
+                            <div className="h-4 bg-muted rounded w-32 animate-pulse" />
+                            <div className="h-3 bg-muted rounded w-24 animate-pulse" />
                           </div>
-                        ) : (
-                          filteredTransactions.map((tx, index) => (
-                            <TransactionRow
-                              key={index}
-                              tx={tx}
-                              isExpanded={expandedRows[tx.id] || false}
-                              toggleExpand={() => setExpandedRows(prev => ({
-                                ...prev,
-                                [tx.id]: !prev[tx.id]
-                              }))}
-                            />
-                          ))
-                        )}
-                      </>
-                    )}
-                  </Accordion>
+                          <div className="h-3 bg-muted rounded w-16 animate-pulse" />
+                        </div>
+                      ))}
+                    </div>
+                  ) : filteredTransactions.length === 0 && transactions.length > 0 ? (
+                    <div className="text-center py-12 px-4">
+                      <Filter className="h-8 w-8 mx-auto text-muted-foreground/40 mb-3" />
+                      <p className="text-sm text-muted-foreground mb-4">No matching transactions</p>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setSelectedFilters([]);
+                          fetchTransactions(1);
+                        }}
+                        className="text-xs"
+                      >
+                        Clear filters
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="divide-y divide-border/50">
+                      {filteredTransactions.map((tx, index) => (
+                        <TransactionRow
+                          key={tx.id || index}
+                          tx={tx}
+                          isExpanded={expandedRows[tx.id] || false}
+                          toggleExpand={() => setExpandedRows(prev => ({
+                            ...prev,
+                            [tx.id]: !prev[tx.id]
+                          }))}
+                          showAdvanced={advancedView}
+                        />
+                      ))}
+                    </div>
+                  )}
                 </div>
               </>
             )}

@@ -11,6 +11,11 @@ export function useLatestBlock(refreshInterval = 12000) {
   const { rpcNode } = useWallet();
 
   useEffect(() => {
+    // Don't fetch if rpcNode is not set yet
+    if (!rpcNode) {
+      return;
+    }
+
     async function fetchLatestBlock() {
       try {
         const data = await getHeadBlockInfo(rpcNode);
@@ -32,7 +37,7 @@ export function useLatestBlock(refreshInterval = 12000) {
 
     // Cleanup
     return () => clearInterval(interval);
-  }, [refreshInterval]);
+  }, [refreshInterval, rpcNode]);
 
   return { blockInfo, loading, error };
 } 

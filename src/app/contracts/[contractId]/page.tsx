@@ -14,23 +14,23 @@ import { FooterComponent } from "@/components/FooterComponent";
 import {
   BLOCK_EXPLORER,
   GOVERNANCE_CONTRACT_ID,
+  KOIN_CONTRACT_ID,
   NICKNAMES_CONTRACT_ID,
   RPC_NODE,
+  VHP_CONTRACT_ID,
 } from "@/koinos/constants";
 import { ContractInfo } from "@/components/ContractInfo";
 import { JsonDisplay } from "@/components/JsonDisplay";
-import { useRouter } from "next/navigation";
+import { useRouter, useParams } from "next/navigation";
 import { Navbar } from "@/components/Navbar";
 import { useWallet } from "@/contexts/WalletContext";
 import { cn } from "@/lib/utils";
 import { abiGovernance } from "@/koinos/abis";
 import { getTokenImageUrl } from "@/koinos/utils";
 
-export default function ContractPage({
-  params,
-}: {
-  params: { contractId: string };
-}) {
+export default function ContractPage() {
+  const params = useParams();
+  const contractIdParam = params.contractId as string;
   const router = useRouter();
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [methodStates, setMethodStates] = useState<Record<string, {
@@ -56,47 +56,110 @@ export default function ContractPage({
   });
 
   useEffect(() => {
+    if (!provider) {
+      setContract(null);
+      setLoading(false);
+      setError("Provider unavailable");
+      return;
+    }
+
     (async () => {
       try {
         setLoading(true);
         setError("");
-        const nicknames = new Contract({
-          id: NICKNAMES_CONTRACT_ID,
-          provider,
-          abi: utils.nicknamesAbi,
-        });
+
+        // Create nicknames contract - handle serializer errors gracefully
+        let nicknames: Contract | null = null;
+        let nicknamesSerializerWorking = false;
+        try {
+          nicknames = new Contract({
+            id: NICKNAMES_CONTRACT_ID,
+            provider,
+            abi: utils.nicknamesAbi,
+          });
+          nicknamesSerializerWorking = true;
+        } catch (e) {
+          console.warn("Failed to create nicknames contract with serializer:", e);
+          // Create without ABI for basic operations
+          nicknames = new Contract({
+            id: NICKNAMES_CONTRACT_ID,
+            provider,
+          });
+        }
 
         let contractId = "";
         let nickname = "";
-        
+
         // Handle contract ID resolution
-        if (params.contractId.startsWith("1")) {
-          contractId = params.contractId;
-          try {
-            const { result } = await nicknames.functions.get_main_token({
-              value: contractId,
-            });
-            if (result) {
-              nickname = new TextDecoder().decode(
-                utils.toUint8Array(result.token_id.slice(2)),
-              );
+        if (contractIdParam.startsWith("1")) {
+          contractId = contractIdParam;
+          if (nicknamesSerializerWorking && nicknames.functions.get_main_token) {
+            try {
+              const { result } = await nicknames.functions.get_main_token({
+                value: contractId,
+              });
+              if (result) {
+                nickname = new TextDecoder().decode(
+                  utils.toUint8Array(result.token_id.slice(2)),
+                );
+              }
+            } catch (error) {
+              console.warn("Failed to resolve nickname for contract:", error);
             }
-          } catch (error) {
-            console.warn("Failed to resolve nickname for contract:", error);
           }
         } else {
-          nickname = params.contractId;
-          try {
-            // resolve nickname
-            const { result } = await nicknames.functions.get_address({
-              value: params.contractId.replace("@", ""),
-            });
-            if (!result || !result.value) {
-              throw new Error(`Contract not found for nickname: @${params.contractId}`);
+          nickname = contractIdParam.replace("@", "");
+
+          if (nicknamesSerializerWorking && nicknames.functions.get_address) {
+            try {
+              // resolve nickname using contract
+              const { result } = await nicknames.functions.get_address({
+                value: nickname,
+              });
+              if (!result || !result.value) {
+                throw new Error(`Contract not found for nickname: @${nickname}`);
+              }
+              contractId = result.value;
+            } catch (error) {
+              throw new Error(`Failed to resolve address for @${nickname}`);
             }
-            contractId = result.value;
-          } catch (error) {
-            throw new Error(`Failed to resolve address for @${params.contractId}`);
+          } else {
+            // Fallback: use provider to call contract directly
+            try {
+              const entryPoint = 0xa61ae5e8; // get_address entry point from nicknamesAbi
+
+              // Encode argument as protobuf common.str: { value: string }
+              // Field 1 (string) = tag 0x0a, then length, then bytes
+              const nicknameBytes = new TextEncoder().encode(nickname);
+              const argBuffer = new Uint8Array(2 + nicknameBytes.length);
+              argBuffer[0] = 0x0a; // tag for field 1, wire type 2 (length-delimited)
+              argBuffer[1] = nicknameBytes.length;
+              argBuffer.set(nicknameBytes, 2);
+              const args = utils.encodeBase64url(argBuffer);
+
+              const response = await provider.readContract({
+                contract_id: NICKNAMES_CONTRACT_ID,
+                entry_point: entryPoint,
+                args,
+              });
+
+              if (response.result) {
+                // Decode the result as protobuf address_data: { value: bytes (ADDRESS) }
+                const resultBytes = utils.decodeBase64url(response.result);
+                // Field 1 (bytes) = tag 0x0a, then length, then address bytes
+                if (resultBytes.length > 2 && resultBytes[0] === 0x0a) {
+                  const addrLen = resultBytes[1];
+                  const addrBytes = resultBytes.slice(2, 2 + addrLen);
+                  contractId = utils.encodeBase58(addrBytes);
+                }
+              }
+
+              if (!contractId) {
+                throw new Error(`Contract not found for nickname: @${nickname}`);
+              }
+            } catch (error) {
+              throw new Error(`Failed to resolve address for @${nickname}`);
+            }
           }
         }
 
@@ -104,7 +167,7 @@ export default function ContractPage({
           throw new Error("No contract address found");
         }
 
-        let image = "https://upload.wikimedia.org/wikipedia/commons/b/bc/Unknown_person.jpg";
+        const image = getTokenImageUrl(contractId, nickname);
         let description = "";
         
         // Try to fetch metadata if nickname exists
@@ -115,8 +178,6 @@ export default function ContractPage({
             });
             if (result && result.value) {
               const metadata = JSON.parse(result.value);
-              // Use our token image utility, falling back to metadata.image if provided
-              image = getTokenImageUrl(contractId, nickname);
               if (metadata.image) {
                 // If metadata has an image and it's a full URL, use it as a secondary option
                 if (metadata.image.startsWith('http')) {
@@ -137,59 +198,79 @@ export default function ContractPage({
           provider,
         });
 
-        try {
-          let abi: Abi | undefined;
-          if (contractId === GOVERNANCE_CONTRACT_ID) {
-            // special case to fix the abi of governance
-            abi = abiGovernance;
-          } else {
-            abi = await c.fetchAbi({
-              updateFunctions: false,
-              updateSerializer: false,
-            });
-          }
-          
-          if (!abi || !abi.methods) {
-            throw new Error(`No ABI found for contract ${contractId}`);
-          }
-
-          // Process ABI methods
-          Object.keys(abi.methods).forEach((m) => {
-            if (abi.methods[m].entry_point === undefined) {
-              abi.methods[m].entry_point = Number(
-                (abi.methods[m] as any)["entry-point"]
-              );
-            }
-            if (abi.methods[m].read_only === undefined) {
-              abi.methods[m].read_only = (abi.methods[m] as any)["read-only"];
-            }
+        // Fetch and process ABI
+        let abi: Abi | undefined;
+        if (contractId === GOVERNANCE_CONTRACT_ID) {
+          // special case to fix the abi of governance
+          abi = abiGovernance;
+        } else if (contractId === KOIN_CONTRACT_ID || contractId === VHP_CONTRACT_ID) {
+          abi = utils.tokenAbi;
+        } else {
+          abi = await c.fetchAbi({
+            updateFunctions: false,
+            updateSerializer: false,
           });
-
-          c.abi = abi;
-          c.updateFunctionsFromAbi();
-          
-          if (c.abi.koilib_types) {
-            c.serializer = new Serializer(c.abi.koilib_types);
-          } else if (c.abi.types) {
-            try {
-              c.serializer = new Serializer(c.abi.types);
-            } catch (serializerError) {
-              console.error("Error initializing serializer:", serializerError);
-              // Continue without a serializer
-            }
-          }
-          
-          setContract(c);
-          setInfo({
-            nickname,
-            address: contractId,
-            description,
-            image,
-          });
-        } catch (error) {
-          console.error("Failed to load contract ABI:", error);
-          throw new Error(`Failed to load contract ABI: ${(error as Error).message}`);
         }
+
+        if (!abi || !abi.methods) {
+          throw new Error(`No ABI found for contract ${contractId}`);
+        }
+
+        // Process ABI methods
+        Object.keys(abi.methods).forEach((m) => {
+          // update entry point if it is using an old format
+          if (abi.methods[m].entry_point === undefined) {
+            abi.methods[m].entry_point = Number(
+              (abi.methods[m] as any)["entry-point"]
+            );
+          }
+
+          // update read only if it is using an old format
+          if (abi.methods[m].read_only === undefined) {
+            abi.methods[m].read_only = (abi.methods[m] as any)["read-only"];
+          }
+
+          // force default output for balance of methods
+          const balanceOfReturnTypes = [
+            "token.balance_of_result",
+            "token.uint64",
+            "bitkoincontract.balance_of_result",
+          ];
+          if (abi.methods[m].return && !abi.methods[m].default_output && balanceOfReturnTypes.includes(abi.methods[m].return)) {
+            abi.methods[m].default_output = { value: "0" };
+          }
+
+          // force default output for other methods
+          if (abi.methods[m].return && !abi.methods[m].default_output) {
+            abi.methods[m].default_output = "undefined";
+          }
+        });
+
+        c.abi = abi;
+        c.updateFunctionsFromAbi();
+
+        // Try to create a serializer, but continue without one if it fails
+        // Some contracts have ABIs with protobuf extensions that can't be resolved
+        try {
+          if (c.abi.koilib_types) {
+            const serializer = new Serializer(c.abi.koilib_types);
+            c.serializer = serializer;
+          } else if (c.abi.types) {
+            const serializer = new Serializer(c.abi.types);
+            c.serializer = serializer;
+          }
+        } catch (serializerError) {
+          console.warn("Serializer unavailable for contract:", serializerError);
+          // Continue without a serializer - the KoinosForm will show a warning
+        }
+
+        setContract(c);
+        setInfo({
+          nickname,
+          address: contractId,
+          description,
+          image,
+        });
       } catch (error) {
         setError((error as Error).message);
         setContract(null);
@@ -197,7 +278,7 @@ export default function ContractPage({
         setLoading(false);
       }
     })();
-  }, [params.contractId, provider]);
+  }, [contractIdParam, provider]);
 
   const contractMethods = useMemo(() => {
     if (!contract) return [];
@@ -259,35 +340,6 @@ export default function ContractPage({
       // Debug info about what's being called
       console.log(`Calling method: ${methodName}`, currentArgs);
 
-      // Check if this is a balance method and validate address input
-      if (/balance/i.test(methodName)) {
-        // Get the owner address from the arguments object
-        let addressArg = '';
-        
-        if (typeof currentArgs === 'object' && currentArgs !== null) {
-          // Try common parameter names for address in balance methods
-          addressArg = (currentArgs as Record<string, any>)['owner'] || 
-                      (currentArgs as Record<string, any>)['address'] || 
-                      (currentArgs as Record<string, any>)['account'] || '';
-        }
-        
-        if (!addressArg || addressArg.trim() === '') {
-          const errorMessage = "Please enter an address to check the balance";
-          
-          setMethodStates(prev => ({
-            ...prev,
-            [methodName]: {
-              ...prev[methodName],
-              loading: false,
-              error: errorMessage
-            }
-          }));
-          
-          toast.error(errorMessage);
-          return; // Exit early without making the contract call
-        }
-      }
-
       if (isRead) {
         const { result } = await contract.functions[methodName](currentArgs);
         
@@ -296,17 +348,6 @@ export default function ContractPage({
         
         // Special handling for balance methods when result is empty or null
         let processedResult = result;
-        
-        // Check if this is a balance-related function and has an empty result
-        const isBalanceMethod = /balance/i.test(methodName); // Case insensitive check for any 'balance' method
-        
-        if (isBalanceMethod && 
-            (!result || 
-             Object.keys(result).length === 0 || 
-             (typeof result === 'object' && result.value === undefined))) {
-          console.log(`Empty balance result for ${methodName}, defaulting to zero value`);
-          processedResult = { value: "0" };
-        }
         
         setMethodStates(prev => ({
           ...prev,
@@ -363,35 +404,17 @@ export default function ContractPage({
       const errorMessage = (error as Error).message;
       console.error(`Error calling ${methodName}:`, errorMessage);
       
-      // For balance-related read methods, return 0 instead of showing an error
-      const isBalanceMethod = isRead && /balance/i.test(methodName);
-      
-      if (isBalanceMethod) {
-        console.log(`Balance method ${methodName} failed, showing zero balance instead`);
-        setMethodStates(prev => ({
-          ...prev,
-          [methodName]: {
-            ...prev[methodName],
-            loading: false,
-            results: JSON.stringify({ value: "0" }, null, 2)
-          }
-        }));
-        // Optional toast to indicate fallback behavior
-        toast.custom("No balance found, showing zero", { duration: 3000 });
-      } else {
-        // Standard error handling for non-balance methods
-        setMethodStates(prev => ({
-          ...prev,
-          [methodName]: {
-            ...prev[methodName],
-            loading: false,
-            error: errorMessage
-          }
-        }));
-        toast.error(errorMessage, {
-          duration: 15000,
-        });
-      }
+      setMethodStates(prev => ({
+        ...prev,
+        [methodName]: {
+          ...prev[methodName],
+          loading: false,
+          error: errorMessage
+        }
+      }));
+      toast.error(errorMessage, {
+        duration: 15000,
+      });
     }
   }, [contract, signer, methodStates]);
 
@@ -590,7 +613,7 @@ export default function ContractPage({
                             </div>
                             {!method.readOnly && signer ? (
                               <div className="mt-3 text-sm text-muted-foreground flex items-center gap-2">
-                                <div className="w-2 h-2 rounded-full bg-green-500" />
+                                <div className="w-2 h-2 rounded-full bg-[hsl(var(--logo-color-2))]" />
                                 <span>Signing as: {signer.getAddress()}</span>
                               </div>
                             ) : !method.readOnly ? (

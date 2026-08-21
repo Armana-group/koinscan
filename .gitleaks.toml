@@ -1,0 +1,10 @@
+title = "Koinscan Gitleaks configuration"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Ignore local investigation logs that contain public blockchain data"
+paths = [
+  '''^local-docs/''',
+]

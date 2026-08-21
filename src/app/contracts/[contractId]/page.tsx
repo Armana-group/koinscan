@@ -218,13 +218,31 @@ export default function ContractPage() {
 
         // Process ABI methods
         Object.keys(abi.methods).forEach((m) => {
+          // update entry point if it is using an old format
           if (abi.methods[m].entry_point === undefined) {
             abi.methods[m].entry_point = Number(
               (abi.methods[m] as any)["entry-point"]
             );
           }
+
+          // update read only if it is using an old format
           if (abi.methods[m].read_only === undefined) {
             abi.methods[m].read_only = (abi.methods[m] as any)["read-only"];
+          }
+
+          // force default output for balance of methods
+          const balanceOfReturnTypes = [
+            "token.balance_of_result",
+            "token.uint64",
+            "bitkoincontract.balance_of_result",
+          ];
+          if (abi.methods[m].return && !abi.methods[m].default_output && balanceOfReturnTypes.includes(abi.methods[m].return)) {
+            abi.methods[m].default_output = { value: "0" };
+          }
+
+          // force default output for other methods
+          if (abi.methods[m].return && !abi.methods[m].default_output) {
+            abi.methods[m].default_output = "undefined";
           }
         });
 
@@ -322,35 +340,6 @@ export default function ContractPage() {
       // Debug info about what's being called
       console.log(`Calling method: ${methodName}`, currentArgs);
 
-      // Check if this is a balance method and validate address input
-      if (/balance/i.test(methodName)) {
-        // Get the owner address from the arguments object
-        let addressArg = '';
-        
-        if (typeof currentArgs === 'object' && currentArgs !== null) {
-          // Try common parameter names for address in balance methods
-          addressArg = (currentArgs as Record<string, any>)['owner'] || 
-                      (currentArgs as Record<string, any>)['address'] || 
-                      (currentArgs as Record<string, any>)['account'] || '';
-        }
-        
-        if (!addressArg || addressArg.trim() === '') {
-          const errorMessage = "Please enter an address to check the balance";
-          
-          setMethodStates(prev => ({
-            ...prev,
-            [methodName]: {
-              ...prev[methodName],
-              loading: false,
-              error: errorMessage
-            }
-          }));
-          
-          toast.error(errorMessage);
-          return; // Exit early without making the contract call
-        }
-      }
-
       if (isRead) {
         const { result } = await contract.functions[methodName](currentArgs);
         
@@ -359,17 +348,6 @@ export default function ContractPage() {
         
         // Special handling for balance methods when result is empty or null
         let processedResult = result;
-        
-        // Check if this is a balance-related function and has an empty result
-        const isBalanceMethod = /balance/i.test(methodName); // Case insensitive check for any 'balance' method
-        
-        if (isBalanceMethod && 
-            (!result || 
-             Object.keys(result).length === 0 || 
-             (typeof result === 'object' && result.value === undefined))) {
-          console.log(`Empty balance result for ${methodName}, defaulting to zero value`);
-          processedResult = { value: "0" };
-        }
         
         setMethodStates(prev => ({
           ...prev,
@@ -426,35 +404,17 @@ export default function ContractPage() {
       const errorMessage = (error as Error).message;
       console.error(`Error calling ${methodName}:`, errorMessage);
       
-      // For balance-related read methods, return 0 instead of showing an error
-      const isBalanceMethod = isRead && /balance/i.test(methodName);
-      
-      if (isBalanceMethod) {
-        console.log(`Balance method ${methodName} failed, showing zero balance instead`);
-        setMethodStates(prev => ({
-          ...prev,
-          [methodName]: {
-            ...prev[methodName],
-            loading: false,
-            results: JSON.stringify({ value: "0" }, null, 2)
-          }
-        }));
-        // Optional toast to indicate fallback behavior
-        toast.custom("No balance found, showing zero", { duration: 3000 });
-      } else {
-        // Standard error handling for non-balance methods
-        setMethodStates(prev => ({
-          ...prev,
-          [methodName]: {
-            ...prev[methodName],
-            loading: false,
-            error: errorMessage
-          }
-        }));
-        toast.error(errorMessage, {
-          duration: 15000,
-        });
-      }
+      setMethodStates(prev => ({
+        ...prev,
+        [methodName]: {
+          ...prev[methodName],
+          loading: false,
+          error: errorMessage
+        }
+      }));
+      toast.error(errorMessage, {
+        duration: 15000,
+      });
     }
   }, [contract, signer, methodStates]);
 

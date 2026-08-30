@@ -7,6 +7,7 @@ import { getTotalTransactionCount } from "../src/lib/account-history";
 import type { KoinosToken } from "../src/lib/tokens";
 import { getHeadBlockInfo, getTransactionDetails } from "../src/lib/api";
 import { getKoinPrice } from "../src/lib/price";
+import { GET as getKoinPriceRoute } from "../src/app/api/koin-price/route";
 
 const token = (
   symbol: string,
@@ -187,6 +188,74 @@ async function main() {
   } finally {
     globalThis.fetch = originalFetch;
     console.error = originalConsoleError;
+  }
+
+  const originalCoinMarketCapApiKey = process.env.COINMARKETCAP_API_KEY;
+  let coinMarketCapRequestUrl = "";
+  let coinMarketCapRequestHeaders: HeadersInit | undefined;
+
+  try {
+    process.env.COINMARKETCAP_API_KEY = "regression-secret";
+    globalThis.fetch = async (input, init) => {
+      coinMarketCapRequestUrl = String(input);
+      coinMarketCapRequestHeaders = init?.headers;
+      return new Response(
+        JSON.stringify({
+          status: {
+            timestamp: "2026-08-30T23:01:03.192Z",
+            error_code: "0",
+            error_message: "",
+            elapsed: 6,
+            credit_count: 1,
+          },
+          data: [
+            {
+              id: 8282,
+              name: "Koinos",
+              symbol: "KOIN",
+              slug: "koinos",
+              quote: [
+                {
+                  id: 2781,
+                  symbol: "USD",
+                  price: 0.00982613623031301,
+                  percent_change_24h: 2.07504114,
+                  market_cap: 818097.9453612161,
+                  last_updated: "2026-08-30T23:00:02.000Z",
+                },
+              ],
+            },
+          ],
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    };
+
+    const routeResponse = await getKoinPriceRoute();
+    assert.equal(routeResponse.status, 200);
+    assert.deepEqual(await routeResponse.json(), {
+      usd: 0.00982613623031301,
+      change: 2.07504114,
+      timestamp: Date.parse("2026-08-30T23:00:02.000Z"),
+      source: "coinmarketcap",
+    });
+    assert.equal(
+      coinMarketCapRequestUrl,
+      "https://pro-api.coinmarketcap.com/v3/cryptocurrency/quotes/latest?id=8282&convert=USD",
+      "the server requests the stable CoinMarketCap Koinos asset ID",
+    );
+    assert.equal(
+      new Headers(coinMarketCapRequestHeaders).get("X-CMC_PRO_API_KEY"),
+      "regression-secret",
+      "the CoinMarketCap credential stays in the server request header",
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalCoinMarketCapApiKey === undefined) {
+      delete process.env.COINMARKETCAP_API_KEY;
+    } else {
+      process.env.COINMARKETCAP_API_KEY = originalCoinMarketCapApiKey;
+    }
   }
 
   console.log("address accuracy regressions passed");

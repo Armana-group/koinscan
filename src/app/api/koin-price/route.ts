@@ -1,47 +1,95 @@
 import { NextResponse } from "next/server";
 
-const PRICE_API_URL = "https://kondor-price-service.armana.workers.dev/price/koin";
+const COINMARKETCAP_QUOTES_URL =
+  "https://pro-api.coinmarketcap.com/v3/cryptocurrency/quotes/latest?id=8282&convert=USD";
 
-interface KoinPriceResponse {
-  usd: number;
-  change: number;
-  timestamp: number;
-  source: string;
+interface CoinMarketCapQuote {
+  symbol: string;
+  price: number;
+  percent_change_24h: number;
+  last_updated: string;
 }
 
-function isKoinPriceResponse(value: unknown): value is KoinPriceResponse {
-  if (!value || typeof value !== "object") return false;
+interface CoinMarketCapResponse {
+  status?: {
+    error_code?: string | number;
+  };
+  data?: Array<{
+    id?: number;
+    quote?: CoinMarketCapQuote[];
+  }>;
+}
 
-  const candidate = value as Partial<KoinPriceResponse>;
-  return (
-    typeof candidate.usd === "number" &&
-    Number.isFinite(candidate.usd) &&
-    typeof candidate.change === "number" &&
-    typeof candidate.timestamp === "number" &&
-    typeof candidate.source === "string"
-  );
+function parseKoinQuote(value: unknown) {
+  if (!value || typeof value !== "object") return null;
+
+  const response = value as CoinMarketCapResponse;
+  if (Number(response.status?.error_code) !== 0) return null;
+
+  const koin = response.data?.find(({ id }) => id === 8282);
+  const usd = koin?.quote?.find(({ symbol }) => symbol === "USD");
+  const timestamp = Date.parse(usd?.last_updated ?? "");
+
+  if (
+    !usd ||
+    !Number.isFinite(usd.price) ||
+    !Number.isFinite(usd.percent_change_24h) ||
+    !Number.isFinite(timestamp)
+  ) {
+    return null;
+  }
+
+  return {
+    usd: usd.price,
+    change: usd.percent_change_24h,
+    timestamp,
+    source: "coinmarketcap",
+  };
 }
 
 export async function GET() {
+  const apiKey = process.env.COINMARKETCAP_API_KEY;
+  if (!apiKey) {
+    return NextResponse.json(
+      { error: "KOIN price is not configured" },
+      { status: 503 },
+    );
+  }
+
   try {
-    const response = await fetch(PRICE_API_URL, {
-      headers: { Accept: "application/json" },
-      next: { revalidate: 60 },
+    const response = await fetch(COINMARKETCAP_QUOTES_URL, {
+      headers: {
+        Accept: "application/json",
+        "X-CMC_PRO_API_KEY": apiKey,
+      },
+      next: { revalidate: 300 },
     });
 
     if (!response.ok) {
-      return NextResponse.json({ error: "KOIN price is unavailable" }, { status: 502 });
+      return NextResponse.json(
+        { error: "KOIN price is unavailable" },
+        { status: 502 },
+      );
     }
 
-    const data: unknown = await response.json();
-    if (!isKoinPriceResponse(data)) {
-      return NextResponse.json({ error: "Invalid KOIN price response" }, { status: 502 });
+    const price = parseKoinQuote(await response.json());
+    if (!price) {
+      return NextResponse.json(
+        { error: "Invalid KOIN price response" },
+        { status: 502 },
+      );
     }
 
-    return NextResponse.json(data, {
-      headers: { "Cache-Control": "public, max-age=30, s-maxage=60" },
+    return NextResponse.json(price, {
+      headers: {
+        "Cache-Control":
+          "public, max-age=60, s-maxage=300, stale-while-revalidate=3600",
+      },
     });
   } catch {
-    return NextResponse.json({ error: "KOIN price is unavailable" }, { status: 502 });
+    return NextResponse.json(
+      { error: "KOIN price is unavailable" },
+      { status: 502 },
+    );
   }
 }

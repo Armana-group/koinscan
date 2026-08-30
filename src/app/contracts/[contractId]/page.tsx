@@ -236,7 +236,8 @@ export default function ContractPage() {
             "token.uint64",
             "bitkoincontract.balance_of_result",
           ];
-          if (abi.methods[m].return && !abi.methods[m].default_output && balanceOfReturnTypes.includes(abi.methods[m].return)) {
+          const returnType = abi.methods[m].return;
+          if (returnType && !abi.methods[m].default_output && balanceOfReturnTypes.includes(returnType)) {
             abi.methods[m].default_output = { value: "0" };
           }
 

@@ -19,8 +19,10 @@ export function useLatestBlock(refreshInterval = 12000) {
     async function fetchLatestBlock() {
       try {
         const data = await getHeadBlockInfo(rpcNode);
-        setBlockInfo(data);
-        setError(null);
+        if (data) {
+          setBlockInfo(data);
+          setError(null);
+        }
       } catch (err) {
         console.error('Error fetching latest block:', err);
         setError('Failed to fetch latest block');
@@ -40,4 +42,4 @@ export function useLatestBlock(refreshInterval = 12000) {
   }, [refreshInterval, rpcNode]);
 
   return { blockInfo, loading, error };
-} 
+}

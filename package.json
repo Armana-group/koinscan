@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
+    "accuracy:regression": "tsx scripts/regression-address-accuracy.ts",
     "security:regression": "node scripts/regression-security-hardening.mjs"
   },
   "dependencies": {
@@ -54,6 +55,7 @@
     "pwa-asset-generator": "^6.4.0",
     "tailwindcss": "^3.4.1",
     "tailwindcss-animate": "^1.0.7",
+    "tsx": "4.23.13",
     "typescript": "^5"
   },
   "resolutions": {

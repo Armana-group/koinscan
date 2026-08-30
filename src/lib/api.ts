@@ -1371,6 +1371,9 @@ export async function getTransactionDetails(restNode: string, transactionId: str
     const response = await fetch(url);
     
     if (!response.ok) {
+      if (response.status === 429) {
+        return null;
+      }
       throw new Error(`API request failed with status ${response.status}`);
     }
     
@@ -1416,13 +1419,12 @@ export async function getHeadBlockInfo(restNode: string): Promise<any> {
     const response = await fetch(url);
     
     if (!response.ok) {
-      throw new Error(`API request failed with status ${response.status}`);
+      return null;
     }
     
     const data = await response.json();
     return data;
-  } catch (error) {
-    console.error('Error fetching head block info:', error);
+  } catch {
     return null;
   }
 }
@@ -1471,8 +1473,12 @@ export const blockByHeight = getBlockByHeight;
  * @returns Promise resolving to transactions with timestamp information
  */
 export async function enrichTransactionsWithTimestamps(restNode: string, transactions: any[]): Promise<any[]> {
-  const enrichedTransactions = await Promise.all(
-    transactions.map(async (tx) => {
+  const enrichedTransactions: any[] = [];
+
+  for (let index = 0; index < transactions.length; index += 2) {
+    const batch = transactions.slice(index, index + 2);
+    const enrichedBatch = await Promise.all(
+      batch.map(async (tx) => {
       try {
         const txDetails = await getTransactionDetails(restNode, tx.id);
         
@@ -1505,8 +1511,11 @@ export async function enrichTransactionsWithTimestamps(restNode: string, transac
         console.error('Error enriching transaction:', error);
         return tx;
       }
-    })
-  );
+      })
+    );
+
+    enrichedTransactions.push(...enrichedBatch);
+  }
   
   return enrichedTransactions;
 }

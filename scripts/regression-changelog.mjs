@@ -27,6 +27,41 @@ assert.match(
   /5d9698d/,
   "the public release points to its deployed commit",
 );
+assert.match(
+  changelog.html,
+  /More reliable contract interactions/,
+  "Julian's contract explorer improvements are documented",
+);
+assert.match(
+  changelog.html,
+  /Julian Gonzalez/,
+  "the contract explorer improvements credit their contributor",
+);
+assert.match(
+  changelog.html,
+  /993b052/,
+  "the first contract explorer commit is linked",
+);
+assert.match(
+  changelog.html,
+  /002fe20/,
+  "the second contract explorer commit is linked",
+);
+assert.match(
+  changelog.html,
+  /Reliable blockchain requests and safer administration/,
+  "the June reliability release is documented",
+);
+assert.match(
+  changelog.html,
+  /Correct transfers and resilient account history/,
+  "the June history repairs are documented",
+);
+assert.match(
+  changelog.html,
+  /Clearer transaction history and accurate balances/,
+  "the January history and balance release is documented",
+);
 
 const home = await fetchPage("/");
 assert.equal(home.status, 200, "the home page remains reachable");

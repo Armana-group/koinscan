@@ -40,7 +40,7 @@ export default function ChangelogPage() {
             />
             {changelogEntries.map((entry) => (
               <li
-                key={`${entry.date}-${entry.commit}`}
+                key={`${entry.date}-${entry.commits.join("-")}`}
                 className="relative grid grid-cols-[16px_minmax(0,1fr)] gap-5 md:grid-cols-[145px_32px_minmax(0,1fr)] md:gap-4"
               >
                 <time
@@ -73,6 +73,14 @@ export default function ChangelogPage() {
                   <p className="mt-3 max-w-2xl leading-7 text-muted-foreground">
                     {entry.summary}
                   </p>
+                  <p className="mt-4 font-mono text-xs text-muted-foreground">
+                    <span className="uppercase tracking-[0.14em]">
+                      {entry.contributors.length === 1 ? "Contributor" : "Contributors"}
+                    </span>{" "}
+                    <span className="text-foreground/80">
+                      {entry.contributors.join(", ")}
+                    </span>
+                  </p>
 
                   <ul className="mt-6 space-y-3 border-t border-border/60 pt-6">
                     {entry.changes.map((change) => (
@@ -85,20 +93,25 @@ export default function ChangelogPage() {
                     ))}
                   </ul>
 
-                  <div className="mt-7 flex items-center justify-between gap-4 border-t border-border/60 pt-5">
+                  <div className="mt-7 flex flex-wrap items-center justify-between gap-4 border-t border-border/60 pt-5">
                     <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
-                      Deployed commit
+                      {entry.commits.length === 1 ? "Related commit" : "Related commits"}
                     </span>
-                    <Link
-                      href={`https://github.com/Armana-group/koinscan/commit/${entry.commit}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="group inline-flex items-center gap-2 font-mono text-xs text-foreground underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                    >
-                      <GitCommitHorizontal className="h-4 w-4 text-muted-foreground" />
-                      {entry.commit}
-                      <ArrowUpRight className="h-3.5 w-3.5 text-muted-foreground transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
-                    </Link>
+                    <div className="flex flex-wrap items-center justify-end gap-x-4 gap-y-2">
+                      {entry.commits.map((commit) => (
+                        <Link
+                          key={commit}
+                          href={`https://github.com/Armana-group/koinscan/commit/${commit}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="group inline-flex items-center gap-2 font-mono text-xs text-foreground underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                        >
+                          <GitCommitHorizontal className="h-4 w-4 text-muted-foreground" />
+                          {commit}
+                          <ArrowUpRight className="h-3.5 w-3.5 text-muted-foreground transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+                        </Link>
+                      ))}
+                    </div>
                   </div>
                 </article>
               </li>

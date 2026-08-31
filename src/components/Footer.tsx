@@ -30,6 +30,12 @@ export function Footer() {
               {buildLabel}
             </span>
           )}
+          <Link
+            href="/changelog"
+            className="text-xs leading-none text-muted-foreground/70 transition-colors hover:text-foreground hover:underline"
+          >
+            Changelog
+          </Link>
         </div>
         {!loading && blockInfo && (
           <Link

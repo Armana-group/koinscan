@@ -1,3 +1,5 @@
+"use client";
+
 import { NavigationWithSearch } from "./NavigationWithSearch";
 import { Logo } from "./Logo";
 import { WalletButton } from "./WalletButton";
@@ -172,4 +174,4 @@ export function Navbar() {
       </div>
     </div>
   );
-} 
+}

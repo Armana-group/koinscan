@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useLatestBlock } from '@/hooks/useLatestBlock'
 import { Blocks } from 'lucide-react'
+import { BetaBanner } from '@/components/BetaBanner'
 
 export function Footer() {
   const { blockInfo, loading } = useLatestBlock();
@@ -12,8 +13,8 @@ export function Footer() {
 
   return (
     <footer className="w-full py-4 text-sm text-muted-foreground">
-      <div className="container mx-auto px-4 flex flex-col md:flex-row justify-between items-center gap-4">
-        <div className="flex flex-wrap items-baseline justify-center gap-x-3 gap-y-1">
+      <div className="container mx-auto grid items-center gap-3 px-4 text-center lg:grid-cols-[1fr_auto_1fr] lg:text-left">
+        <div className="flex flex-wrap items-baseline justify-center gap-x-3 gap-y-1 lg:justify-self-start">
           <p className="leading-none">
             © 2025{' '}
             <Link
@@ -37,10 +38,11 @@ export function Footer() {
             Changelog
           </Link>
         </div>
+        <BetaBanner className="max-w-xl justify-self-center px-2" />
         {!loading && blockInfo && (
           <Link
             href="/blocks"
-            className="flex items-center gap-2 hover:text-foreground transition-colors"
+            className="flex items-center justify-self-center gap-2 transition-colors hover:text-foreground lg:justify-self-end"
           >
             <Blocks className="h-4 w-4" />
             <span>

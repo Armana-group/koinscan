@@ -58,7 +58,7 @@ export function Navbar() {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-56 mt-2">
               <div className="px-2 py-2">
-                <Logo />
+                <Logo showBetaBadge />
               </div>
               <DropdownMenuSeparator />
               <Link href="/">
@@ -116,7 +116,7 @@ export function Navbar() {
 
         {/* Desktop Logo (Left) */}
         <div className="hidden md:flex w-[200px] justify-start">
-          <Logo />
+          <Logo showBetaBadge />
         </div>
 
         {/* Desktop Navigation (Center) */}
@@ -134,7 +134,7 @@ export function Navbar() {
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="relative flex items-center justify-center w-10 h-10 rounded-full hover:bg-muted/50 transition-all duration-300"
+                  className="relative flex items-center justify-center w-10 h-10 rounded-full hover:bg-muted/50 transition-colors duration-300"
                 >
                   <Settings className="h-[18px] w-[18px]" strokeWidth={1.5} />
                 </Button>

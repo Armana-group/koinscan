@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint .",
     "accuracy:regression": "tsx scripts/regression-address-accuracy.ts",
+    "beta-status:regression": "node scripts/regression-beta-status.mjs",
     "changelog:regression": "node scripts/regression-changelog.mjs",
     "security:regression": "node scripts/regression-security-hardening.mjs"
   },

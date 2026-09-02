@@ -11,6 +11,12 @@ import {
 
 const dapps = [
   {
+    name: "KOIN / VHP DEX",
+    slug: "dex",
+    description: "Order book decentralized exchange for KOIN and VHP",
+    imageUrl: "/koinscan-logo.svg",
+  },
+  {
     name: "Fogata v2",
     slug: "fogata",
     description: "Fogata mining pools",

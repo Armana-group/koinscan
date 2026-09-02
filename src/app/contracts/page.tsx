@@ -137,6 +137,13 @@ const systemContracts = [
     address: "1KD9Es7LBBjA1FY3ViCgQJ7e6WH1ipKbhz",
     categories: ["utility"],
   },
+  {
+    id: "koinvhpdex",
+    name: "Koin/VHP DEX",
+    description: "Koin/VHP decentralized exchange",
+    address: "1KZVMtRxdfsHp4yXU7CZh9s7CodGvRPGhx",
+    categories: ["utility"],
+  },
 ];
 
 export default function ContractsPage() {

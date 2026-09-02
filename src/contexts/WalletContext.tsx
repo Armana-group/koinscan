@@ -190,6 +190,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         // Update signer with new account
         const newSigner = getWalletSigner("kondor", accounts[0].address);
         (newSigner as ExtendedSigner).name = "kondor";
+        newSigner.provider = provider;
         setSigner(newSigner as ExtendedSigner);
         
         // Update beta access with the new wallet

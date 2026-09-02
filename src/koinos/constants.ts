@@ -11,8 +11,11 @@ export const NICKNAMES_CONTRACT_ID = "1KD9Es7LBBjA1FY3ViCgQJ7e6WH1ipKbhz";
 export const GOVERNANCE_CONTRACT_ID = "19qj51eTbSFJYU7ZagudkpxPgNSzPMfdPX";
 export const KOIN_CONTRACT_ID = "19GYjDBVXU7keLbYvMLazsGQn3GTWHjHkK";
 export const VHP_CONTRACT_ID = "12Y5vW6gk8GceH53YfRkRre2Rrcsgw7Naq";
+export const POB_CONTRACT_ID = "159myq5YUhhoVWu3wsHKHiJYKPKGUrGiyv";
 export const MULTICALL_CONTRACT_ID = "18dVCqPG3gwgL7DWQAciKYNuXfzEg5LW7";
 export const FOGATA1_LIST_POOLS_CONTRACT_ID = "1MmV5nzSBVGnBrjTr3B8XtA4yPs8wcSpr";
+export const FOGATA2_LIST_POOLS_CONTRACT_ID = "1FiBcmCus5N2bWv2RHwyiA1YRVVSE8uPqF";
+export const KOIN_VHP_DEX_CONTRACT_ID = "1KZVMtRxdfsHp4yXU7CZh9s7CodGvRPGhx";
 
 export const WALLET_CONNECT_MODAL_SIGN_OPTIONS = {
   // Get your projectId by creating a free WalletConnect

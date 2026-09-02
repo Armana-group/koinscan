@@ -11,18 +11,11 @@ import {
 
 const dapps = [
   {
-    name: "Fogata v1",
-    slug: "fogata1",
+    name: "Fogata v2",
+    slug: "fogata",
     description: "Fogata mining pools",
     imageUrl:
-      "https://images.unsplash.com/photo-1526407706864-79a107a36efe?auto=format&fit=crop&w=600&q=80",
-  },
-  {
-    name: "Fogata 2",
-    slug: "fogata2",
-    description: "Track Fogata 2 mining pools and join to start earning rewards on Koinos.",
-    imageUrl:
-      "https://images.unsplash.com/photo-1526407706864-79a107a36efe?auto=format&fit=crop&w=600&q=80",
+      "https://upload.wikimedia.org/wikipedia/commons/b/bc/Unknown_person.jpg",
   },
 ];
 

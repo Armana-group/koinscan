@@ -1,13 +1,7 @@
 "use client";
 
-import {
-  Contract,
-  Provider,
-  SignerInterface,
-  Transaction,
-  TransactionReceipt,
-  utils,
-} from "koilib";
+import { Contract, Multicall, ProviderInterface, utils } from "koilib";
+import Link from "next/link";
 import {
   Card,
   CardContent,
@@ -18,12 +12,45 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useWallet } from "@/contexts/WalletContext";
-import { FOGATA1_LIST_POOLS_CONTRACT_ID, MULTICALL_CONTRACT_ID } from "@/koinos/constants";
-import { abiFogata1ListPools } from "@/koinos/abis/fogata1ListPools";
+import { FOGATA2_LIST_POOLS_CONTRACT_ID, POB_CONTRACT_ID, KOIN_CONTRACT_ID, VHP_CONTRACT_ID } from "@/koinos/constants";
+import { abiFogata2ListPools } from "@/koinos/abis/fogata2ListPools";
 import { useEffect, useState } from "react";
 import { abiFogataPool } from "@/koinos/abis/fogataPool";
-import { abiMulticall } from "@/koinos/abis/multicall";
-import Image from "next/image";
+import { abiPob } from "@/koinos/abis";
+import tokenAbi from "@/koinos/abi";
+
+/**
+ * APY = 2% * virtual supply / VHP producing
+ * Same formula as src/app/network/page.tsx
+ */
+async function getNetworkApy(provider: ProviderInterface): Promise<number> {
+  const vhpContract = new Contract({ id: VHP_CONTRACT_ID, provider, abi: tokenAbi });
+  const { result: resultVhp } = await vhpContract.functions.totalSupply();
+  const totalVhp = Number(resultVhp!.value) / 1e8;
+
+  const koinContract = new Contract({ id: KOIN_CONTRACT_ID, provider, abi: tokenAbi });
+  const { result: resultKoin } = await koinContract.functions.totalSupply();
+  const totalKoin = Number(resultKoin!.value) / 1e8;
+
+  const pobContract = new Contract({ id: POB_CONTRACT_ID, provider, abi: abiPob });
+  const { result: resultPob } = await pobContract.functions.get_metadata();
+  const difficulty = Number(
+    "0x" + utils.toHexString(utils.decodeBase64url(resultPob!.value.difficulty))
+  );
+  const vhpProducing = 10 * difficulty / 3000 / 1e8;
+  return 2 * (totalVhp + totalKoin) / vhpProducing;
+}
+
+function computePoolApy(
+  networkApy: number,
+  beneficiaries: Pool["beneficiaries"]
+): number {
+  const beneficiaryShare = beneficiaries.reduce(
+    (sum, beneficiary) => sum + beneficiary.percentage,
+    0
+  ) / 1000;
+  return networkApy * (1 - beneficiaryShare / 100);
+}
 
 interface Pool {
   account: string;
@@ -39,9 +66,10 @@ interface Pool {
   approval_time: string;
 }
 
-export default function Fogata1Page() {
-  const { signer, provider } = useWallet();
+export default function FogataPage() {
+  const { provider } = useWallet();
   const [pools, setPools] = useState<Pool[]>([]);
+  const [networkApy, setNetworkApy] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -54,45 +82,36 @@ export default function Fogata1Page() {
 
       try {
         const listPoolsContract = new Contract({
-          id: FOGATA1_LIST_POOLS_CONTRACT_ID,
+          id: FOGATA2_LIST_POOLS_CONTRACT_ID,
           provider,
-          abi: abiFogata1ListPools,
+          abi: abiFogata2ListPools,
         });
 
-        const { result: listPoolsResult } = await listPoolsContract.functions.get_approved_pools({
+        const { result: listPoolsResult } = await listPoolsContract.functions.get_pools({
           start: "", // Empty to start from beginning
           limit: 100, // Get up to 100 pools
           direction: 0, // ascending
         });
 
-        const transaction = new Transaction({ provider });
-        const fogataPoolContract = new Contract({
-          id: listPoolsResult?.value[0]?.account as string,
+        const multicall = new Multicall({
           provider,
-          abi: abiFogataPool,
+          contracts: listPoolsResult?.value.map((pool: { account: string }) => new Contract({
+            id: pool.account,
+            provider,
+            abi: abiFogataPool,
+          })),
         });
-
-        for (const pool of listPoolsResult?.value) {
-          fogataPoolContract.id = utils.decodeBase58(pool.account as string);
-          await transaction.pushOperation(fogataPoolContract.functions.get_pool_params, {});
+        for (const contract of multicall.contracts) {
+          await multicall.add(contract.functions.get_pool_params, {});
         }
-
-        const multicallContract = new Contract({
-          id: MULTICALL_CONTRACT_ID,
-          provider,
-          abi: abiMulticall,
-        });
-        const { result: multicallResult } = await multicallContract.functions.get({
-          calls: transaction.transaction.operations!.map((op) => op.call_contract),
-        });
-        
-        const poolParams = await Promise.all(multicallResult!.results.map(async (result: any, index: number) => {
-          const decoded = await fogataPoolContract.serializer!.deserialize(result.res.object, "fogata.pool_params");
+        const poolParams = (await multicall.call()).map((result, i) => {
           return {
-            ...decoded,
-            ...listPoolsResult!.value[index]!,
-          };
-        }));
+            ...result,
+            ...listPoolsResult?.value[i],
+          } as Pool;
+        });
+        const apy = await getNetworkApy(provider);
+        setNetworkApy(apy);
         setPools(poolParams);
       } catch (err) {
         console.error("Error fetching pools:", err);
@@ -137,26 +156,27 @@ export default function Fogata1Page() {
           {pools.map((pool, index) => {
             const address = pool.account;
             const submissionDate = pool.submission_time
-              ? new Date(Number(pool.submission_time) / 1000).toLocaleDateString()
+              ? new Date(Number(pool.submission_time)).toLocaleDateString()
               : "N/A";
-            const approvalDate = pool.approval_time && pool.approval_time !== "0"
-              ? new Date(Number(pool.approval_time) / 1000).toLocaleDateString()
-              : "Pending approval";
             const paymentPeriod = pool.payment_period
               ? `${Number(pool.payment_period) / 1000 / 86400} days`
               : "N/A";
+            const poolApy =
+              networkApy !== null
+                ? computePoolApy(networkApy, pool.beneficiaries ?? [])
+                : null;
 
             return (
               <Card key={`${address}-${index}`} className="border border-border/60 overflow-hidden">
                 {/* Pool Image */}
                 {pool.image && (
                   <div className="relative h-48 w-full overflow-hidden bg-muted">
-                    <Image
+                    {/* Plain <img>: pool image hosts are arbitrary on-chain URLs */}
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
                       src={pool.image}
                       alt={pool.name || "Pool image"}
-                      fill
-                      sizes="(max-width: 768px) 100vw, 50vw"
-                      className="object-cover"
+                      className="h-full w-full object-cover"
                       onError={(e) => {
                         e.currentTarget.style.display = "none";
                       }}
@@ -165,9 +185,16 @@ export default function Fogata1Page() {
                 )}
                 
                 <CardHeader>
-                  <CardTitle className="text-xl font-semibold">
-                    {pool.name || "Unnamed Pool"}
-                  </CardTitle>
+                  <div className="flex items-start justify-between gap-3">
+                    <CardTitle className="text-xl font-semibold">
+                      {pool.name || "Unnamed Pool"}
+                    </CardTitle>
+                    {poolApy !== null && (
+                      <Badge variant="default" className="flex-shrink-0">
+                        {poolApy.toFixed(2)}% APY
+                      </Badge>
+                    )}
+                  </div>
                   {pool.description && (
                     <CardDescription className="line-clamp-2">
                       {pool.description}
@@ -212,7 +239,7 @@ export default function Fogata1Page() {
                               {beneficiary.address}
                             </span>
                             <Badge variant="secondary" className="flex-shrink-0">
-                              {beneficiary.percentage}%
+                              {beneficiary.percentage / 1000}%
                             </Badge>
                           </div>
                         ))}
@@ -226,14 +253,10 @@ export default function Fogata1Page() {
                       <span>Submitted:</span>
                       <span>{submissionDate}</span>
                     </div>
-                    <div className="flex justify-between">
-                      <span>Status:</span>
-                      <span>{approvalDate}</span>
-                    </div>
                   </div>
 
-                  <Button variant="outline" className="w-full" disabled>
-                    Join pool (coming soon)
+                  <Button variant="outline" className="w-full" asChild>
+                    <Link href={`/dapps/fogata/${address}`}>Manage pool</Link>
                   </Button>
                 </CardContent>
               </Card>

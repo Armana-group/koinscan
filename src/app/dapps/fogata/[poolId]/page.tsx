@@ -2,13 +2,16 @@
 
 import { Contract, Multicall, ProviderInterface, utils } from "koilib";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Plus, Trash2 } from "lucide-react";
 
-import { abiFogataPool } from "@/koinos/abis/fogataPool";
+import { abiFogata2Pool } from "@/koinos/abis/fogata2Pool";
 import tokenAbi from "@/koinos/abi";
+import { abiFogata2ListPools } from "@/koinos/abis/fogata2ListPools";
+import { abiPob } from "@/koinos/abis";
 import {
+  FOGATA2_LIST_POOLS_CONTRACT_ID,
   KOIN_CONTRACT_ID,
   POB_CONTRACT_ID,
   VHP_CONTRACT_ID,
@@ -35,7 +38,13 @@ interface PoolParams {
   name: string;
   image: string;
   description: string;
+  beneficiaries: Beneficiary[];
   payment_period: string;
+}
+
+interface Beneficiary {
+  address: string;
+  percentage: number;
 }
 
 interface PoolBalance {
@@ -85,8 +94,8 @@ async function fetchWalletBalances(
   const [koinResult, vhpResult] = await multicall.call();
 
   return {
-    koin: koinResult?.value ?? "0",
-    vhp: vhpResult?.value ?? "0",
+    koin: (koinResult as { value?: string } | undefined)?.value ?? "0",
+    vhp: (vhpResult as { value?: string } | undefined)?.value ?? "0",
   };
 }
 
@@ -98,9 +107,9 @@ async function fetchPoolBalance(
   const poolContract = new Contract({
     id: poolId,
     provider,
-    abi: abiFogataPool,
+    abi: abiFogata2Pool,
   });
-  const { result } = await poolContract.functions.balance_of({ account });
+  const { result } = await poolContract.functions.balance_of({ value: account });
   return {
     koin_amount: result?.koin_amount ?? "0",
     vhp_amount: result?.vhp_amount ?? "0",
@@ -110,6 +119,7 @@ async function fetchPoolBalance(
 
 export default function FogataPoolPage() {
   const params = useParams<{ poolId: string }>();
+  const router = useRouter();
   const poolId = params.poolId;
   const { provider, signer, savedAddress } = useWallet();
 
@@ -119,16 +129,28 @@ export default function FogataPoolPage() {
   const [walletBalances, setWalletBalances] = useState<{ koin: string; vhp: string } | null>(null);
   const [poolBalance, setPoolBalance] = useState<PoolBalance | null>(null);
   const [preferences, setPreferences] = useState<CollectKoinPreferences | null>(null);
+  const [poolOwner, setPoolOwner] = useState<string | null>(null);
+  const [reservedKoin, setReservedKoin] = useState("0");
+  const [registeredPublicKey, setRegisteredPublicKey] = useState("");
 
   const [koinDeposit, setKoinDeposit] = useState("");
   const [vhpDeposit, setVhpDeposit] = useState("");
   const [koinWithdraw, setKoinWithdraw] = useState("");
   const [vhpWithdraw, setVhpWithdraw] = useState("");
   const [percentageKoin, setPercentageKoin] = useState("100");
+  const [poolName, setPoolName] = useState("");
+  const [poolImage, setPoolImage] = useState("");
+  const [poolDescription, setPoolDescription] = useState("");
+  const [reburnPeriodDays, setReburnPeriodDays] = useState("");
+  const [beneficiaries, setBeneficiaries] = useState<Beneficiary[]>([]);
+  const [reservedKoinAmount, setReservedKoinAmount] = useState("");
+  const [publicKey, setPublicKey] = useState("");
+  const [deleteConfirmation, setDeleteConfirmation] = useState("");
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const isOwner = Boolean(account && poolOwner && account === poolOwner);
 
   const loadData = useCallback(async () => {
     if (!provider || !poolId) return;
@@ -140,16 +162,46 @@ export default function FogataPoolPage() {
       const poolContract = new Contract({
         id: poolId,
         provider,
-        abi: abiFogataPool,
+        abi: abiFogata2Pool,
       });
-      const { result: paramsResult } = await poolContract.functions.get_pool_params({});
-      setPoolParams(paramsResult as PoolParams);
+      const pobContract = new Contract({
+        id: POB_CONTRACT_ID,
+        provider,
+        abi: abiPob,
+      });
+      const publicKeyRequest = pobContract.functions
+        .get_public_key({ producer: poolId })
+        .catch((err) => {
+          console.info("No public key registered for this pool:", err);
+          return null;
+        });
+      const [paramsResponse, ownerResponse, reservedResponse, publicKeyResponse] =
+        await Promise.all([
+          poolContract.functions.get_pool_params({}),
+          poolContract.functions.get_owner({}),
+          poolContract.functions.get_all_reserved_koin({}),
+          publicKeyRequest,
+        ]);
+      const paramsResult = paramsResponse.result as PoolParams;
+      setPoolParams(paramsResult);
+      setPoolOwner(ownerResponse.result?.value ?? null);
+      setReservedKoin(reservedResponse.result?.value ?? "0");
+      setRegisteredPublicKey(publicKeyResponse?.result?.value ?? "");
+      setPoolName(paramsResult.name ?? "");
+      setPoolImage(paramsResult.image ?? "");
+      setPoolDescription(paramsResult.description ?? "");
+      setBeneficiaries(paramsResult.beneficiaries ?? []);
+      setReburnPeriodDays(
+        paramsResult.payment_period
+          ? String(Number(paramsResult.payment_period) / 1000 / 86400)
+          : ""
+      );
 
       if (account) {
         const [balances, staked, prefsResult] = await Promise.all([
           fetchWalletBalances(provider, account),
           fetchPoolBalance(provider, poolId, account),
-          poolContract.functions.get_collect_koin_preferences({ account }),
+          poolContract.functions.get_collect_koin_preferences({ value: account }),
         ]);
         setWalletBalances(balances);
         setPoolBalance(staked);
@@ -228,7 +280,7 @@ export default function FogataPoolPage() {
         id: poolId,
         signer,
         provider,
-        abi: abiFogataPool,
+        abi: abiFogata2Pool,
       });
       const { transaction, receipt } = await poolContract.functions.stake(
         { account: userAccount, koin_amount: koinAmount, vhp_amount: vhpAmount },
@@ -269,7 +321,7 @@ export default function FogataPoolPage() {
         id: poolId,
         signer,
         provider,
-        abi: abiFogataPool,
+        abi: abiFogata2Pool,
       });
       const { transaction, receipt } = await poolContract.functions.unstake(
         { account: userAccount, koin_amount: koinAmount, vhp_amount: vhpAmount },
@@ -308,7 +360,7 @@ export default function FogataPoolPage() {
         id: poolId,
         signer,
         provider,
-        abi: abiFogataPool,
+        abi: abiFogata2Pool,
       });
       console.log("provider", provider);
       const { transaction, receipt } =
@@ -329,6 +381,212 @@ export default function FogataPoolPage() {
       toast.dismiss(loadingToast);
       toast.error(err instanceof Error ? err.message : "Failed to save preferences");
     } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const requireOwner = (): string | null => {
+    const userAccount = requireWallet();
+    if (!userAccount) return null;
+    if (userAccount !== poolOwner) {
+      toast.error("Only the pool owner can perform this action");
+      return null;
+    }
+    return userAccount;
+  };
+
+  const handleSavePoolParams = async () => {
+    if (!requireOwner() || !provider) return;
+
+    const days = Number(reburnPeriodDays);
+    const totalBeneficiaryPercentage = beneficiaries.reduce(
+      (sum, beneficiary) => sum + beneficiary.percentage,
+      0
+    );
+    if (!poolName.trim()) {
+      toast.error("Pool name is required");
+      return;
+    }
+    if (!Number.isFinite(days) || days <= 0) {
+      toast.error("Reburn period must be greater than zero");
+      return;
+    }
+    if (
+      beneficiaries.some(
+        (beneficiary) =>
+          !beneficiary.address.trim() ||
+          !Number.isFinite(beneficiary.percentage) ||
+          beneficiary.percentage <= 0
+      )
+    ) {
+      toast.error("Each beneficiary needs an address and a positive percentage");
+      return;
+    }
+    if (totalBeneficiaryPercentage > 100_000) {
+      toast.error("Beneficiary percentages cannot exceed 100%");
+      return;
+    }
+
+    setSubmitting(true);
+    const loadingToast = toast.loading("Updating pool parameters...");
+    try {
+      const poolContract = new Contract({
+        id: poolId,
+        signer,
+        provider,
+        abi: abiFogata2Pool,
+      });
+      const { transaction, receipt } =
+        await poolContract.functions.set_pool_params({
+          name: poolName.trim(),
+          image: poolImage.trim(),
+          description: poolDescription.trim(),
+          beneficiaries: beneficiaries.map((beneficiary) => ({
+            address: beneficiary.address.trim(),
+            percentage: beneficiary.percentage,
+          })),
+          payment_period: String(Math.round(days * 86_400_000)),
+        });
+      if (receipt?.reverted) throw new Error("Transaction reverted");
+      await transaction?.wait();
+      toast.dismiss(loadingToast);
+      toast.success("Pool parameters updated");
+      await loadData();
+    } catch (err) {
+      toast.dismiss(loadingToast);
+      toast.error(err instanceof Error ? err.message : "Failed to update pool");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleReservedKoin = async (action: "add" | "remove") => {
+    const owner = requireOwner();
+    if (!owner || !provider) return;
+
+    const amount = toBaseUnits(reservedKoinAmount);
+    if (amount === "0") {
+      toast.error("Enter a KOIN amount");
+      return;
+    }
+    if (action === "remove" && BigInt(amount) > BigInt(reservedKoin)) {
+      toast.error("Amount exceeds the pool's reserved KOIN");
+      return;
+    }
+
+    setSubmitting(true);
+    const loadingToast = toast.loading(
+      action === "add" ? "Adding reserved KOIN..." : "Removing reserved KOIN..."
+    );
+    try {
+      const poolContract = new Contract({
+        id: poolId,
+        signer,
+        provider,
+        abi: abiFogata2Pool,
+      });
+      let response;
+      if (action === "add") {
+        const koinContract = new Contract({
+          id: KOIN_CONTRACT_ID,
+          signer,
+          provider,
+          abi: utils.tokenAbi,
+        });
+        const { operation: approveOperation } =
+          await koinContract.functions.approve(
+            { owner, spender: poolId, value: amount },
+            { onlyOperation: true }
+          );
+        response = await poolContract.functions.add_reserved_koin(
+          { account: owner, koin_amount: amount },
+          { previousOperations: [approveOperation] }
+        );
+      } else {
+        response = await poolContract.functions.remove_reserved_koin({
+          account: owner,
+          koin_amount: amount,
+        });
+      }
+      if (response.receipt?.reverted) throw new Error("Transaction reverted");
+      await response.transaction?.wait();
+      toast.dismiss(loadingToast);
+      toast.success(
+        action === "add" ? "Reserved KOIN added" : "Reserved KOIN removed"
+      );
+      setReservedKoinAmount("");
+      await loadData();
+    } catch (err) {
+      toast.dismiss(loadingToast);
+      toast.error(
+        err instanceof Error ? err.message : `Failed to ${action} reserved KOIN`
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleRegisterPublicKey = async () => {
+    if (!requireOwner() || !provider) return;
+    const normalizedPublicKey = publicKey.trim();
+    if (!normalizedPublicKey) {
+      toast.error("Enter the node operator public key");
+      return;
+    }
+
+    setSubmitting(true);
+    const loadingToast = toast.loading("Registering public key...");
+    try {
+      const pobContract = new Contract({
+        id: POB_CONTRACT_ID,
+        signer,
+        provider,
+        abi: abiPob,
+      });
+      const { transaction, receipt } =
+        await pobContract.functions.register_public_key({
+          producer: poolId,
+          public_key: normalizedPublicKey,
+        });
+      if (receipt?.reverted) throw new Error("Transaction reverted");
+      await transaction?.wait();
+      toast.dismiss(loadingToast);
+      toast.success("Public key registered");
+      setPublicKey("");
+      await loadData();
+    } catch (err) {
+      toast.dismiss(loadingToast);
+      toast.error(
+        err instanceof Error ? err.message : "Failed to register public key"
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleDeletePool = async () => {
+    if (!requireOwner() || !provider || deleteConfirmation !== poolId) return;
+
+    setSubmitting(true);
+    const loadingToast = toast.loading("Removing pool from the Fogata list...");
+    try {
+      const listContract = new Contract({
+        id: FOGATA2_LIST_POOLS_CONTRACT_ID,
+        signer,
+        provider,
+        abi: abiFogata2ListPools,
+      });
+      const { transaction, receipt } = await listContract.functions.remove_pool({
+        value: poolId,
+      });
+      if (receipt?.reverted) throw new Error("Transaction reverted");
+      await transaction?.wait();
+      toast.dismiss(loadingToast);
+      toast.success("Pool removed from the Fogata list");
+      router.push("/dapps/fogata");
+    } catch (err) {
+      toast.dismiss(loadingToast);
+      toast.error(err instanceof Error ? err.message : "Failed to remove pool");
       setSubmitting(false);
     }
   };
@@ -394,16 +652,21 @@ export default function FogataPoolPage() {
           {!account && (
             <Alert>
               <AlertDescription>
-                Connect your wallet to deposit, withdraw, or configure this pool.
+                Connect your wallet to deposit, withdraw, or manage this pool.
               </AlertDescription>
             </Alert>
           )}
 
           <Tabs defaultValue="deposit">
-            <TabsList className="grid w-full grid-cols-3">
+            <TabsList
+              className={`grid w-full ${isOwner ? "grid-cols-4" : "grid-cols-3"}`}
+            >
               <TabsTrigger value="deposit">Deposit</TabsTrigger>
               <TabsTrigger value="withdraw">Withdraw</TabsTrigger>
-              <TabsTrigger value="configure">Configure</TabsTrigger>
+              <TabsTrigger value="rewards">Rewards</TabsTrigger>
+              {isOwner && (
+                <TabsTrigger value="configure">Configure</TabsTrigger>
+              )}
             </TabsList>
 
             <TabsContent value="deposit">
@@ -571,10 +834,10 @@ export default function FogataPoolPage() {
               </Card>
             </TabsContent>
 
-            <TabsContent value="configure">
+            <TabsContent value="rewards">
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-lg">Configure</CardTitle>
+                  <CardTitle className="text-lg">Reward preferences</CardTitle>
                   <CardDescription>
                     Set how rewards are collected from this pool.
                   </CardDescription>
@@ -611,6 +874,311 @@ export default function FogataPoolPage() {
                 </CardContent>
               </Card>
             </TabsContent>
+
+            {isOwner && (
+              <TabsContent value="configure" className="space-y-6">
+                <Alert>
+                  <AlertDescription>
+                    You are connected as this pool&apos;s owner. The settings
+                    below modify the pool on-chain.
+                  </AlertDescription>
+                </Alert>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Pool parameters</CardTitle>
+                    <CardDescription>
+                      Update the public details, beneficiaries, and reburn
+                      period using the pool&apos;s set_pool_params function.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="pool-name">Name</Label>
+                      <Input
+                        id="pool-name"
+                        value={poolName}
+                        onChange={(event) => setPoolName(event.target.value)}
+                        disabled={submitting}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="pool-image">Image URL</Label>
+                      <Input
+                        id="pool-image"
+                        type="url"
+                        value={poolImage}
+                        onChange={(event) => setPoolImage(event.target.value)}
+                        disabled={submitting}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="pool-description">Description</Label>
+                      <textarea
+                        id="pool-description"
+                        value={poolDescription}
+                        onChange={(event) =>
+                          setPoolDescription(event.target.value)
+                        }
+                        disabled={submitting}
+                        rows={4}
+                        className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="reburn-period">Reburn period (days)</Label>
+                      <Input
+                        id="reburn-period"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={reburnPeriodDays}
+                        onChange={(event) =>
+                          setReburnPeriodDays(event.target.value)
+                        }
+                        disabled={submitting}
+                      />
+                    </div>
+
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <Label>Beneficiaries</Label>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() =>
+                            setBeneficiaries((current) => [
+                              ...current,
+                              { address: "", percentage: 0 },
+                            ])
+                          }
+                          disabled={submitting}
+                        >
+                          <Plus className="mr-2 h-4 w-4" />
+                          Add
+                        </Button>
+                      </div>
+                      {beneficiaries.length === 0 && (
+                        <p className="text-sm text-muted-foreground">
+                          No beneficiaries configured.
+                        </p>
+                      )}
+                      {beneficiaries.map((beneficiary, index) => (
+                        <div
+                          key={index}
+                          className="grid gap-2 rounded-md border p-3 sm:grid-cols-[1fr_8rem_auto]"
+                        >
+                          <Input
+                            aria-label={`Beneficiary ${index + 1} address`}
+                            placeholder="Beneficiary address"
+                            value={beneficiary.address}
+                            onChange={(event) =>
+                              setBeneficiaries((current) =>
+                                current.map((item, itemIndex) =>
+                                  itemIndex === index
+                                    ? { ...item, address: event.target.value }
+                                    : item
+                                )
+                              )
+                            }
+                            disabled={submitting}
+                          />
+                          <Input
+                            aria-label={`Beneficiary ${index + 1} percentage`}
+                            type="number"
+                            min="0"
+                            max="100"
+                            step="0.001"
+                            placeholder="%"
+                            value={beneficiary.percentage / 1000}
+                            onChange={(event) =>
+                              setBeneficiaries((current) =>
+                                current.map((item, itemIndex) =>
+                                  itemIndex === index
+                                    ? {
+                                        ...item,
+                                        percentage: Math.round(
+                                          Number(event.target.value) * 1000
+                                        ),
+                                      }
+                                    : item
+                                )
+                              )
+                            }
+                            disabled={submitting}
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            aria-label={`Remove beneficiary ${index + 1}`}
+                            onClick={() =>
+                              setBeneficiaries((current) =>
+                                current.filter(
+                                  (_, itemIndex) => itemIndex !== index
+                                )
+                              )
+                            }
+                            disabled={submitting}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
+                      <p className="text-xs text-muted-foreground">
+                        Total beneficiary share:{" "}
+                        {beneficiaries.reduce(
+                          (sum, beneficiary) =>
+                            sum + beneficiary.percentage,
+                          0
+                        ) / 1000}
+                        %
+                      </p>
+                    </div>
+
+                    <Button
+                      className="w-full"
+                      onClick={handleSavePoolParams}
+                      disabled={submitting}
+                    >
+                      {submitting ? "Saving..." : "Save pool parameters"}
+                    </Button>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">
+                      Manage reserved KOIN
+                    </CardTitle>
+                    <CardDescription>
+                      Reserved KOIN provides mana for operating the pool and is
+                      not burned. Lower reburn periods require more frequent
+                      operations, so more reserved KOIN is recommended. As a
+                      base reference, use about 2,000 KOIN for a 4-day reburn
+                      period.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <p className="text-sm">
+                      <span className="text-muted-foreground">
+                        Currently reserved:{" "}
+                      </span>
+                      {formatAmount(reservedKoin)} KOIN
+                    </p>
+                    <div className="space-y-2">
+                      <Label htmlFor="reserved-koin-amount">KOIN amount</Label>
+                      <Input
+                        id="reserved-koin-amount"
+                        type="number"
+                        min="0"
+                        step="any"
+                        placeholder="0"
+                        value={reservedKoinAmount}
+                        onChange={(event) =>
+                          setReservedKoinAmount(event.target.value)
+                        }
+                        disabled={submitting}
+                      />
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <Button
+                        onClick={() => handleReservedKoin("add")}
+                        disabled={submitting}
+                      >
+                        Add reserved KOIN
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => handleReservedKoin("remove")}
+                        disabled={submitting}
+                      >
+                        Remove reserved KOIN
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">
+                      Register node operator public key
+                    </CardTitle>
+                    <CardDescription>
+                      Register the public key from{" "}
+                      <code>.koinos/block_producer/public.key</code>. Also set
+                      the <code>producer</code> field in the{" "}
+                      <code>block_producer</code> section of your node&apos;s{" "}
+                      <code>config.yml</code> to this pool address.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {registeredPublicKey && (
+                      <div className="space-y-1">
+                        <p className="text-xs text-muted-foreground">
+                          Currently registered public key
+                        </p>
+                        <p className="break-all font-mono text-xs">
+                          {registeredPublicKey}
+                        </p>
+                      </div>
+                    )}
+                    <div className="space-y-2">
+                      <Label htmlFor="public-key">Public key</Label>
+                      <Input
+                        id="public-key"
+                        value={publicKey}
+                        onChange={(event) => setPublicKey(event.target.value)}
+                        placeholder="Paste the contents of public.key"
+                        disabled={submitting}
+                      />
+                    </div>
+                    <Button
+                      className="w-full"
+                      onClick={handleRegisterPublicKey}
+                      disabled={submitting}
+                    >
+                      Register public key
+                    </Button>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-destructive/50">
+                  <CardHeader>
+                    <CardTitle className="text-lg text-destructive">
+                      Remove pool
+                    </CardTitle>
+                    <CardDescription>
+                      Remove this pool from the Fogata pool list. This does not
+                      delete the deployed pool contract. Enter the pool address
+                      to confirm.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <Input
+                      aria-label="Pool address confirmation"
+                      value={deleteConfirmation}
+                      onChange={(event) =>
+                        setDeleteConfirmation(event.target.value)
+                      }
+                      placeholder={poolId}
+                      disabled={submitting}
+                    />
+                    <Button
+                      variant="destructive"
+                      className="w-full"
+                      onClick={handleDeletePool}
+                      disabled={
+                        submitting || deleteConfirmation !== poolId
+                      }
+                    >
+                      Remove pool from Fogata
+                    </Button>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            )}
           </Tabs>
         </div>
       )}

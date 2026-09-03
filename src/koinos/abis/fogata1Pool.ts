@@ -1,6 +1,6 @@
 import { Abi } from "koilib";
 
-export const abiFogataPool: Abi = {
+export const abiFogata1Pool: Abi = {
   "methods": {
     "authorize": {
       "argument": "authority.authorize_arguments",

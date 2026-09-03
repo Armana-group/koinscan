@@ -41,18 +41,24 @@ import {
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useWallet } from "@/contexts/WalletContext";
+import tokenAbi from "@/koinos/abi";
 import { abiDexKoinVhp } from "@/koinos/abis/dexKoinVhp";
+import { abiFogata2ListPools } from "@/koinos/abis/fogata2ListPools";
+import { abiFogata2Pool } from "@/koinos/abis/fogata2Pool";
 import {
+  FOGATA2_LIST_POOLS_CONTRACT_ID,
   KOIN_CONTRACT_ID,
   KOIN_VHP_DEX_CONTRACT_ID,
   VHP_CONTRACT_ID,
 } from "@/koinos/constants";
+import { cn } from "@/lib/utils";
 import * as toast from "@/lib/toast";
 
 const DECIMALS = 8;
 const TIERS = Array.from({ length: 17 }, (_, index) => index + 1);
 // A single 17-tier call exceeds the chain's compute-bandwidth limit.
 const TIERS_PER_MULTICALL = 4;
+const NO_POOL_VALUE = "__wallet__";
 
 interface DexOrder {
   id: string;
@@ -62,6 +68,22 @@ interface DexOrder {
   koin_amount: string;
   vhp_amount: string;
   tier: number;
+}
+
+interface MiningPool {
+  account: string;
+  name: string;
+}
+
+interface WalletBalances {
+  koin: string;
+  vhp: string;
+}
+
+interface PoolBalance {
+  koin_amount: string;
+  vhp_amount: string;
+  vapor_amount: string;
 }
 
 interface OrdersResult {
@@ -88,6 +110,17 @@ function formatAmount(raw: string, maximumFractionDigits = 8): string {
     .slice(0, maximumFractionDigits)
     .replace(/0+$/, "");
   return `${whole.toLocaleString()}${fraction ? `.${fraction}` : ""}`;
+}
+
+function formatAmountForInput(raw: string): string {
+  const amount = BigInt(raw || "0");
+  const scale = BigInt(100_000_000);
+  const whole = amount / scale;
+  const fraction = (amount % scale)
+    .toString()
+    .padStart(DECIMALS, "0")
+    .replace(/0+$/, "");
+  return fraction ? `${whole}.${fraction}` : whole.toString();
 }
 
 function formatPrice(order: DexOrder): string {
@@ -172,6 +205,94 @@ async function fetchOrdersByOwner(
   });
 }
 
+async function fetchMiningPools(
+  provider: ProviderInterface
+): Promise<MiningPool[]> {
+  const listPoolsContract = new Contract({
+    id: FOGATA2_LIST_POOLS_CONTRACT_ID,
+    provider,
+    abi: abiFogata2ListPools,
+  });
+  const { result: listPoolsResult } = await listPoolsContract.functions.get_pools({
+    start: "",
+    limit: 100,
+    direction: 0,
+  });
+  const listedPools = (listPoolsResult?.value ?? []) as { account: string }[];
+  if (listedPools.length === 0) return [];
+
+  const multicall = new Multicall({
+    provider,
+    contracts: listedPools.map(
+      (listedPool) =>
+        new Contract({
+          id: listedPool.account,
+          provider,
+          abi: abiFogata2Pool,
+        })
+    ),
+  });
+  for (const contract of multicall.contracts) {
+    await multicall.add(contract.functions.get_pool_params, {});
+  }
+  const poolParams = await multicall.call();
+  return listedPools.map((listedPool, index) => ({
+    account: listedPool.account,
+    name:
+      (poolParams[index] as { name?: string } | undefined)?.name
+      || "Unnamed Pool",
+  }));
+}
+
+async function fetchWalletBalances(
+  provider: ProviderInterface,
+  owner: string
+): Promise<WalletBalances> {
+  const koinContract = new Contract({
+    id: KOIN_CONTRACT_ID,
+    provider,
+    abi: tokenAbi,
+  });
+  const vhpContract = new Contract({
+    id: VHP_CONTRACT_ID,
+    provider,
+    abi: tokenAbi,
+  });
+
+  const multicall = new Multicall({
+    provider,
+    contracts: [koinContract, vhpContract],
+  });
+  await multicall.add(koinContract.functions.balanceOf, { owner });
+  await multicall.add(vhpContract.functions.balanceOf, { owner });
+  const results = await multicall.call();
+  const koinResult = results[0] as { value?: string } | undefined;
+  const vhpResult = results[1] as { value?: string } | undefined;
+
+  return {
+    koin: koinResult?.value ?? "0",
+    vhp: vhpResult?.value ?? "0",
+  };
+}
+
+async function fetchPoolBalance(
+  provider: ProviderInterface,
+  poolId: string,
+  owner: string
+): Promise<PoolBalance> {
+  const poolContract = new Contract({
+    id: poolId,
+    provider,
+    abi: abiFogata2Pool,
+  });
+  const { result } = await poolContract.functions.balance_of({ value: owner });
+  return {
+    koin_amount: result?.koin_amount ?? "0",
+    vhp_amount: result?.vhp_amount ?? "0",
+    vapor_amount: result?.vapor_amount ?? "0",
+  };
+}
+
 export default function DexPage() {
   const { provider, signer, savedAddress } = useWallet();
   const account = signer?.getAddress() ?? savedAddress ?? null;
@@ -179,7 +300,14 @@ export default function DexPage() {
   const [sellOrders, setSellOrders] = useState<DexOrder[]>([]);
   const [buyOrders, setBuyOrders] = useState<DexOrder[]>([]);
   const [myOrders, setMyOrders] = useState<DexOrder[]>([]);
+  const [pools, setPools] = useState<MiningPool[]>([]);
+  const [walletBalances, setWalletBalances] = useState<WalletBalances | null>(
+    null
+  );
+  const [poolBalance, setPoolBalance] = useState<PoolBalance | null>(null);
   const [loading, setLoading] = useState(true);
+  const [poolsLoading, setPoolsLoading] = useState(false);
+  const [balancesLoading, setBalancesLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -191,10 +319,22 @@ export default function DexPage() {
   const [selectedOrder, setSelectedOrder] = useState<DexOrder | null>(null);
   const [fillAmount, setFillAmount] = useState("");
 
-  const newOrderTier = useMemo(() => {
-    const raw = parseAmount(vhpAmount);
-    return raw ? Math.min(raw.length, 17) : null;
-  }, [vhpAmount]);
+  const impliedPrice = useMemo(() => {
+    const koin = Number(koinAmount);
+    const vhp = Number(vhpAmount);
+    if (!Number.isFinite(koin) || !Number.isFinite(vhp) || koin <= 0 || vhp <= 0) {
+      return null;
+    }
+    return (koin / vhp).toLocaleString(undefined, { maximumFractionDigits: 8 });
+  }, [koinAmount, vhpAmount]);
+
+  const availablePayBalance = useMemo(() => {
+    if (side === "buy") return walletBalances?.koin ?? null;
+    if (pool) return poolBalance?.vhp_amount ?? null;
+    return walletBalances?.vhp ?? null;
+  }, [side, pool, walletBalances, poolBalance]);
+
+  const availablePaySymbol = side === "buy" ? "KOIN" : "VHP";
 
   const loadOrders = useCallback(async () => {
     if (!provider) return;
@@ -217,9 +357,55 @@ export default function DexPage() {
     }
   }, [provider, account]);
 
+  const loadBalances = useCallback(async () => {
+    if (!provider || !account) {
+      setWalletBalances(null);
+      setPoolBalance(null);
+      return;
+    }
+
+    setBalancesLoading(true);
+    try {
+      const [wallet, staked] = await Promise.all([
+        fetchWalletBalances(provider, account),
+        pool
+          ? fetchPoolBalance(provider, pool, account)
+          : Promise.resolve(null),
+      ]);
+      setWalletBalances(wallet);
+      setPoolBalance(staked);
+    } catch (err) {
+      console.error("Failed to load balances:", err);
+      setWalletBalances(null);
+      setPoolBalance(null);
+    } finally {
+      setBalancesLoading(false);
+    }
+  }, [provider, account, pool]);
+
   useEffect(() => {
     loadOrders();
   }, [loadOrders]);
+
+  useEffect(() => {
+    const loadPools = async () => {
+      if (!provider) return;
+      setPoolsLoading(true);
+      try {
+        setPools(await fetchMiningPools(provider));
+      } catch (err) {
+        console.error("Failed to load mining pools:", err);
+        setPools([]);
+      } finally {
+        setPoolsLoading(false);
+      }
+    };
+    loadPools();
+  }, [provider]);
+
+  useEffect(() => {
+    loadBalances();
+  }, [loadBalances]);
 
   const requireWallet = () => {
     if (!account || !signer || !provider) {
@@ -238,8 +424,23 @@ export default function DexPage() {
       toast.error("Enter valid KOIN and VHP amounts (up to 8 decimals)");
       return;
     }
+    if (BigInt(koinRaw) > BigInt(vhpRaw)) {
+      toast.error("KOIN amount cannot be greater than VHP amount");
+      return;
+    }
     if (vhpRaw.length > 17) {
       toast.error("The VHP amount exceeds the supported tier range");
+      return;
+    }
+
+    const offeredRaw = side === "buy" ? koinRaw : vhpRaw;
+    if (
+      availablePayBalance !== null
+      && BigInt(offeredRaw) > BigInt(availablePayBalance)
+    ) {
+      toast.error(
+        `Insufficient ${availablePaySymbol} balance. Available: ${formatAmount(availablePayBalance)}`
+      );
       return;
     }
 
@@ -249,7 +450,18 @@ export default function DexPage() {
       const previousOperations = [];
       const usesPoolVhp = side === "sell" && pool.trim().length > 0;
 
-      if (!usesPoolVhp) {
+      if (usesPoolVhp) {
+        const poolContract = new Contract({
+          id: pool.trim(),
+          provider,
+          abi: abiFogata2Pool,
+        });
+        const { operation } = await poolContract.functions.set_allow_dex_to_unstake({
+          account,
+          allow_dex_to_unstake: true,
+        }, { onlyOperation: true });
+        if (operation) previousOperations.push(operation);
+      } else {
         const offeredToken = new Contract({
           id: side === "buy" ? KOIN_CONTRACT_ID : VHP_CONTRACT_ID,
           signer,
@@ -293,7 +505,7 @@ export default function DexPage() {
       setKoinAmount("");
       setVhpAmount("");
       setPool("");
-      await loadOrders();
+      await Promise.all([loadOrders(), loadBalances()]);
     } catch (err) {
       toast.dismiss(toastId);
       toast.error(err instanceof Error ? err.message : "Failed to create order");
@@ -367,7 +579,7 @@ export default function DexPage() {
       toast.dismiss(toastId);
       toast.success("Order filled");
       setSelectedOrder(null);
-      await loadOrders();
+      await Promise.all([loadOrders(), loadBalances()]);
     } catch (err) {
       toast.dismiss(toastId);
       toast.error(err instanceof Error ? err.message : "Failed to fill order");
@@ -408,9 +620,12 @@ export default function DexPage() {
   const renderOrders = (orders: DexOrder[], type: "buy" | "sell") => (
     <Card>
       <CardHeader>
-        <CardTitle className="text-lg capitalize">{type} orders</CardTitle>
+        <CardTitle className="text-lg capitalize">{type} VHP orders</CardTitle>
         <CardDescription>
-          Sorted by KOIN per VHP, with the best price first.
+         Orders that are {type === "buy" ? "buying VHP with KOIN" : "selling VHP for KOIN"}. By filling an order you pay {type === "buy" 
+            ? "VHP to get KOIN"
+            : "KOIN to get VHP"
+          }.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -458,6 +673,12 @@ export default function DexPage() {
     </Card>
   );
 
+  const getPoolLabel = (poolAddress: string) => {
+    if (!poolAddress) return "—";
+    const match = pools.find((miningPool) => miningPool.account === poolAddress);
+    return match?.name || poolAddress;
+  };
+
   const renderMyOrders = () => (
     <Card>
       <CardHeader>
@@ -483,6 +704,7 @@ export default function DexPage() {
                 <TableHead>Price</TableHead>
                 <TableHead>KOIN</TableHead>
                 <TableHead>VHP</TableHead>
+                <TableHead>Pool</TableHead>
                 <TableHead className="text-right">Action</TableHead>
               </TableRow>
             </TableHeader>
@@ -495,6 +717,7 @@ export default function DexPage() {
                   <TableCell>{formatPrice(order)}</TableCell>
                   <TableCell>{formatAmount(order.koin_amount)}</TableCell>
                   <TableCell>{formatAmount(order.vhp_amount)}</TableCell>
+                  <TableCell>{getPoolLabel(order.pool)}</TableCell>
                   <TableCell className="text-right">
                     <Button
                       size="sm"
@@ -543,72 +766,80 @@ export default function DexPage() {
           <CardHeader>
             <CardTitle>Create an order</CardTitle>
             <CardDescription>
-              Choose how much KOIN and VHP to exchange. The contract derives
-              the order tier from the VHP amount.
+              Set the amounts you pay and receive. The contract derives the
+              order tier from the VHP amount.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label>Order side</Label>
-                <Select
-                  value={side}
-                  onValueChange={(value) => setSide(value as "buy" | "sell")}
-                  disabled={submitting}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="sell">Sell VHP for KOIN</SelectItem>
-                    <SelectItem value="buy">Buy VHP with KOIN</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Calculated tier</Label>
-                <div className="flex h-9 items-center rounded-md border px-3 text-sm">
-                  {newOrderTier ?? "Enter a VHP amount"}
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="dex-koin-amount">KOIN amount</Label>
-                <Input
-                  id="dex-koin-amount"
-                  type="number"
-                  min="0"
-                  step="0.00000001"
-                  placeholder="0"
-                  value={koinAmount}
-                  onChange={(event) => setKoinAmount(event.target.value)}
-                  disabled={submitting}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="dex-vhp-amount">VHP amount</Label>
-                <Input
-                  id="dex-vhp-amount"
-                  type="number"
-                  min="0"
-                  step="0.00000001"
-                  placeholder="0"
-                  value={vhpAmount}
-                  onChange={(event) => setVhpAmount(event.target.value)}
-                  disabled={submitting}
-                />
-              </div>
+            <div
+              className="grid grid-cols-2 gap-1 rounded-lg bg-muted p-1"
+              role="group"
+              aria-label="Order side"
+            >
+              <button
+                type="button"
+                disabled={submitting}
+                onClick={() => setSide("sell")}
+                className={cn(
+                  "rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                  side === "sell"
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                Sell VHP
+              </button>
+              <button
+                type="button"
+                disabled={submitting}
+                onClick={() => {
+                  setSide("buy");
+                  setPool("");
+                }}
+                className={cn(
+                  "rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                  side === "buy"
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                Buy VHP
+              </button>
             </div>
 
             {side === "sell" && (
               <div className="space-y-2">
-                <Label htmlFor="dex-pool">Mining pool address (optional)</Label>
-                <Input
-                  id="dex-pool"
-                  placeholder="Leave empty to sell VHP from your wallet"
-                  value={pool}
-                  onChange={(event) => setPool(event.target.value)}
-                  disabled={submitting}
-                />
+                <Label htmlFor="dex-pool">Mining pool (optional)</Label>
+                <Select
+                  value={pool || NO_POOL_VALUE}
+                  onValueChange={(value) =>
+                    setPool(value === NO_POOL_VALUE ? "" : value)
+                  }
+                  disabled={submitting || poolsLoading}
+                >
+                  <SelectTrigger id="dex-pool">
+                    <SelectValue
+                      placeholder={
+                        poolsLoading
+                          ? "Loading pools..."
+                          : "Sell VHP from your wallet"
+                      }
+                    />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={NO_POOL_VALUE}>
+                      Sell VHP from your wallet
+                    </SelectItem>
+                    {pools.map((miningPool) => (
+                      <SelectItem
+                        key={miningPool.account}
+                        value={miningPool.account}
+                      >
+                        {miningPool.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 <p className="text-xs text-muted-foreground">
                   The pool must support DEX withdrawals and your pool settings
                   must allow the DEX to unstake VHP.
@@ -616,12 +847,100 @@ export default function DexPage() {
               </div>
             )}
 
+            <div className="space-y-3">
+              <div className="space-y-2">
+                <Label htmlFor="dex-pay-amount">
+                  {side === "sell" ? "VHP to pay" : "KOIN to pay"}
+                </Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="dex-pay-amount"
+                    type="number"
+                    min="0"
+                    step="0.00000001"
+                    placeholder="0"
+                    value={side === "sell" ? vhpAmount : koinAmount}
+                    onChange={(event) =>
+                      side === "sell"
+                        ? setVhpAmount(event.target.value)
+                        : setKoinAmount(event.target.value)
+                    }
+                    disabled={submitting}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={
+                      submitting
+                      || !availablePayBalance
+                      || balancesLoading
+                      || BigInt(availablePayBalance || "0") <= BigInt(0)
+                    }
+                    onClick={() => {
+                      if (!availablePayBalance) return;
+                      const maxValue = formatAmountForInput(availablePayBalance);
+                      if (side === "sell") setVhpAmount(maxValue);
+                      else setKoinAmount(maxValue);
+                    }}
+                  >
+                    Max
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {!account
+                    ? "Connect your wallet to see available balance"
+                    : balancesLoading
+                      ? "Loading available balance..."
+                      : availablePayBalance !== null
+                        ? `Available: ${formatAmount(availablePayBalance)} ${availablePaySymbol}${
+                            side === "sell" && pool ? " in pool" : ""
+                          }`
+                        : "Available balance unavailable"}
+                </p>
+              </div>
+
+              <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                <div className="h-px flex-1 bg-border" />
+                <span>
+                  {impliedPrice
+                    ? `${impliedPrice} KOIN / VHP`
+                    : "Price appears when both amounts are set"}
+                </span>
+                <div className="h-px flex-1 bg-border" />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="dex-get-amount">
+                  {side === "sell" ? "KOIN to get" : "VHP to get"}
+                </Label>
+                <Input
+                  id="dex-get-amount"
+                  type="number"
+                  min="0"
+                  step="0.00000001"
+                  placeholder="0"
+                  value={side === "sell" ? koinAmount : vhpAmount}
+                  onChange={(event) =>
+                    side === "sell"
+                      ? setKoinAmount(event.target.value)
+                      : setVhpAmount(event.target.value)
+                  }
+                  disabled={submitting}
+                />
+              </div>
+            </div>
+
             <Button
               className="w-full"
               onClick={handleCreateOrder}
               disabled={!account || submitting}
             >
-              {submitting ? "Submitting..." : "Create order"}
+              {submitting
+                ? "Submitting..."
+                : side === "sell"
+                  ? "Create sell order"
+                  : "Create buy order"}
             </Button>
           </CardContent>
         </Card>

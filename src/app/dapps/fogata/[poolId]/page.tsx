@@ -1,10 +1,25 @@
 "use client";
 
-import { Contract, Multicall, ProviderInterface, utils } from "koilib";
+import {
+  BlockHeaderJson,
+  Contract,
+  Multicall,
+  ProviderInterface,
+  utils,
+} from "koilib";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
-import { ArrowLeft, Plus, Trash2 } from "lucide-react";
+import {
+  Activity,
+  ArrowLeft,
+  CalendarClock,
+  Clock,
+  Coins,
+  Hash,
+  Plus,
+  Trash2,
+} from "lucide-react";
 
 import { abiFogata2Pool } from "@/koinos/abis/fogata2Pool";
 import tokenAbi from "@/koinos/abi";
@@ -58,10 +73,90 @@ interface CollectKoinPreferences {
   all_after_virtual: string;
 }
 
+interface PoolPerformance {
+  vhpAmount?: number;
+  averageTimeToProduce?: number;
+  expectedTimeToProduce?: number;
+  effectiveness?: number;
+  lastBlockHeight?: number;
+  lastBlockTime?: Date;
+}
+
+interface PoolState {
+  next_snapshot?: string;
+}
+
 function formatAmount(raw: string): string {
   const value = Number(raw) / SCALE;
   if (value === 0) return "0";
   return value.toLocaleString(undefined, { maximumFractionDigits: 8 });
+}
+
+function formatVhp(amount?: number): string {
+  if (amount === undefined) return "Unavailable";
+  if (amount >= 1e9) return `${(amount / 1e9).toFixed(2)}B VHP`;
+  if (amount >= 1e6) return `${(amount / 1e6).toFixed(2)}M VHP`;
+  if (amount >= 1e3) return `${(amount / 1e3).toFixed(2)}K VHP`;
+  return `${amount.toLocaleString(undefined, {
+    maximumFractionDigits: 2,
+  })} VHP`;
+}
+
+function formatDuration(milliseconds?: number): string {
+  if (
+    milliseconds === undefined ||
+    !Number.isFinite(milliseconds) ||
+    milliseconds < 0
+  ) {
+    return "Unavailable";
+  }
+
+  const seconds = Math.floor(milliseconds / 1000);
+  if (seconds < 60) return `${seconds}s`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ${seconds % 60}s`;
+  const hours = Math.floor(minutes / 60);
+  return `${hours}h ${minutes % 60}m`;
+}
+
+function formatTimeAgo(date?: Date): string {
+  if (!date) return "Never";
+
+  const difference = Math.floor((Date.now() - date.getTime()) / 1000);
+  const seconds = Math.abs(difference);
+  const relative =
+    seconds < 60
+      ? `${seconds}s`
+      : seconds < 3600
+        ? `${Math.floor(seconds / 60)}m`
+        : seconds < 86400
+          ? `${Math.floor(seconds / 3600)}h`
+          : `${Math.floor(seconds / 86400)}d`;
+
+  return difference < 0 ? `in ${relative}` : `${relative} ago`;
+}
+
+async function getRecentProducedBlocks(
+  provider: ProviderInterface,
+  producer: string
+): Promise<{ header: BlockHeaderJson }[]> {
+  const result = await provider.call<{
+    values?: {
+      block?: {
+        header: BlockHeaderJson;
+      };
+    }[];
+  }>("account_history.get_account_history", {
+    address: producer,
+    ascending: false,
+    limit: 30,
+    irreversible: false,
+    seq_num: null,
+  });
+
+  return (result.values ?? []).flatMap((entry) =>
+    entry.block ? [entry.block] : []
+  );
 }
 
 function toBaseUnits(amount: string): string {
@@ -70,51 +165,8 @@ function toBaseUnits(amount: string): string {
   return Math.floor(value * SCALE).toString();
 }
 
-async function fetchWalletBalances(
-  provider: ProviderInterface,
-  account: string
-): Promise<{ koin: string; vhp: string }> {
-  const koinContract = new Contract({
-    id: KOIN_CONTRACT_ID,
-    provider,
-    abi: tokenAbi,
-  });
-  const vhpContract = new Contract({
-    id: VHP_CONTRACT_ID,
-    provider,
-    abi: tokenAbi,
-  });
-
-  const multicall = new Multicall({
-    provider,
-    contracts: [koinContract, vhpContract],
-  });
-  await multicall.add(koinContract.functions.balanceOf, { owner: account });
-  await multicall.add(vhpContract.functions.balanceOf, { owner: account });
-  const [koinResult, vhpResult] = await multicall.call();
-
-  return {
-    koin: (koinResult as { value?: string } | undefined)?.value ?? "0",
-    vhp: (vhpResult as { value?: string } | undefined)?.value ?? "0",
-  };
-}
-
-async function fetchPoolBalance(
-  provider: ProviderInterface,
-  poolId: string,
-  account: string
-): Promise<PoolBalance> {
-  const poolContract = new Contract({
-    id: poolId,
-    provider,
-    abi: abiFogata2Pool,
-  });
-  const { result } = await poolContract.functions.balance_of({ value: account });
-  return {
-    koin_amount: result?.koin_amount ?? "0",
-    vhp_amount: result?.vhp_amount ?? "0",
-    vapor_amount: result?.vapor_amount ?? "0",
-  };
+function isMulticallError(result: unknown): result is Error {
+  return result instanceof Error;
 }
 
 export default function FogataPoolPage() {
@@ -132,6 +184,8 @@ export default function FogataPoolPage() {
   const [poolOwner, setPoolOwner] = useState<string | null>(null);
   const [reservedKoin, setReservedKoin] = useState("0");
   const [registeredPublicKey, setRegisteredPublicKey] = useState("");
+  const [performance, setPerformance] = useState<PoolPerformance>({});
+  const [nextPayment, setNextPayment] = useState<Date | null>(null);
 
   const [koinDeposit, setKoinDeposit] = useState("");
   const [vhpDeposit, setVhpDeposit] = useState("");
@@ -150,6 +204,7 @@ export default function FogataPoolPage() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [poolBalanceError, setPoolBalanceError] = useState<string | null>(null);
   const isOwner = Boolean(account && poolOwner && account === poolOwner);
 
   const loadData = useCallback(async () => {
@@ -169,23 +224,97 @@ export default function FogataPoolPage() {
         provider,
         abi: abiPob,
       });
-      const publicKeyRequest = pobContract.functions
-        .get_public_key({ producer: poolId })
-        .catch((err) => {
-          console.info("No public key registered for this pool:", err);
-          return null;
+      const koinContract = new Contract({
+        id: KOIN_CONTRACT_ID,
+        provider,
+        abi: tokenAbi,
+      });
+      const vhpContract = new Contract({
+        id: VHP_CONTRACT_ID,
+        provider,
+        abi: tokenAbi,
+      });
+      const multicall = new Multicall({
+        provider,
+        contracts: [poolContract, pobContract, koinContract, vhpContract],
+      });
+
+      await multicall.add(poolContract.functions.get_pool_params, {});
+      await multicall.add(poolContract.functions.get_owner, {});
+      await multicall.add(poolContract.functions.get_all_reserved_koin, {});
+      await multicall.add(vhpContract.functions.balanceOf, {
+        owner: poolId,
+      });
+      await multicall.add(pobContract.functions.get_metadata, {});
+      await multicall.add(poolContract.functions.get_pool_state, {});
+      if (account) {
+        await multicall.add(koinContract.functions.balanceOf, {
+          owner: account,
         });
-      const [paramsResponse, ownerResponse, reservedResponse, publicKeyResponse] =
+        await multicall.add(vhpContract.functions.balanceOf, {
+          owner: account,
+        });
+        await multicall.add(
+          poolContract.functions.get_collect_koin_preferences,
+          { value: account }
+        );
+      }
+
+      const publicKeyRequest = account
+        ? pobContract.functions
+            .get_public_key({ producer: poolId })
+            .catch((err) => {
+              console.info("No public key registered for this pool:", err);
+              return null;
+            })
+        : Promise.resolve(null);
+      const poolBalanceRequest = account
+        ? poolContract.functions
+            .balance_of({ value: account })
+            .then((response) => ({
+              result: response.result as Partial<PoolBalance> | undefined,
+              error: null,
+            }))
+            .catch((err) => ({
+              result: undefined,
+              error:
+                err instanceof Error
+                  ? err.message
+                  : "The pool contract could not return your balance",
+            }))
+        : Promise.resolve(null);
+
+      const recentBlocksRequest = getRecentProducedBlocks(provider, poolId).catch(
+        (err) => {
+          console.info("Unable to load recent blocks for this pool:", err);
+          return [];
+        }
+      );
+
+      const [results, publicKeyResponse, poolBalanceResponse, recentBlocks] =
         await Promise.all([
-          poolContract.functions.get_pool_params({}),
-          poolContract.functions.get_owner({}),
-          poolContract.functions.get_all_reserved_koin({}),
+          multicall.call(),
           publicKeyRequest,
+          poolBalanceRequest,
+          recentBlocksRequest,
         ]);
-      const paramsResult = paramsResponse.result as PoolParams;
+      const paramsResult = results[0] as PoolParams | Error;
+      const ownerResult = results[1] as { value?: string } | Error;
+      const reservedResult = results[2] as { value?: string } | Error;
+      const poolVhpResult = results[3] as { value?: string } | Error;
+      const metadataResult = results[4] as
+        | { value?: { difficulty?: string } }
+        | Error;
+      const poolStateResult = results[5] as PoolState | Error;
+
+      if (isMulticallError(paramsResult)) throw paramsResult;
+      if (isMulticallError(ownerResult)) throw ownerResult;
+
       setPoolParams(paramsResult);
-      setPoolOwner(ownerResponse.result?.value ?? null);
-      setReservedKoin(reservedResponse.result?.value ?? "0");
+      setPoolOwner(ownerResult.value ?? null);
+      setReservedKoin(
+        isMulticallError(reservedResult) ? "0" : (reservedResult.value ?? "0")
+      );
       setRegisteredPublicKey(publicKeyResponse?.result?.value ?? "");
       setPoolName(paramsResult.name ?? "");
       setPoolImage(paramsResult.image ?? "");
@@ -196,24 +325,137 @@ export default function FogataPoolPage() {
           ? String(Number(paramsResult.payment_period) / 1000 / 86400)
           : ""
       );
+      const nextSnapshot = isMulticallError(poolStateResult)
+        ? undefined
+        : Number(poolStateResult.next_snapshot);
+      setNextPayment(
+        nextSnapshot !== undefined &&
+          Number.isFinite(nextSnapshot) &&
+          nextSnapshot > 0
+          ? new Date(nextSnapshot)
+          : null
+      );
+
+      const vhpAmount = isMulticallError(poolVhpResult)
+        ? undefined
+        : Number(poolVhpResult.value ?? "0") / SCALE;
+      let expectedTimeToProduce: number | undefined;
+
+      if (
+        !isMulticallError(metadataResult) &&
+        metadataResult.value?.difficulty &&
+        vhpAmount !== undefined &&
+        vhpAmount > 0
+      ) {
+        const difficulty = Number(
+          "0x" +
+            utils.toHexString(
+              utils.decodeBase64url(metadataResult.value.difficulty)
+            )
+        );
+        const expected = (10 * difficulty) / (vhpAmount * SCALE);
+        if (Number.isFinite(expected)) expectedTimeToProduce = expected;
+      }
+
+      const newestBlock = recentBlocks[0];
+      const oldestBlock = recentBlocks[recentBlocks.length - 1];
+      const newestTime = newestBlock
+        ? Number(newestBlock.header.timestamp)
+        : undefined;
+      const oldestTime = oldestBlock
+        ? Number(oldestBlock.header.timestamp)
+        : undefined;
+      let averageTimeToProduce: number | undefined;
+
+      if (
+        newestTime !== undefined &&
+        oldestTime !== undefined &&
+        expectedTimeToProduce !== undefined
+      ) {
+        const timeSinceLastBlock = Date.now() - newestTime;
+        if (timeSinceLastBlock > expectedTimeToProduce) {
+          averageTimeToProduce =
+            (Date.now() - oldestTime) / recentBlocks.length;
+        } else if (recentBlocks.length > 1) {
+          averageTimeToProduce =
+            (newestTime - oldestTime) / (recentBlocks.length - 1);
+        }
+      }
+
+      const effectiveness =
+        expectedTimeToProduce !== undefined &&
+        averageTimeToProduce !== undefined &&
+        averageTimeToProduce > 0
+          ? (expectedTimeToProduce * 100) / averageTimeToProduce
+          : undefined;
+
+      setPerformance({
+        vhpAmount,
+        expectedTimeToProduce,
+        averageTimeToProduce,
+        effectiveness: Number.isFinite(effectiveness)
+          ? effectiveness
+          : undefined,
+        lastBlockHeight: newestBlock
+          ? Number(newestBlock.header.height)
+          : undefined,
+        lastBlockTime:
+          newestTime !== undefined ? new Date(newestTime) : undefined,
+      });
 
       if (account) {
-        const [balances, staked, prefsResult] = await Promise.all([
-          fetchWalletBalances(provider, account),
-          fetchPoolBalance(provider, poolId, account),
-          poolContract.functions.get_collect_koin_preferences({ value: account }),
-        ]);
-        setWalletBalances(balances);
-        setPoolBalance(staked);
-        if (prefsResult.result) {
-          const prefs = prefsResult.result as CollectKoinPreferences;
+        const koinResult = results[6] as { value?: string } | Error;
+        const vhpResult = results[7] as { value?: string } | Error;
+        const preferencesResult = results[8] as
+          | Partial<CollectKoinPreferences>
+          | Error;
+
+        if (isMulticallError(koinResult) || isMulticallError(vhpResult)) {
+          setWalletBalances(null);
+        } else {
+          setWalletBalances({
+            koin: koinResult.value ?? "0",
+            vhp: vhpResult.value ?? "0",
+          });
+        }
+
+        if (
+          !poolBalanceResponse?.result ||
+          poolBalanceResponse.result.koin_amount === undefined ||
+          poolBalanceResponse.result.vhp_amount === undefined
+        ) {
+          setPoolBalance(null);
+          setPoolBalanceError(
+            poolBalanceResponse?.error ??
+              "The pool contract could not return your balance"
+          );
+        } else {
+          setPoolBalance({
+            koin_amount: poolBalanceResponse.result.koin_amount,
+            vhp_amount: poolBalanceResponse.result.vhp_amount,
+            vapor_amount: poolBalanceResponse.result.vapor_amount ?? "0",
+          });
+          setPoolBalanceError(null);
+        }
+
+        if (
+          !isMulticallError(preferencesResult) &&
+          preferencesResult.percentage_koin !== undefined
+        ) {
+          const prefs = {
+            percentage_koin: preferencesResult.percentage_koin,
+            all_after_virtual: preferencesResult.all_after_virtual ?? "0",
+          };
           setPreferences(prefs);
           setPercentageKoin(String(Number(prefs.percentage_koin) / 1000));
+        } else {
+          setPreferences(null);
         }
       } else {
         setWalletBalances(null);
         setPoolBalance(null);
         setPreferences(null);
+        setPoolBalanceError(null);
       }
     } catch (err) {
       console.error("Error loading pool:", err);
@@ -612,47 +854,239 @@ export default function FogataPoolPage() {
       )}
 
       {!loading && !error && poolParams && (
-        <div className="mx-auto max-w-2xl space-y-6">
-          <Card className="overflow-hidden border border-border/60">
-            {poolParams.image && (
-              <div className="relative h-48 w-full overflow-hidden bg-muted">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={poolParams.image}
-                  alt={poolParams.name || "Pool image"}
-                  className="h-full w-full object-cover"
-                  onError={(e) => {
-                    e.currentTarget.style.display = "none";
-                  }}
-                />
-              </div>
-            )}
-            <CardHeader>
-              <CardTitle className="text-2xl">
-                {poolParams.name || "Unnamed Pool"}
-              </CardTitle>
-              {poolParams.description && (
-                <CardDescription>{poolParams.description}</CardDescription>
-              )}
-            </CardHeader>
-            <CardContent className="space-y-2 text-sm">
-              <div>
-                <span className="text-muted-foreground">Pool address: </span>
-                <span className="break-all font-mono">{poolId}</span>
-              </div>
-              {poolParams.payment_period && (
-                <div>
-                  <span className="text-muted-foreground">Payment period: </span>
-                  {Number(poolParams.payment_period) / 1000 / 86400} days
+        <div className="mx-auto max-w-5xl space-y-6">
+          <Card className="border-border/60">
+            <CardContent className="p-5 sm:p-6">
+              <div className="flex flex-col gap-5 sm:flex-row sm:items-start">
+                <div className="relative flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-xl border bg-muted text-2xl font-semibold text-muted-foreground">
+                  {(poolParams.name || "P").charAt(0).toUpperCase()}
+                  {poolParams.image && (
+                    <>
+                      {/* Pool logo hosts are arbitrary on-chain URLs */}
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={poolParams.image}
+                        alt={`${poolParams.name || "Pool"} logo`}
+                        className="absolute inset-0 h-full w-full bg-background object-contain"
+                        onError={(event) => {
+                          event.currentTarget.style.display = "none";
+                        }}
+                      />
+                    </>
+                  )}
                 </div>
-              )}
+
+                <div className="min-w-0 flex-1">
+                  <h1 className="text-2xl font-semibold tracking-tight">
+                    {poolParams.name || "Unnamed Pool"}
+                  </h1>
+                  {poolParams.description && (
+                    <p className="mt-2 whitespace-pre-wrap text-sm text-muted-foreground">
+                      {poolParams.description}
+                    </p>
+                  )}
+                  <div className="mt-4 space-y-1 text-sm">
+                    <div>
+                      <span className="text-muted-foreground">
+                        Pool address:{" "}
+                      </span>
+                      <span className="break-all font-mono">{poolId}</span>
+                    </div>
+                    {poolParams.payment_period && (
+                      <div>
+                        <span className="text-muted-foreground">
+                          Payment period:{" "}
+                        </span>
+                        {Number(poolParams.payment_period) / 1000 / 86400} days
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
             </CardContent>
           </Card>
+
+          <section aria-labelledby="pool-performance-heading">
+            <h2
+              id="pool-performance-heading"
+              className="mb-3 text-lg font-semibold"
+            >
+              Pool performance
+            </h2>
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">
+                    VHP amount
+                  </CardTitle>
+                  <Hash className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-xl font-semibold">
+                    {formatVhp(performance.vhpAmount)}
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Producing stake held by the pool
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">
+                    Average time to produce
+                  </CardTitle>
+                  <Clock className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-xl font-semibold">
+                    {formatDuration(performance.averageTimeToProduce)}
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Expected{" "}
+                    {formatDuration(performance.expectedTimeToProduce)}
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="flex items-center gap-2 text-sm font-medium">
+                    Effectiveness
+                    {performance.effectiveness !== undefined &&
+                      performance.effectiveness > 5 && (
+                        <span
+                          className="h-2.5 w-2.5 rounded-full bg-green-500 shadow-[0_0_0_3px_rgba(34,197,94,0.15)]"
+                          title="Effectiveness is above 5%"
+                        />
+                      )}
+                  </CardTitle>
+                  <Activity className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-xl font-semibold">
+                    {performance.effectiveness !== undefined
+                      ? `${performance.effectiveness.toFixed(1)}%`
+                      : "Unavailable"}
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Based on expected production time
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">
+                    Last block produced
+                  </CardTitle>
+                  <Clock className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-xl font-semibold">
+                    {performance.lastBlockHeight !== undefined ? (
+                      <Link
+                        href={`/blocks/${performance.lastBlockHeight}`}
+                        className="hover:underline"
+                      >
+                        #{performance.lastBlockHeight}
+                      </Link>
+                    ) : (
+                      "Unavailable"
+                    )}
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {formatTimeAgo(performance.lastBlockTime)}
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+          </section>
+
+          {account && (
+            <section aria-labelledby="pool-position-heading">
+              <h2
+                id="pool-position-heading"
+                className="mb-3 text-lg font-semibold"
+              >
+                Your pool position
+              </h2>
+              <div className="grid gap-4 sm:grid-cols-3">
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">
+                      VHP staked
+                    </CardTitle>
+                    <Hash className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-xl font-semibold">
+                      {poolBalance
+                        ? `${formatAmount(poolBalance.vhp_amount)} VHP`
+                        : "Unavailable"}
+                    </div>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Changes over time: reburning rewards increases it, while
+                      taking rewards as KOIN reduces it
+                    </p>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">
+                      KOIN balance
+                    </CardTitle>
+                    <Coins className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-xl font-semibold">
+                      {poolBalance
+                        ? `${formatAmount(poolBalance.koin_amount)} KOIN`
+                        : "Unavailable"}
+                    </div>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Automatically reburned or sent to you according to your
+                      reward configuration
+                    </p>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">
+                      Next payment
+                    </CardTitle>
+                    <CalendarClock className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-base font-semibold">
+                      {nextPayment ? nextPayment.toLocaleString() : "Unavailable"}
+                    </div>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {nextPayment
+                        ? `Scheduled ${formatTimeAgo(nextPayment)}`
+                        : "Pool schedule is unavailable"}
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
+            </section>
+          )}
 
           {!account && (
             <Alert>
               <AlertDescription>
                 Connect your wallet to deposit, withdraw, or manage this pool.
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {poolBalanceError && (
+            <Alert variant="destructive">
+              <AlertDescription>
+                Unable to load your pool balance: {poolBalanceError}. The rest
+                of the pool data is still available.
               </AlertDescription>
             </Alert>
           )}

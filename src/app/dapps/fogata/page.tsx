@@ -3,14 +3,8 @@
 import { Contract, Multicall, ProviderInterface, Signer, utils } from "koilib";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Plus, Trash2 } from "lucide-react";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { ChevronDown, Plus, Trash2 } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -205,9 +199,9 @@ export default function FogataPage() {
         authorizesUploadContract: true,
         payer: account,
         nextOperations: [
+          submitOperation,
           setOwnerOperation,
           setParamsOperation,
-          submitOperation,
           startOperation,
         ],
         beforeSend: async (transactionToSign) => {
@@ -284,18 +278,12 @@ export default function FogataPage() {
 
   return (
     <div className="container mx-auto px-4 py-10">
-      <div className="mx-auto max-w-3xl text-center">
-        <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">Fogata 2 Mining Pools</h1>
-        <p className="mt-4 text-muted-foreground">
-          Fogata 2 empowers the Koinos community with decentralized mining pools. Choose a pool to join, contribute your resources, and earn rewards for helping secure the network.
-        </p>
-        <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-          <DialogTrigger asChild>
-            <Button className="mt-6">
-              <Plus className="mr-2 h-4 w-4" />
-              Create a mining pool
-            </Button>
-          </DialogTrigger>
+      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+        <div className="mx-auto max-w-3xl text-center">
+          <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">Fogata 2 Mining Pools</h1>
+          <p className="mt-4 text-muted-foreground">
+            Fogata 2 empowers the Koinos community with decentralized mining pools. Choose a pool to join, contribute your resources, and earn rewards for helping secure the network.
+          </p>
           <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
             <DialogHeader>
               <DialogTitle>Create a Fogata mining pool</DialogTitle>
@@ -305,6 +293,12 @@ export default function FogataPage() {
                 The connected account becomes the pool owner.
               </DialogDescription>
             </DialogHeader>
+
+            <div className="rounded-md border border-amber-500/50 bg-amber-500/10 p-3 text-sm">
+              Before creating a mining pool, you must already be running a
+              Koinos block producer. A pool coordinates mining work, but it
+              does not set up or run a block producer for you.
+            </div>
 
             {!account && (
               <p className="rounded-md border p-3 text-sm text-muted-foreground">
@@ -471,8 +465,7 @@ export default function FogataPage() {
               </p>
             </div>
           </DialogContent>
-        </Dialog>
-      </div>
+        </div>
 
       {loading && (
         <div className="mt-10 text-center text-muted-foreground">
@@ -493,7 +486,7 @@ export default function FogataPage() {
       )}
 
       {!loading && !error && pools.length > 0 && (
-        <div className="mt-10 grid gap-6 sm:grid-cols-2">
+        <div className="mt-10 space-y-4">
           {pools.map((pool, index) => {
             const address = pool.account;
             const submissionDate = pool.submission_time
@@ -508,103 +501,134 @@ export default function FogataPage() {
                 : null;
 
             return (
-              <Card key={`${address}-${index}`} className="border border-border/60 overflow-hidden">
-                {/* Pool Image */}
-                {pool.image && (
-                  <div className="relative h-48 w-full overflow-hidden bg-muted">
-                    {/* Plain <img>: pool image hosts are arbitrary on-chain URLs */}
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={pool.image}
-                      alt={pool.name || "Pool image"}
-                      className="h-full w-full object-cover"
-                      onError={(e) => {
-                        e.currentTarget.style.display = "none";
-                      }}
-                    />
-                  </div>
-                )}
-                
-                <CardHeader>
-                  <div className="flex items-start justify-between gap-3">
-                    <CardTitle className="text-xl font-semibold">
-                      {pool.name || "Unnamed Pool"}
-                    </CardTitle>
-                    {poolApy !== null && (
-                      <Badge variant="default" className="flex-shrink-0">
-                        {poolApy.toFixed(2)}% APY
-                      </Badge>
-                    )}
-                  </div>
-                  {pool.description && (
-                    <CardDescription className="line-clamp-2">
-                      {pool.description}
-                    </CardDescription>
-                  )}
-                </CardHeader>
-                
-                <CardContent className="space-y-4">
-                  {/* Pool Address */}
-                  <div>
-                    <div className="text-xs font-medium text-muted-foreground mb-1">
-                      Pool Address
-                    </div>
-                    <div className="break-all font-mono text-sm">
-                      {address}
-                    </div>
-                  </div>
-
-                  {/* Payment Period */}
-                  <div>
-                    <div className="text-xs font-medium text-muted-foreground mb-1">
-                      Payment Period
-                    </div>
-                    <div className="text-sm">
-                      {paymentPeriod}
-                    </div>
-                  </div>
-
-                  {/* Beneficiaries */}
-                  {pool.beneficiaries && pool.beneficiaries.length > 0 && (
-                    <div>
-                      <div className="text-xs font-medium text-muted-foreground mb-2">
-                        Beneficiaries
+              <Card key={`${address}-${index}`} className="border-border/60">
+                <CardContent className="p-4 sm:p-5">
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+                    <div className="flex min-w-0 flex-1 items-center gap-4">
+                      <div className="relative flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-lg border bg-muted text-lg font-semibold text-muted-foreground">
+                        {(pool.name || "P").charAt(0).toUpperCase()}
+                        {pool.image && (
+                          /* Pool logo hosts are arbitrary on-chain URLs */
+                          /* eslint-disable-next-line @next/next/no-img-element */
+                          <img
+                            src={pool.image}
+                            alt={`${pool.name || "Pool"} logo`}
+                            className="absolute inset-0 h-full w-full bg-background object-contain"
+                            onError={(event) => {
+                              event.currentTarget.style.display = "none";
+                            }}
+                          />
+                        )}
                       </div>
-                      <div className="space-y-2">
-                        {pool.beneficiaries.map((beneficiary, idx) => (
-                          <div
-                            key={idx}
-                            className="flex items-center justify-between p-2 bg-muted/50 rounded-md"
-                          >
-                            <span className="font-mono text-xs break-all flex-1 mr-2">
-                              {beneficiary.address}
-                            </span>
-                            <Badge variant="secondary" className="flex-shrink-0">
-                              {beneficiary.percentage / 1000}%
-                            </Badge>
+
+                      <div className="min-w-0">
+                        <h2 className="truncate text-lg font-semibold">
+                          {pool.name || "Unnamed Pool"}
+                        </h2>
+                        <p className="line-clamp-1 text-sm text-muted-foreground">
+                          {pool.description || "No description provided."}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-3 sm:justify-end">
+                      <div className="text-sm">
+                        <span className="text-muted-foreground">Payout </span>
+                        <span className="font-medium">{paymentPeriod}</span>
+                      </div>
+                      {poolApy !== null && (
+                        <Badge variant="default" className="shrink-0">
+                          {poolApy.toFixed(2)}% APY
+                        </Badge>
+                      )}
+                      <Button variant="outline" size="sm" asChild>
+                        <Link href={`/dapps/fogata/${address}`}>
+                          Open pool
+                        </Link>
+                      </Button>
+                    </div>
+                  </div>
+
+                  <details className="group mt-4 border-t pt-3">
+                    <summary className="flex cursor-pointer list-none items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground">
+                      <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" />
+                      View pool details
+                    </summary>
+
+                    <div className="mt-4 grid gap-5 sm:grid-cols-2">
+                      <div className="sm:col-span-2">
+                        <div className="mb-1 text-xs font-medium text-muted-foreground">
+                          Description
+                        </div>
+                        <p className="whitespace-pre-wrap text-sm">
+                          {pool.description || "No description provided."}
+                        </p>
+                      </div>
+
+                      <div>
+                        <div className="mb-1 text-xs font-medium text-muted-foreground">
+                          Pool address
+                        </div>
+                        <div className="break-all font-mono text-sm">
+                          {address}
+                        </div>
+                      </div>
+
+                      <div>
+                        <div className="mb-1 text-xs font-medium text-muted-foreground">
+                          Submitted
+                        </div>
+                        <div className="text-sm">{submissionDate}</div>
+                      </div>
+
+                      <div className="sm:col-span-2">
+                        <div className="mb-2 text-xs font-medium text-muted-foreground">
+                          Beneficiaries
+                        </div>
+                        {pool.beneficiaries &&
+                        pool.beneficiaries.length > 0 ? (
+                          <div className="space-y-2">
+                            {pool.beneficiaries.map((beneficiary, idx) => (
+                              <div
+                                key={idx}
+                                className="flex items-center justify-between gap-3 rounded-md bg-muted/50 p-2"
+                              >
+                                <span className="min-w-0 break-all font-mono text-xs">
+                                  {beneficiary.address}
+                                </span>
+                                <Badge variant="secondary" className="shrink-0">
+                                  {beneficiary.percentage / 1000}%
+                                </Badge>
+                              </div>
+                            ))}
                           </div>
-                        ))}
+                        ) : (
+                          <p className="text-sm text-muted-foreground">
+                            No beneficiaries configured.
+                          </p>
+                        )}
                       </div>
                     </div>
-                  )}
-
-                  {/* Dates */}
-                  <div className="space-y-1 text-sm text-muted-foreground border-t pt-3">
-                    <div className="flex justify-between">
-                      <span>Submitted:</span>
-                      <span>{submissionDate}</span>
-                    </div>
-                  </div>
-
-                  <Button variant="outline" className="w-full" asChild>
-                    <Link href={`/dapps/fogata/${address}`}>Manage pool</Link>
-                  </Button>
+                  </details>
                 </CardContent>
               </Card>
             );
           })}
         </div>
       )}
+
+        <div className="mt-12 border-t pt-8 text-center">
+          <p className="mb-4 text-sm text-muted-foreground">
+            Already running a Koinos block producer?
+          </p>
+          <DialogTrigger asChild>
+            <Button variant="outline">
+              <Plus className="mr-2 h-4 w-4" />
+              Create a mining pool
+            </Button>
+          </DialogTrigger>
+        </div>
+      </Dialog>
     </div>
   );
 }

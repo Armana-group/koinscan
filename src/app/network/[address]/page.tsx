@@ -10,7 +10,7 @@ import { ArrowLeft, Clock, Hash, TrendingUp, Vote } from "lucide-react";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { KNOWN_PRODUCERS } from "@/koinos/constants";
+import { KNOWN_PRODUCERS, POB_CONTRACT_ID, VHP_CONTRACT_ID } from "@/koinos/constants";
 import { Navbar } from "@/components/Navbar";
 
 interface ProducerStats {
@@ -50,18 +50,14 @@ function formatVHP(amount: number): string {
 }
 
 async function getVhpBalance(provider: ProviderInterface, address: string): Promise<number> {
-  const resultInvoke = await provider.invokeGetContractAddress!("vhp");
-  const id = resultInvoke!.value.address;
-  const vhpContract = new Contract({ id, provider, abi: utils.tokenAbi });
+  const vhpContract = new Contract({ id: VHP_CONTRACT_ID, provider, abi: utils.tokenAbi });
   const { result } = await vhpContract.functions.balanceOf({ owner: address });
   if (!result) return 0;
   return Number(result.value) / 1e8;
 }
 
 async function getDifficulty(provider: ProviderInterface): Promise<number> {
-  const resultInvoke = await provider.invokeGetContractAddress!("pob");
-  const id = resultInvoke!.value.address;
-  const pobContract = new Contract({ id, provider, abi: abiPob });
+  const pobContract = new Contract({ id: POB_CONTRACT_ID, provider, abi: abiPob });
   const { result } = await pobContract.functions.get_metadata();
   if (!result) return 0;
   return Number(

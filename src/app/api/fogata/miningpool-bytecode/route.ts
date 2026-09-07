@@ -12,6 +12,7 @@ export async function GET() {
     headers: {
       "Content-Type": "application/wasm",
       "Cache-Control": "public, max-age=31536000, immutable",
+      // "Cache-Control": "no-cache",
     },
   });
 }

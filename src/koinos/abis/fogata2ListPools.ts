@@ -1,6 +1,6 @@
 import { Abi } from "koilib";
 
-export const abiFogata2ListPools: Abi = {
+export const abiFogata2ListPools = {
     "methods": {
       "get_config": {
         "argument": "",
@@ -591,4 +591,4 @@ export const abiFogata2ListPools: Abi = {
         "argument": "common.address"
       }
     }
-  };
+  } as Abi;

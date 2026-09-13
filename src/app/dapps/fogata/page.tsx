@@ -7,6 +7,7 @@ import { ChevronDown, Plus, Trash2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { BetaTag } from "@/components/BetaTag";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -280,7 +281,10 @@ export default function FogataPage() {
     <div className="container mx-auto px-4 py-10">
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <div className="mx-auto max-w-3xl text-center">
-          <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">Fogata 2 Mining Pools</h1>
+          <h1 className="inline-flex flex-wrap items-center justify-center gap-2 text-3xl font-semibold tracking-tight sm:text-4xl">
+            Fogata 2 Mining Pools
+            <BetaTag />
+          </h1>
           <p className="mt-4 text-muted-foreground">
             Fogata 2 empowers the Koinos community with decentralized mining pools. Choose a pool to join, contribute your resources, and earn rewards for helping secure the network.
           </p>

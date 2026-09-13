@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
+import { BetaTag } from "@/components/BetaTag";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -744,8 +745,9 @@ export default function DexPage() {
           <div className="mb-3 flex justify-center">
             <ArrowDownUp className="h-10 w-10 text-primary" />
           </div>
-          <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
+          <h1 className="inline-flex flex-wrap items-center justify-center gap-2 text-3xl font-semibold tracking-tight sm:text-4xl">
             KOIN / VHP order book decentralized exchange
+            <BetaTag />
           </h1>
           <p className="mx-auto mt-4 max-w-3xl text-muted-foreground">
             Trade KOIN and VHP directly through a decentralized order book.

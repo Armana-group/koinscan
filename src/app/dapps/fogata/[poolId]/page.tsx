@@ -42,9 +42,13 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { BetaTag } from "@/components/BetaTag";
 import * as toast from "@/lib/toast";
+
+type RewardMode = "percentage" | "virtual";
 
 const DECIMALS = 8;
 const SCALE = 10 ** DECIMALS;
@@ -75,6 +79,7 @@ interface CollectKoinPreferences {
 
 interface PoolPerformance {
   vhpAmount?: number;
+  koinAmount?: number;
   averageTimeToProduce?: number;
   expectedTimeToProduce?: number;
   effectiveness?: number;
@@ -92,14 +97,14 @@ function formatAmount(raw: string): string {
   return value.toLocaleString(undefined, { maximumFractionDigits: 8 });
 }
 
-function formatVhp(amount?: number): string {
+function formatTokenAmount(amount?: number, symbol = "VHP"): string {
   if (amount === undefined) return "Unavailable";
-  if (amount >= 1e9) return `${(amount / 1e9).toFixed(2)}B VHP`;
-  if (amount >= 1e6) return `${(amount / 1e6).toFixed(2)}M VHP`;
-  if (amount >= 1e3) return `${(amount / 1e3).toFixed(2)}K VHP`;
+  if (amount >= 1e9) return `${(amount / 1e9).toFixed(2)}B ${symbol}`;
+  if (amount >= 1e6) return `${(amount / 1e6).toFixed(2)}M ${symbol}`;
+  if (amount >= 1e3) return `${(amount / 1e3).toFixed(2)}K ${symbol}`;
   return `${amount.toLocaleString(undefined, {
     maximumFractionDigits: 2,
-  })} VHP`;
+  })} ${symbol}`;
 }
 
 function formatDuration(milliseconds?: number): string {
@@ -191,7 +196,9 @@ export default function FogataPoolPage() {
   const [vhpDeposit, setVhpDeposit] = useState("");
   const [koinWithdraw, setKoinWithdraw] = useState("");
   const [vhpWithdraw, setVhpWithdraw] = useState("");
+  const [rewardMode, setRewardMode] = useState<RewardMode>("percentage");
   const [percentageKoin, setPercentageKoin] = useState("100");
+  const [allAfterVirtual, setAllAfterVirtual] = useState("");
   const [poolName, setPoolName] = useState("");
   const [poolImage, setPoolImage] = useState("");
   const [poolDescription, setPoolDescription] = useState("");
@@ -243,6 +250,9 @@ export default function FogataPoolPage() {
       await multicall.add(poolContract.functions.get_owner, {});
       await multicall.add(poolContract.functions.get_all_reserved_koin, {});
       await multicall.add(vhpContract.functions.balanceOf, {
+        owner: poolId,
+      });
+      await multicall.add(koinContract.functions.balanceOf, {
         owner: poolId,
       });
       await multicall.add(pobContract.functions.get_metadata, {});
@@ -302,10 +312,11 @@ export default function FogataPoolPage() {
       const ownerResult = results[1] as { value?: string } | Error;
       const reservedResult = results[2] as { value?: string } | Error;
       const poolVhpResult = results[3] as { value?: string } | Error;
-      const metadataResult = results[4] as
+      const poolKoinResult = results[4] as { value?: string } | Error;
+      const metadataResult = results[5] as
         | { value?: { difficulty?: string } }
         | Error;
-      const poolStateResult = results[5] as PoolState | Error;
+      const poolStateResult = results[6] as PoolState | Error;
 
       if (isMulticallError(paramsResult)) throw paramsResult;
       if (isMulticallError(ownerResult)) throw ownerResult;
@@ -339,6 +350,9 @@ export default function FogataPoolPage() {
       const vhpAmount = isMulticallError(poolVhpResult)
         ? undefined
         : Number(poolVhpResult.value ?? "0") / SCALE;
+      const koinAmount = isMulticallError(poolKoinResult)
+        ? undefined
+        : Number(poolKoinResult.value ?? "0") / SCALE;
       let expectedTimeToProduce: number | undefined;
 
       if (
@@ -391,6 +405,7 @@ export default function FogataPoolPage() {
 
       setPerformance({
         vhpAmount,
+        koinAmount,
         expectedTimeToProduce,
         averageTimeToProduce,
         effectiveness: Number.isFinite(effectiveness)
@@ -404,9 +419,9 @@ export default function FogataPoolPage() {
       });
 
       if (account) {
-        const koinResult = results[6] as { value?: string } | Error;
-        const vhpResult = results[7] as { value?: string } | Error;
-        const preferencesResult = results[8] as
+        const koinResult = results[7] as { value?: string } | Error;
+        const vhpResult = results[8] as { value?: string } | Error;
+        const preferencesResult = results[9] as
           | Partial<CollectKoinPreferences>
           | Error;
 
@@ -440,14 +455,26 @@ export default function FogataPoolPage() {
 
         if (
           !isMulticallError(preferencesResult) &&
-          preferencesResult.percentage_koin !== undefined
+          (preferencesResult.percentage_koin !== undefined ||
+            preferencesResult.all_after_virtual !== undefined)
         ) {
           const prefs = {
-            percentage_koin: preferencesResult.percentage_koin,
+            percentage_koin: preferencesResult.percentage_koin ?? "0",
             all_after_virtual: preferencesResult.all_after_virtual ?? "0",
           };
           setPreferences(prefs);
-          setPercentageKoin(String(Number(prefs.percentage_koin) / 1000));
+          if (BigInt(prefs.all_after_virtual || "0") > BigInt(0)) {
+            setRewardMode("virtual");
+            const virtualAmount = Number(prefs.all_after_virtual) / SCALE;
+            setAllAfterVirtual(
+              Number.isFinite(virtualAmount) ? String(virtualAmount) : ""
+            );
+            setPercentageKoin("0");
+          } else {
+            setRewardMode("percentage");
+            setPercentageKoin(String(Number(prefs.percentage_koin) / 1000));
+            setAllAfterVirtual("");
+          }
         } else {
           setPreferences(null);
         }
@@ -589,10 +616,23 @@ export default function FogataPoolPage() {
     const userAccount = requireWallet();
     if (!userAccount || !provider) return;
 
-    const pct = parseFloat(percentageKoin);
-    if (Number.isNaN(pct) || pct < 0 || pct > 100) {
-      toast.error("Percentage must be between 0 and 100");
-      return;
+    let percentage_koin = "0";
+    let all_after_virtual = "0";
+
+    if (rewardMode === "percentage") {
+      const pct = parseFloat(percentageKoin);
+      if (Number.isNaN(pct) || pct < 0 || pct > 100) {
+        toast.error("Percentage must be between 0 and 100");
+        return;
+      }
+      percentage_koin = String(Math.round(pct * 1000));
+    } else {
+      const amount = toBaseUnits(allAfterVirtual);
+      if (amount === "0") {
+        toast.error("Enter a VHP amount to keep");
+        return;
+      }
+      all_after_virtual = amount;
     }
 
     setSubmitting(true);
@@ -604,17 +644,15 @@ export default function FogataPoolPage() {
         provider,
         abi: abiFogata2Pool,
       });
-      console.log("provider", provider);
       const { transaction, receipt } =
         await poolContract.functions.set_collect_koin_preferences({
           account: userAccount,
-          percentage_koin: String(Math.round(pct * 1000)),
-          all_after_virtual: preferences?.all_after_virtual ?? "0",
+          percentage_koin,
+          all_after_virtual,
         });
       if (receipt?.reverted) {
         throw new Error("Transaction reverted");
       }
-      console.log("transaction", transaction);
       await transaction?.wait();
       toast.dismiss(loadingToast);
       toast.success("Preferences saved");
@@ -877,8 +915,9 @@ export default function FogataPoolPage() {
                 </div>
 
                 <div className="min-w-0 flex-1">
-                  <h1 className="text-2xl font-semibold tracking-tight">
+                  <h1 className="inline-flex flex-wrap items-center gap-2 text-2xl font-semibold tracking-tight">
                     {poolParams.name || "Unnamed Pool"}
+                    <BetaTag />
                   </h1>
                   {poolParams.description && (
                     <p className="mt-2 whitespace-pre-wrap text-sm text-muted-foreground">
@@ -913,7 +952,7 @@ export default function FogataPoolPage() {
             >
               Pool performance
             </h2>
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">
@@ -923,10 +962,27 @@ export default function FogataPoolPage() {
                 </CardHeader>
                 <CardContent>
                   <div className="text-xl font-semibold">
-                    {formatVhp(performance.vhpAmount)}
+                    {formatTokenAmount(performance.vhpAmount, "VHP")}
                   </div>
                   <p className="mt-1 text-xs text-muted-foreground">
                     Producing stake held by the pool
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">
+                    KOIN balance
+                  </CardTitle>
+                  <Coins className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-xl font-semibold">
+                    {formatTokenAmount(performance.koinAmount, "KOIN")}
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Liquid KOIN held by the pool
                   </p>
                 </CardContent>
               </Card>
@@ -1273,31 +1329,92 @@ export default function FogataPoolPage() {
                 <CardHeader>
                   <CardTitle className="text-lg">Reward preferences</CardTitle>
                   <CardDescription>
-                    Set how rewards are collected from this pool.
+                    Choose one option for how rewards are collected.
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="percentage-koin">
-                      KOIN collection percentage
-                    </Label>
-                    <Input
-                      id="percentage-koin"
-                      type="number"
-                      min="0"
-                      max="100"
-                      step="0.1"
-                      value={percentageKoin}
-                      onChange={(e) => setPercentageKoin(e.target.value)}
-                      disabled={!account || submitting}
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Percentage of earned KOIN to collect as KOIN (remainder as VHP).
-                      {preferences && (
-                        <> Current: {Number(preferences.percentage_koin) / 1000}%</>
-                      )}
-                    </p>
-                  </div>
+                  <RadioGroup
+                    value={rewardMode}
+                    onValueChange={(value) =>
+                      setRewardMode(value as RewardMode)
+                    }
+                    disabled={!account || submitting}
+                    className="space-y-4"
+                  >
+                    <div className="space-y-3 rounded-md border p-4">
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="percentage" id="reward-percentage" />
+                        <Label htmlFor="reward-percentage">
+                          KOIN collection percentage
+                        </Label>
+                      </div>
+                      <div className="space-y-2 pl-6">
+                        <Input
+                          id="percentage-koin"
+                          type="number"
+                          min="0"
+                          max="100"
+                          step="0.1"
+                          value={percentageKoin}
+                          onChange={(e) => setPercentageKoin(e.target.value)}
+                          disabled={
+                            !account ||
+                            submitting ||
+                            rewardMode !== "percentage"
+                          }
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Keep this percentage of earned KOIN and burn the rest
+                          into VHP.
+                          {preferences &&
+                            BigInt(preferences.all_after_virtual || "0") ===
+                              BigInt(0) && (
+                              <>
+                                {" "}
+                                Current:{" "}
+                                {Number(preferences.percentage_koin) / 1000}%
+                              </>
+                            )}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="space-y-3 rounded-md border p-4">
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="virtual" id="reward-virtual" />
+                        <Label htmlFor="reward-virtual">
+                          Keep a VHP amount
+                        </Label>
+                      </div>
+                      <div className="space-y-2 pl-6">
+                        <Input
+                          id="all-after-virtual"
+                          type="number"
+                          min="0"
+                          step="any"
+                          value={allAfterVirtual}
+                          onChange={(e) => setAllAfterVirtual(e.target.value)}
+                          disabled={
+                            !account || submitting || rewardMode !== "virtual"
+                          }
+                          placeholder="VHP to keep"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Keep this amount of VHP and burn anything above it.
+                          {preferences &&
+                            BigInt(preferences.all_after_virtual || "0") >
+                              BigInt(0) && (
+                              <>
+                                {" "}
+                                Current:{" "}
+                                {formatAmount(preferences.all_after_virtual)}{" "}
+                                VHP
+                              </>
+                            )}
+                        </p>
+                      </div>
+                    </div>
+                  </RadioGroup>
                   <Button
                     className="w-full"
                     onClick={handleSavePreferences}

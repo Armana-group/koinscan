@@ -133,9 +133,7 @@ export default function FogataPage() {
     setCreating(true);
     let activeToast = toast.loading("Preparing pool deployment...");
     try {
-      const bytecodeResponse = await fetch(
-        "/api/fogata/miningpool-bytecode"
-      );
+      const bytecodeResponse = await fetch("/miningpool.wasm");
       if (!bytecodeResponse.ok) {
         throw new Error("Failed to load mining pool bytecode");
       }

@@ -29,6 +29,7 @@ import { cn } from "@/lib/utils";
 import { abiGovernance } from "@/koinos/abis";
 import { getTokenImageUrl } from "@/koinos/utils";
 import { abiKoinosFund } from "@/koinos/abis/koinosFund";
+import { abiKoin } from "@/koinos/abis/koin";
 
 export default function ContractPage() {
   const params = useParams();
@@ -205,7 +206,9 @@ export default function ContractPage() {
         if (contractId === GOVERNANCE_CONTRACT_ID) {
           // special case to fix the abi of governance
           abi = abiGovernance;
-        } else if (contractId === KOIN_CONTRACT_ID || contractId === VHP_CONTRACT_ID) {
+        } else if (contractId === KOIN_CONTRACT_ID) {
+          abi = abiKoin;
+        } else if (contractId === VHP_CONTRACT_ID) {
           abi = utils.tokenAbi;
         } else if (contractId === KOINOS_FUND_CONTRACT_ID) {
           abi = abiKoinosFund;

@@ -79,6 +79,15 @@ interface Beneficiary {
   percentage: number;
 }
 
+const KOIN_DECIMALS = 8;
+const KOIN_SCALE = 10 ** KOIN_DECIMALS;
+
+function toBaseUnits(amount: string): string {
+  const value = parseFloat(amount);
+  if (Number.isNaN(value) || value <= 0) return "0";
+  return Math.floor(value * KOIN_SCALE).toString();
+}
+
 export default function FogataPage() {
   const router = useRouter();
   const { provider, signer, savedAddress } = useWallet();
@@ -94,6 +103,8 @@ export default function FogataPage() {
   const [poolDescription, setPoolDescription] = useState("");
   const [reburnPeriodDays, setReburnPeriodDays] = useState("4");
   const [beneficiaries, setBeneficiaries] = useState<Beneficiary[]>([]);
+  const [reservedKoinAmount, setReservedKoinAmount] = useState("2000");
+  const [publicKey, setPublicKey] = useState("");
 
   const handleCreatePool = async () => {
     if (!account || !signer || !provider) {
@@ -106,6 +117,8 @@ export default function FogataPage() {
       (sum, beneficiary) => sum + beneficiary.percentage,
       0
     );
+    const reservedKoinBaseUnits = toBaseUnits(reservedKoinAmount);
+    const normalizedPublicKey = publicKey.trim();
     if (!poolName.trim()) {
       toast.error("Pool name is required");
       return;
@@ -127,6 +140,14 @@ export default function FogataPage() {
     }
     if (totalBeneficiaryPercentage > 100_000) {
       toast.error("Beneficiary percentages cannot exceed 100%");
+      return;
+    }
+    if (reservedKoinBaseUnits === "0") {
+      toast.error("Enter a reserved KOIN amount greater than zero");
+      return;
+    }
+    if (!normalizedPublicKey) {
+      toast.error("Enter the node operator public key");
       return;
     }
 
@@ -154,12 +175,25 @@ export default function FogataPage() {
         provider,
         abi: abiFogata2ListPools,
       });
+      const koinContract = new Contract({
+        id: KOIN_CONTRACT_ID,
+        provider,
+        abi: utils.tokenAbi,
+      });
+      const pobContract = new Contract({
+        id: POB_CONTRACT_ID,
+        provider,
+        abi: abiPob,
+      });
 
       const [
         { operation: setOwnerOperation },
         { operation: setParamsOperation },
         { operation: startOperation },
         { operation: submitOperation },
+        { operation: approveReservedOperation },
+        { operation: addReservedOperation },
+        { operation: registerPublicKeyOperation },
       ] = await Promise.all([
         poolContract.functions.set_owner(
           { value: account },
@@ -186,6 +220,25 @@ export default function FogataPage() {
           { value: poolAddress },
           { onlyOperation: true }
         ),
+        koinContract.functions.approve(
+          {
+            owner: account,
+            spender: poolAddress,
+            value: reservedKoinBaseUnits,
+          },
+          { onlyOperation: true }
+        ),
+        poolContract.functions.add_reserved_koin(
+          { account, koin_amount: reservedKoinBaseUnits },
+          { onlyOperation: true }
+        ),
+        pobContract.functions.register_public_key(
+          {
+            producer: poolAddress,
+            public_key: normalizedPublicKey,
+          },
+          { onlyOperation: true }
+        ),
       ]);
 
       toast.dismiss(activeToast);
@@ -202,11 +255,16 @@ export default function FogataPage() {
           setOwnerOperation,
           setParamsOperation,
           startOperation,
+          approveReservedOperation,
+          addReservedOperation,
+          registerPublicKeyOperation,
         ],
         beforeSend: async (transactionToSign) => {
           await signer.signTransaction(transactionToSign, {
             [poolAddress]: abiFogata2Pool,
             [FOGATA2_LIST_POOLS_CONTRACT_ID]: abiFogata2ListPools,
+            [KOIN_CONTRACT_ID]: utils.tokenAbi,
+            [POB_CONTRACT_ID]: abiPob,
           });
         },
       });
@@ -451,6 +509,51 @@ export default function FogataPage() {
                     0
                   ) / 1000}
                   %
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="new-pool-reserved-koin">
+                  Reserved KOIN
+                </Label>
+                <Input
+                  id="new-pool-reserved-koin"
+                  type="number"
+                  min="0"
+                  step="any"
+                  placeholder="2000"
+                  value={reservedKoinAmount}
+                  onChange={(event) =>
+                    setReservedKoinAmount(event.target.value)
+                  }
+                  disabled={creating}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Reserved KOIN provides mana for operating the pool and is not
+                  burned. Lower reburn periods require more frequent operations,
+                  so more reserved KOIN is recommended. As a base reference, use
+                  about 2,000 KOIN for a 4-day reburn period.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="new-pool-public-key">
+                  Node operator public key
+                </Label>
+                <Input
+                  id="new-pool-public-key"
+                  value={publicKey}
+                  onChange={(event) => setPublicKey(event.target.value)}
+                  placeholder="Paste the contents of public.key"
+                  disabled={creating}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Register the public key from{" "}
+                  <code>.koinos/block_producer/public.key</code>. Also set the{" "}
+                  <code>producer</code> field in the{" "}
+                  <code>block_producer</code> section of your node&apos;s{" "}
+                  <code>config.yml</code> to the new pool address after
+                  deployment.
                 </p>
               </div>
 

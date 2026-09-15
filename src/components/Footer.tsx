@@ -1,11 +1,8 @@
 'use client';
 
 import Link from 'next/link'
-import { useLatestBlock } from '@/hooks/useLatestBlock'
-import { Blocks } from 'lucide-react'
 
 export function Footer() {
-  const { blockInfo, loading } = useLatestBlock();
   const appVersion = process.env.NEXT_PUBLIC_APP_VERSION;
   const buildCommit = process.env.NEXT_PUBLIC_BUILD_COMMIT;
   const buildLabel = appVersion && buildCommit ? `v${appVersion} · ${buildCommit}` : null;
@@ -31,19 +28,7 @@ export function Footer() {
             </span>
           )}
         </div>
-        {!loading && blockInfo && (
-          <Link
-            href="/blocks"
-            className="flex items-center gap-2 hover:text-foreground transition-colors"
-          >
-            <Blocks className="h-4 w-4" />
-            <span>
-              Latest Block: {blockInfo.head_topology?.height}
-              {/* {formattedTime && <span className="ml-2 text-xs">({formattedTime})</span>} */}
-            </span>
-          </Link>
-        )}
       </div>
     </footer>
   )
-} 
+}

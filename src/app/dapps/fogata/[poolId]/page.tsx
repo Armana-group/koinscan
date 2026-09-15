@@ -19,11 +19,13 @@ import {
   Hash,
   Plus,
   Trash2,
+  Zap,
 } from "lucide-react";
 
 import { abiFogata2Pool } from "@/koinos/abis/fogata2Pool";
 import tokenAbi from "@/koinos/abi";
 import { abiFogata2ListPools } from "@/koinos/abis/fogata2ListPools";
+import { abiKoin } from "@/koinos/abis/koin";
 import { abiPob } from "@/koinos/abis";
 import {
   FOGATA2_LIST_POOLS_CONTRACT_ID,
@@ -80,6 +82,7 @@ interface CollectKoinPreferences {
 interface PoolPerformance {
   vhpAmount?: number;
   koinAmount?: number;
+  manaPercentage?: number;
   averageTimeToProduce?: number;
   expectedTimeToProduce?: number;
   effectiveness?: number;
@@ -234,7 +237,7 @@ export default function FogataPoolPage() {
       const koinContract = new Contract({
         id: KOIN_CONTRACT_ID,
         provider,
-        abi: tokenAbi,
+        abi: abiKoin,
       });
       const vhpContract = new Contract({
         id: VHP_CONTRACT_ID,
@@ -253,6 +256,9 @@ export default function FogataPoolPage() {
         owner: poolId,
       });
       await multicall.add(koinContract.functions.balanceOf, {
+        owner: poolId,
+      });
+      await multicall.add(koinContract.functions.get_account_rc, {
         owner: poolId,
       });
       await multicall.add(pobContract.functions.get_metadata, {});
@@ -313,10 +319,11 @@ export default function FogataPoolPage() {
       const reservedResult = results[2] as { value?: string } | Error;
       const poolVhpResult = results[3] as { value?: string } | Error;
       const poolKoinResult = results[4] as { value?: string } | Error;
-      const metadataResult = results[5] as
+      const poolManaResult = results[5] as { value?: string } | Error;
+      const metadataResult = results[6] as
         | { value?: { difficulty?: string } }
         | Error;
-      const poolStateResult = results[6] as PoolState | Error;
+      const poolStateResult = results[7] as PoolState | Error;
 
       if (isMulticallError(paramsResult)) throw paramsResult;
       if (isMulticallError(ownerResult)) throw ownerResult;
@@ -353,6 +360,15 @@ export default function FogataPoolPage() {
       const koinAmount = isMulticallError(poolKoinResult)
         ? undefined
         : Number(poolKoinResult.value ?? "0") / SCALE;
+      const manaAmount = isMulticallError(poolManaResult)
+        ? undefined
+        : Number(poolManaResult.value ?? "0") / SCALE;
+      const manaPercentage =
+        manaAmount !== undefined &&
+        koinAmount !== undefined &&
+        koinAmount > 0
+          ? (manaAmount * 100) / koinAmount
+          : undefined;
       let expectedTimeToProduce: number | undefined;
 
       if (
@@ -406,6 +422,9 @@ export default function FogataPoolPage() {
       setPerformance({
         vhpAmount,
         koinAmount,
+        manaPercentage: Number.isFinite(manaPercentage)
+          ? manaPercentage
+          : undefined,
         expectedTimeToProduce,
         averageTimeToProduce,
         effectiveness: Number.isFinite(effectiveness)
@@ -419,9 +438,9 @@ export default function FogataPoolPage() {
       });
 
       if (account) {
-        const koinResult = results[7] as { value?: string } | Error;
-        const vhpResult = results[8] as { value?: string } | Error;
-        const preferencesResult = results[9] as
+        const koinResult = results[8] as { value?: string } | Error;
+        const vhpResult = results[9] as { value?: string } | Error;
+        const preferencesResult = results[10] as
           | Partial<CollectKoinPreferences>
           | Error;
 
@@ -952,7 +971,7 @@ export default function FogataPoolPage() {
             >
               Pool performance
             </h2>
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">
@@ -983,6 +1002,23 @@ export default function FogataPoolPage() {
                   </div>
                   <p className="mt-1 text-xs text-muted-foreground">
                     Liquid KOIN held by the pool
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Mana</CardTitle>
+                  <Zap className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-xl font-semibold">
+                    {performance.manaPercentage !== undefined
+                      ? `${performance.manaPercentage.toFixed(1)}%`
+                      : "Unavailable"}
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Relative to the pool&apos;s KOIN balance
                   </p>
                 </CardContent>
               </Card>

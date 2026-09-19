@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
+    "test": "node --import tsx --test \"src/**/*.test.ts\"",
     "accuracy:regression": "tsx scripts/regression-address-accuracy.ts",
     "beta-status:regression": "node scripts/regression-beta-status.mjs",
     "changelog:regression": "node scripts/regression-changelog.mjs",

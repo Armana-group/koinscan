@@ -1,6 +1,6 @@
 "use client";
 
-import { Contract, Multicall, ProviderInterface, Signer, utils } from "koilib";
+import { Contract, Multicall, Signer, utils } from "koilib";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ChevronDown, Plus, Trash2 } from "lucide-react";
@@ -19,46 +19,13 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { useWallet } from "@/contexts/WalletContext";
-import { FOGATA2_LIST_POOLS_CONTRACT_ID, POB_CONTRACT_ID, KOIN_CONTRACT_ID, VHP_CONTRACT_ID } from "@/koinos/constants";
+import { FOGATA2_LIST_POOLS_CONTRACT_ID, POB_CONTRACT_ID, KOIN_CONTRACT_ID } from "@/koinos/constants";
 import { abiFogata2ListPools } from "@/koinos/abis/fogata2ListPools";
 import { useEffect, useState } from "react";
 import { abiFogata2Pool } from "@/koinos/abis/fogata2Pool";
 import { abiPob } from "@/koinos/abis";
-import tokenAbi from "@/koinos/abi";
+import { computePoolApy, getNetworkApy } from "@/lib/fogata";
 import * as toast from "@/lib/toast";
-
-/**
- * APY = 2% * virtual supply / VHP producing
- * Same formula as src/app/network/page.tsx
- */
-async function getNetworkApy(provider: ProviderInterface): Promise<number> {
-  const vhpContract = new Contract({ id: VHP_CONTRACT_ID, provider, abi: tokenAbi });
-  const { result: resultVhp } = await vhpContract.functions.totalSupply();
-  const totalVhp = Number(resultVhp!.value) / 1e8;
-
-  const koinContract = new Contract({ id: KOIN_CONTRACT_ID, provider, abi: tokenAbi });
-  const { result: resultKoin } = await koinContract.functions.totalSupply();
-  const totalKoin = Number(resultKoin!.value) / 1e8;
-
-  const pobContract = new Contract({ id: POB_CONTRACT_ID, provider, abi: abiPob });
-  const { result: resultPob } = await pobContract.functions.get_metadata();
-  const difficulty = Number(
-    "0x" + utils.toHexString(utils.decodeBase64url(resultPob!.value.difficulty))
-  );
-  const vhpProducing = 10 * difficulty / 3000 / 1e8;
-  return 2 * (totalVhp + totalKoin) / vhpProducing;
-}
-
-function computePoolApy(
-  networkApy: number,
-  beneficiaries: Pool["beneficiaries"]
-): number {
-  const beneficiaryShare = beneficiaries.reduce(
-    (sum, beneficiary) => sum + beneficiary.percentage,
-    0
-  ) / 1000;
-  return networkApy * (1 - beneficiaryShare / 100);
-}
 
 interface Pool {
   account: string;

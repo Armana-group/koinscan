@@ -3,13 +3,11 @@
 import { Contract, Multicall, Signer, utils } from "koilib";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronDown, Plus, Trash2 } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
+import { ChevronRight, Trash2, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { BetaTag } from "@/components/BetaTag";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Dialog,
   DialogContent,
@@ -301,16 +299,90 @@ export default function FogataPage() {
   }, [provider]);
 
   return (
-    <div className="container mx-auto px-4 py-10">
+    <div className="mx-auto w-full max-w-[640px] px-4 py-10">
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-        <div className="mx-auto max-w-3xl text-center">
-          <h1 className="inline-flex flex-wrap items-center justify-center gap-2 text-3xl font-semibold tracking-tight sm:text-4xl">
-            Fogata 2 Mining Pools
-            <BetaTag />
-          </h1>
-          <p className="mt-4 text-muted-foreground">
-            Fogata 2 empowers the Koinos community with decentralized mining pools. Choose a pool to join, contribute your resources, and earn rewards for helping secure the network.
+        <h1 className="text-2xl font-semibold tracking-tight">Mining pools</h1>
+
+        {loading && (
+          <ul className="mt-7 divide-y border-t" aria-busy="true">
+            {[0, 1, 2].map((i) => (
+              <li key={i} className="flex items-center gap-4 py-[18px]">
+                <Skeleton className="h-10 w-10 rounded-[10px]" />
+                <Skeleton className="h-4 flex-1" />
+                <Skeleton className="h-4 w-14" />
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {error && !loading && (
+          <p className="mt-7 text-sm text-muted-foreground">
+            Couldn&apos;t load pools.{" "}
+            <button type="button" className="text-brand" onClick={() => router.refresh()}>
+              Retry
+            </button>
           </p>
+        )}
+
+        {!loading && !error && pools.length === 0 && (
+          <p className="mt-7 text-sm text-muted-foreground">No pools are listed yet.</p>
+        )}
+
+        {!loading && !error && pools.length > 0 && (
+          <ul className="mt-7 divide-y border-t">
+            {[...pools]
+              .map((pool) => ({
+                pool,
+                apy:
+                  networkApy !== null
+                    ? computePoolApy(networkApy, pool.beneficiaries ?? [])
+                    : null,
+              }))
+              .sort((a, b) => (b.apy ?? -1) - (a.apy ?? -1) || a.pool.name.localeCompare(b.pool.name))
+              .map(({ pool, apy }) => (
+                <li key={pool.account}>
+                  <Link
+                    href={`/dapps/fogata/${pool.account}`}
+                    className="-mx-3 flex items-center gap-4 rounded-[10px] px-3 py-[18px] transition-colors hover:bg-muted/60"
+                  >
+                    <span className="relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-[10px] bg-muted text-sm font-semibold text-muted-foreground">
+                      {(pool.name || "P").charAt(0).toUpperCase()}
+                      {pool.image && (
+                        /* Pool logo hosts are arbitrary on-chain URLs */
+                        /* eslint-disable-next-line @next/next/no-img-element */
+                        <img
+                          src={pool.image}
+                          alt=""
+                          className="absolute inset-0 h-full w-full bg-background object-contain"
+                          onError={(event) => {
+                            event.currentTarget.style.display = "none";
+                          }}
+                        />
+                      )}
+                    </span>
+                    <span className="min-w-0 flex-1 truncate font-medium">
+                      {pool.name || "Unnamed pool"}
+                    </span>
+                    <span className="text-base font-semibold tabular-nums">
+                      {apy !== null ? `${apy.toFixed(1)}%` : "—"}
+                    </span>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground/60" aria-hidden />
+                  </Link>
+                </li>
+              ))}
+          </ul>
+        )}
+
+        <p className="mt-7 text-xs text-muted-foreground/80">
+          Estimated yearly yield after the pool&apos;s fee. Run a node?{" "}
+          <DialogTrigger asChild>
+            <button type="button" className="text-muted-foreground underline-offset-2 hover:underline">
+              Start a pool
+            </button>
+          </DialogTrigger>
+        </p>
+
+        {/* ---- create-pool dialog: paste the existing <DialogContent>…</DialogContent> here, unchanged ---- */}
           <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
             <DialogHeader>
               <DialogTitle>Create a Fogata mining pool</DialogTitle>
@@ -537,169 +609,6 @@ export default function FogataPage() {
               </p>
             </div>
           </DialogContent>
-        </div>
-
-      {loading && (
-        <div className="mt-10 text-center text-muted-foreground">
-          Loading pools...
-        </div>
-      )}
-
-      {error && (
-        <div className="mt-10 text-center text-destructive">
-          Error: {error}
-        </div>
-      )}
-
-      {!loading && !error && pools.length === 0 && (
-        <div className="mt-10 text-center text-muted-foreground">
-          No pools found.
-        </div>
-      )}
-
-      {!loading && !error && pools.length > 0 && (
-        <div className="mt-10 space-y-4">
-          {pools.map((pool, index) => {
-            const address = pool.account;
-            const submissionDate = pool.submission_time
-              ? new Date(Number(pool.submission_time)).toLocaleDateString()
-              : "N/A";
-            const paymentPeriod = pool.payment_period
-              ? `${Number(pool.payment_period) / 1000 / 86400} days`
-              : "N/A";
-            const poolApy =
-              networkApy !== null
-                ? computePoolApy(networkApy, pool.beneficiaries ?? [])
-                : null;
-
-            return (
-              <Card key={`${address}-${index}`} className="border-border/60">
-                <CardContent className="p-4 sm:p-5">
-                  <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-                    <div className="flex min-w-0 flex-1 items-center gap-4">
-                      <div className="relative flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-lg border bg-muted text-lg font-semibold text-muted-foreground">
-                        {(pool.name || "P").charAt(0).toUpperCase()}
-                        {pool.image && (
-                          /* Pool logo hosts are arbitrary on-chain URLs */
-                          /* eslint-disable-next-line @next/next/no-img-element */
-                          <img
-                            src={pool.image}
-                            alt={`${pool.name || "Pool"} logo`}
-                            className="absolute inset-0 h-full w-full bg-background object-contain"
-                            onError={(event) => {
-                              event.currentTarget.style.display = "none";
-                            }}
-                          />
-                        )}
-                      </div>
-
-                      <div className="min-w-0">
-                        <h2 className="truncate text-lg font-semibold">
-                          {pool.name || "Unnamed Pool"}
-                        </h2>
-                        <p className="line-clamp-1 text-sm text-muted-foreground">
-                          {pool.description || "No description provided."}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-3 sm:justify-end">
-                      <div className="text-sm">
-                        <span className="text-muted-foreground">Payout </span>
-                        <span className="font-medium">{paymentPeriod}</span>
-                      </div>
-                      {poolApy !== null && (
-                        <Badge variant="default" className="shrink-0">
-                          {poolApy.toFixed(2)}% APY
-                        </Badge>
-                      )}
-                      <Button variant="outline" size="sm" asChild>
-                        <Link href={`/dapps/fogata/${address}`}>
-                          Open pool
-                        </Link>
-                      </Button>
-                    </div>
-                  </div>
-
-                  <details className="group mt-4 border-t pt-3">
-                    <summary className="flex cursor-pointer list-none items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground">
-                      <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" />
-                      View pool details
-                    </summary>
-
-                    <div className="mt-4 grid gap-5 sm:grid-cols-2">
-                      <div className="sm:col-span-2">
-                        <div className="mb-1 text-xs font-medium text-muted-foreground">
-                          Description
-                        </div>
-                        <p className="whitespace-pre-wrap text-sm">
-                          {pool.description || "No description provided."}
-                        </p>
-                      </div>
-
-                      <div>
-                        <div className="mb-1 text-xs font-medium text-muted-foreground">
-                          Pool address
-                        </div>
-                        <div className="break-all font-mono text-sm">
-                          {address}
-                        </div>
-                      </div>
-
-                      <div>
-                        <div className="mb-1 text-xs font-medium text-muted-foreground">
-                          Submitted
-                        </div>
-                        <div className="text-sm">{submissionDate}</div>
-                      </div>
-
-                      <div className="sm:col-span-2">
-                        <div className="mb-2 text-xs font-medium text-muted-foreground">
-                          Beneficiaries
-                        </div>
-                        {pool.beneficiaries &&
-                        pool.beneficiaries.length > 0 ? (
-                          <div className="space-y-2">
-                            {pool.beneficiaries.map((beneficiary, idx) => (
-                              <div
-                                key={idx}
-                                className="flex items-center justify-between gap-3 rounded-md bg-muted/50 p-2"
-                              >
-                                <span className="min-w-0 break-all font-mono text-xs">
-                                  {beneficiary.address}
-                                </span>
-                                <Badge variant="secondary" className="shrink-0">
-                                  {beneficiary.percentage / 1000}%
-                                </Badge>
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <p className="text-sm text-muted-foreground">
-                            No beneficiaries configured.
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  </details>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
-      )}
-
-        <div className="mt-12 border-t pt-8 text-center">
-          <p className="mb-4 text-sm text-muted-foreground">
-            Already running a Koinos block producer?
-          </p>
-          <DialogTrigger asChild>
-            <Button variant="outline">
-              <Plus className="mr-2 h-4 w-4" />
-              Create a mining pool
-            </Button>
-          </DialogTrigger>
-        </div>
       </Dialog>
     </div>
   );

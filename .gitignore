@@ -5,6 +5,7 @@ docs/*
 !docs/security/
 docs/security/*
 !docs/security/dependency-log.md
+!docs/superpowers/
 local-docs/
 explorer-base/
 **/.DS_Store
@@ -16,3 +17,4 @@ explorer-base/
 .env.test.local
 koinosblocks/
 yarn-error.log
+.vercel/

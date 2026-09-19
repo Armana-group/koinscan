@@ -1427,7 +1427,9 @@ assert.doesNotMatch(dex, /tiers? \d/i, "the word tier is not in trade copy");
 assert.match(dex, /Waits for a taker/, "the order-placement sentence is present");
 
 for (const html of [pools, dex]) {
-  assert.doesNotMatch(html, /BETA<\/div>|<span[^>]*>Beta<\/span>[^<]*<\/h1>/, "no beta tag inside page titles");
+  const h1s = [...html.matchAll(/<h1[^>]*>([\s\S]*?)<\/h1>/g)].map((m) => m[1]);
+  assert.ok(h1s.length > 0, "page has a title");
+  for (const h1 of h1s) assert.doesNotMatch(h1, /beta/i, "no beta tag inside page titles");
 }
 
 console.log("dapps ui regression passed");

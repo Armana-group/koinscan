@@ -17,4 +17,4 @@ explorer-base/
 .env.test.local
 koinosblocks/
 yarn-error.log
-.vercel/
+.vercel

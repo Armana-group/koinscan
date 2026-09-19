@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link'
+import { BetaBanner } from '@/components/BetaBanner'
 
 export function Footer() {
   const appVersion = process.env.NEXT_PUBLIC_APP_VERSION;
@@ -9,8 +10,8 @@ export function Footer() {
 
   return (
     <footer className="w-full py-4 text-sm text-muted-foreground">
-      <div className="container mx-auto px-4 flex flex-col md:flex-row justify-between items-center gap-4">
-        <div className="flex flex-wrap items-baseline justify-center gap-x-3 gap-y-1">
+      <div className="container mx-auto grid items-center gap-3 px-4 text-center lg:grid-cols-[1fr_auto_1fr] lg:text-left">
+        <div className="flex flex-wrap items-baseline justify-center gap-x-3 gap-y-1 lg:justify-self-start">
           <p className="leading-none">
             © 2025{' '}
             <Link
@@ -27,8 +28,15 @@ export function Footer() {
               {buildLabel}
             </span>
           )}
+          <Link
+            href="/changelog"
+            className="text-xs leading-none text-muted-foreground/70 transition-colors hover:text-foreground hover:underline"
+          >
+            Changelog
+          </Link>
         </div>
+        <BetaBanner className="max-w-xl justify-self-center px-2" />
       </div>
     </footer>
   )
-}
+} 

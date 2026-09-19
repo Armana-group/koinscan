@@ -18,7 +18,7 @@ interface CachedPrice {
 let cachedPrice: CachedPrice | null = null;
 const CACHE_TTL = 60000; // 60 seconds
 
-const PRICE_API_URL = 'https://kondor-price-service.armana.workers.dev/price/koin';
+const PRICE_API_URL = '/api/koin-price';
 
 /**
  * Fetches the current KOIN price in USD
@@ -42,7 +42,6 @@ export async function getKoinPrice(): Promise<number | null> {
     });
 
     if (!response.ok) {
-      console.error('Failed to fetch KOIN price:', response.status, response.statusText);
       // Return stale cache if available
       return cachedPrice?.price ?? null;
     }
@@ -56,8 +55,7 @@ export async function getKoinPrice(): Promise<number | null> {
     };
 
     return data.usd;
-  } catch (error) {
-    console.error('Error fetching KOIN price:', error);
+  } catch {
     // Return stale cache if available
     return cachedPrice?.price ?? null;
   }

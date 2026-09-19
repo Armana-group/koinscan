@@ -8,7 +8,6 @@ import {
   enrichTransactionsWithTimestamps,
   DetailedTransaction,
   TransactionEvent,
-  getTokenBalance,
   shortenAddress,
   TransactionAction,
   decodeTokenTransferEventData
@@ -82,8 +81,9 @@ import {
   AlertTitle,
   AlertDescription
 } from "@/components/ui/alert";
-import { formatTokenAmount, getTokenBySymbol } from '@/lib/tokens';
+import { formatTokenAmount } from '@/lib/tokens';
 import { useWallet } from '@/contexts/WalletContext';
+import { getTotalTransactionCount } from '@/lib/account-history';
 
 type PaginationHistoryItem = {
   transactions: DetailedTransaction[];
@@ -213,32 +213,12 @@ export function DetailedTransactionHistory({
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [totalTransactionCount, setTotalTransactionCount] = useState<number | null>(null);
-  const [balance, setBalance] = useState<string | null>(null);
   const [selectedFilters, setSelectedFilters] = useState<string[]>([]);
   
   // Constants
   const [limit, setLimit] = useState<number>(10);
   const [ascending, setAscending] = useState<boolean>(false); // Default to descending order (newest first)
   const [advancedView, setAdvancedView] = useState<boolean>(false); // Toggle for showing technical details
-  
-  // Add state for token balances
-  const [koinBalance, setKoinBalance] = useState<string>('0');
-  const [vhpBalance, setVhpBalance] = useState<string>('0');
-  const [loadingBalance, setLoadingBalance] = useState<boolean>(false);
-
-  // Format balance for display (REST API returns whole units, not satoshis)
-  const formatBalanceDisplay = (balance: string): string => {
-    const value = parseFloat(balance) || 0;
-    if (value === 0) return '0';
-    if (value < 0.01) return '< 0.01';
-    if (value < 1000) return value.toFixed(2);
-    if (value < 1000000) return `${(value / 1000).toFixed(2)}K`;
-    return `${(value / 1000000).toFixed(2)}M`;
-  };
-  
-  // Maintain tokenBalance and tokenSymbol for backward compatibility
-  const [tokenBalance, setTokenBalance] = useState<string>('0');
-  const [tokenSymbol, setTokenSymbol] = useState<string>('KOIN');
   
   // Add state for pagination
   const [paginationHistory, setPaginationHistory] = useState<{[page: number]: {
@@ -312,10 +292,10 @@ export function DetailedTransactionHistory({
         // If this is the first page and we're in descending order (newest first),
         // use the seq_num of the first transaction to determine total count
         if (pageNumber === 1 && !ascending && response.length > 0 && response[0].seq_num) {
-          const firstTxSeqNum = parseInt(response[0].seq_num, 10);
-          if (!isNaN(firstTxSeqNum)) {
-            console.log(`First transaction has seq_num ${firstTxSeqNum}, using as total count`);
-            setTotalTransactionCount(firstTxSeqNum);
+          const transactionCount = getTotalTransactionCount(response[0].seq_num);
+          if (transactionCount !== null) {
+            console.log(`First transaction has seq_num ${response[0].seq_num}, using ${transactionCount} as total count`);
+            setTotalTransactionCount(transactionCount);
           }
         }
         
@@ -364,26 +344,6 @@ export function DetailedTransactionHistory({
     },
     [address, limit, ascending, rpcNode]
   );
-
-  // Update function to fetch both token balances
-  const fetchTokenBalances = async (accountAddress: string) => {
-    setLoadingBalance(true);
-    try {
-      // Fetch KOIN balance
-      const koinBalanceValue = await getTokenBalance(rpcNode, accountAddress, 'koin');
-      setKoinBalance(koinBalanceValue);
-      setTokenBalance(koinBalanceValue); // Keep this for backward compatibility
-      
-      // Fetch VHP balance
-      const vhpBalanceValue = await getTokenBalance(rpcNode, accountAddress, 'vhp');
-      setVhpBalance(vhpBalanceValue);
-    } catch (err) {
-      console.error('Error fetching token balances:', err);
-      toast.error("Failed to fetch token balances. Please try again.");
-    } finally {
-      setLoadingBalance(false);
-    }
-  };
 
   // Fetch transactions when address changes or when limit/ascending changes
   useEffect(() => {
@@ -471,13 +431,6 @@ export function DetailedTransactionHistory({
         });
     }
   }, [page, address, fetchTransactions]);
-
-  // Replace fetchTokenBalance with fetchTokenBalances in useEffect
-  useEffect(() => {
-    if (address && rpcNode) {
-      fetchTokenBalances(address);
-    }
-  }, [address, rpcNode]);
 
   const formatDate = (timestamp: string) => {
     if (!timestamp) return 'Unknown';

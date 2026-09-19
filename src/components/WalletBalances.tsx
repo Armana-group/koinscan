@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { getAllTokens, KoinosToken } from '@/lib/tokens';
 import { getKoinPrice, formatUsdValue } from '@/lib/price';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -9,51 +8,19 @@ import Image from 'next/image';
 import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { InfoIcon } from 'lucide-react';
 import { useWallet } from '@/contexts/WalletContext';
-import { Contract, Provider } from 'koilib';
-import tokenAbi from '@/koinos/abi';
+import {
+  type TokenBalance,
+  type TokenBalanceFailure,
+  type WalletBalanceLoadResult,
+} from '@/lib/wallet-balances';
 
 interface WalletBalancesProps {
   address: string;
 }
 
-interface TokenBalance {
-  token: KoinosToken;
-  balance: string;
-  formattedBalance: string;
-  numericValue: number;
-}
-
-// Map short names to actual contract addresses
-const SHORT_NAME_TO_CONTRACT: Record<string, string> = {
-  'koin': '15DJN4a8SgrbGhhGksSBASiSYjGnMU8dGL',
-  'vhp': '1AdzuXSpC6K9qtXdCBgcTLYGYyPaUfEvNm',
-};
-
-// Get the actual contract address for a token
-function getContractAddress(token: KoinosToken): string {
-  const lowerAddress = token.address.toLowerCase();
-  return SHORT_NAME_TO_CONTRACT[lowerAddress] || token.address;
-}
-
-// Helper to process tokens in batches
-async function processBatches<T, R>(
-  items: T[],
-  batchSize: number,
-  processor: (item: T) => Promise<R>
-): Promise<R[]> {
-  const results: R[] = [];
-
-  for (let i = 0; i < items.length; i += batchSize) {
-    const batch = items.slice(i, i + batchSize);
-    const batchResults = await Promise.all(batch.map(processor));
-    results.push(...batchResults);
-  }
-
-  return results;
-}
-
 export function WalletBalances({ address }: WalletBalancesProps) {
   const [tokenBalances, setTokenBalances] = useState<TokenBalance[]>([]);
+  const [balanceFailures, setBalanceFailures] = useState<TokenBalanceFailure[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [koinPrice, setKoinPrice] = useState<number | null>(null);
@@ -73,86 +40,47 @@ export function WalletBalances({ address }: WalletBalancesProps) {
   }, []);
 
   useEffect(() => {
+    const controller = new AbortController();
+
     async function fetchBalances() {
       if (!address || !jsonRpcNode) return;
 
       try {
         setLoading(true);
+        setError(null);
+        setBalanceFailures([]);
 
-        // Create provider for RPC calls
-        const provider = new Provider(jsonRpcNode);
-
-        // Get all tokens from the official list
-        const tokens = await getAllTokens();
-
-        // Process tokens in batches of 10
-        const results = await processBatches(tokens, 10, async (token) => {
-          try {
-            const contractAddress = getContractAddress(token);
-
-            // Create contract instance
-            const contract = new Contract({
-              id: contractAddress,
-              provider,
-              abi: tokenAbi
-            });
-
-            // Call balanceOf
-            const { result } = await contract.functions.balanceOf({
-              owner: address
-            });
-
-            // Get balance value (in satoshis)
-            const balanceRaw = result?.value || '0';
-
-            // Skip tokens with zero balance
-            if (balanceRaw === '0') return null;
-
-            // Convert from satoshis to whole units
-            const decimals = parseInt(token.decimals) || 8;
-            const numericValue = parseInt(balanceRaw) / Math.pow(10, decimals);
-
-            // Skip if effectively zero after conversion
-            if (numericValue === 0) return null;
-
-            // Format the balance for display
-            const formatBalance = (value: number): string => {
-              if (value === 0) return '0';
-              if (value < 0.000001) return '< 0.000001';
-              if (value < 1) return value.toFixed(6);
-              if (value < 1000) return value.toFixed(4);
-              if (value < 1000000) return `${(value / 1000).toFixed(2)}K`;
-              return `${(value / 1000000).toFixed(2)}M`;
-            };
-
-            return {
-              token,
-              balance: balanceRaw,
-              formattedBalance: formatBalance(numericValue),
-              numericValue
-            };
-          } catch (err) {
-            // Silently skip tokens that fail
-            return null;
-          }
+        const searchParams = new URLSearchParams({
+          address,
+          rpcNode: jsonRpcNode,
+        });
+        const response = await fetch(`/api/account-balances?${searchParams.toString()}`, {
+          signal: controller.signal,
         });
 
-        // Filter out null results and sort by value
-        const validBalances = results
-          .filter((item): item is TokenBalance => !!item)
-          .sort((a, b) => b.numericValue - a.numericValue);
+        if (!response.ok) {
+          throw new Error(`Balance request failed with status ${response.status}`);
+        }
 
-        setTokenBalances(validBalances);
-        setError(null);
+        const { balances, failures } = await response.json() as WalletBalanceLoadResult;
+
+        if (controller.signal.aborted) return;
+
+        setTokenBalances(balances);
+        setBalanceFailures(failures);
       } catch (err) {
+        if (controller.signal.aborted) return;
         console.error('Error fetching wallet balances:', err);
+        setTokenBalances([]);
+        setBalanceFailures([]);
         setError('Failed to load balances');
       } finally {
-        setLoading(false);
+        if (!controller.signal.aborted) setLoading(false);
       }
     }
 
     fetchBalances();
+    return () => controller.abort();
   }, [address, jsonRpcNode]);
 
   return (
@@ -186,63 +114,76 @@ export function WalletBalances({ address }: WalletBalancesProps) {
           </div>
         ) : error ? (
           <div className="text-destructive">{error}</div>
-        ) : tokenBalances.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {tokenBalances.map(({ token, formattedBalance, numericValue }) => {
-              // Calculate USD value for KOIN only
-              const isKoin = token.symbol.toUpperCase() === 'KOIN';
-              const usdValue = isKoin && koinPrice ? numericValue * koinPrice : null;
-
-              return (
-                <div
-                  key={token.symbol}
-                  className="flex items-center justify-between p-3 rounded-lg bg-background/50 border border-border/40 hover:border-border/60 transition-colors"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-muted/50 flex items-center justify-center overflow-hidden ring-2 ring-border/20">
-                      {token.logoURI ? (
-                        <Image
-                          src={token.logoURI}
-                          alt={token.symbol}
-                          width={32}
-                          height={32}
-                          className="object-contain"
-                        />
-                      ) : (
-                        <span className="text-sm font-bold text-muted-foreground">
-                          {token.symbol.charAt(0)}
-                        </span>
-                      )}
-                    </div>
-                    <div>
-                      <div className="font-semibold text-lg">
-                        {formattedBalance}
-                        {usdValue !== null && (
-                          <span className="text-sm font-normal text-muted-foreground ml-2">
-                            (~{formatUsdValue(usdValue)})
-                          </span>
-                        )}
-                      </div>
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <div className="text-xs text-muted-foreground cursor-help">{token.symbol}</div>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p className="font-normal">{token.name}</p>
-                            {token.description && <p className="text-xs text-muted-foreground max-w-xs">{token.description}</p>}
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
         ) : (
-          <div className="text-muted-foreground text-center py-6 bg-muted/20 rounded-lg">
-            No token balances found
+          <div className="space-y-3">
+            {balanceFailures.length > 0 && (
+              <div
+                className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-700 dark:text-amber-300"
+                role="status"
+              >
+                {balanceFailures.length} token balance{balanceFailures.length === 1 ? '' : 's'} could not be verified: {' '}
+                {balanceFailures.map(({ token }) => token.symbol).join(', ')}
+              </div>
+            )}
+            {tokenBalances.length > 0 ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {tokenBalances.map(({ token, formattedBalance, numericValue }) => {
+                  // Calculate USD value for KOIN only
+                  const isKoin = token.symbol.toUpperCase() === 'KOIN';
+                  const usdValue = isKoin && koinPrice ? numericValue * koinPrice : null;
+
+                  return (
+                    <div
+                      key={token.symbol}
+                      className="flex items-center justify-between p-3 rounded-lg bg-background/50 border border-border/40 hover:border-border/60 transition-colors"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-muted/50 flex items-center justify-center overflow-hidden ring-2 ring-border/20">
+                          {token.logoURI ? (
+                            <Image
+                              src={token.logoURI}
+                              alt={token.symbol}
+                              width={32}
+                              height={32}
+                              className="object-contain"
+                            />
+                          ) : (
+                            <span className="text-sm font-bold text-muted-foreground">
+                              {token.symbol.charAt(0)}
+                            </span>
+                          )}
+                        </div>
+                        <div>
+                          <div className="font-semibold text-lg">
+                            {formattedBalance}
+                            {usdValue !== null && (
+                              <span className="text-sm font-normal text-muted-foreground ml-2">
+                                (~{formatUsdValue(usdValue)})
+                              </span>
+                            )}
+                          </div>
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <div className="text-xs text-muted-foreground cursor-help">{token.symbol}</div>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p className="font-normal">{token.name}</p>
+                                {token.description && <p className="text-xs text-muted-foreground max-w-xs">{token.description}</p>}
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="text-muted-foreground text-center py-6 bg-muted/20 rounded-lg">
+                No verified token balances found
+              </div>
+            )}
           </div>
         )}
       </CardContent>

@@ -1,20 +1,9 @@
 "use client";
 
 import { Contract, Multicall, ProviderInterface, utils } from "koilib";
-import { ArrowDownUp, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
-import { BetaTag } from "@/components/BetaTag";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -32,15 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { WalletButton } from "@/components/WalletButton";
 import { useWallet } from "@/contexts/WalletContext";
 import tokenAbi from "@/koinos/abi";
 import { abiDexKoinVhp } from "@/koinos/abis/dexKoinVhp";
@@ -52,6 +33,7 @@ import {
   KOIN_VHP_DEX_CONTRACT_ID,
   VHP_CONTRACT_ID,
 } from "@/koinos/constants";
+import { findMatchingOrder } from "@/lib/fogata";
 import { cn } from "@/lib/utils";
 import * as toast from "@/lib/toast";
 
@@ -328,6 +310,18 @@ export default function DexPage() {
     }
     return (koin / vhp).toLocaleString(undefined, { maximumFractionDigits: 8 });
   }, [koinAmount, vhpAmount]);
+
+  const matchingOrder = useMemo(
+    () =>
+      findMatchingOrder(
+        side,
+        vhpAmount,
+        koinAmount,
+        side === "sell" ? buyOrders : sellOrders,
+        account
+      ),
+    [side, vhpAmount, koinAmount, buyOrders, sellOrders, account]
+  );
 
   const availablePayBalance = useMemo(() => {
     if (side === "buy") return walletBalances?.koin ?? null;
@@ -618,386 +612,196 @@ export default function DexPage() {
     }
   };
 
-  const renderOrders = (orders: DexOrder[], type: "buy" | "sell") => (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-lg capitalize">{type} VHP orders</CardTitle>
-        <CardDescription>
-         Orders that are {type === "buy" ? "buying VHP with KOIN" : "selling VHP for KOIN"}. By filling an order you pay {type === "buy" 
-            ? "VHP to get KOIN"
-            : "KOIN to get VHP"
-          }.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        {orders.length === 0 ? (
-          <p className="py-8 text-center text-sm text-muted-foreground">
-            No {type} orders found in tiers 1–17.
-          </p>
-        ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Price</TableHead>
-                <TableHead>KOIN</TableHead>
-                <TableHead>VHP</TableHead>
-                <TableHead className="text-right">Action</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {orders.map((order) => (
-                <TableRow key={`${type}-${order.id}`}>
-                  <TableCell className="font-medium">
-                    {formatPrice(order)}
-                  </TableCell>
-                  <TableCell>{formatAmount(order.koin_amount)}</TableCell>
-                  <TableCell>{formatAmount(order.vhp_amount)}</TableCell>
-                  <TableCell className="text-right">
-                    {account === order.owner ? (
-                      <Badge variant="secondary">My order</Badge>
-                    ) : (
-                      <Button
-                        size="sm"
-                        onClick={() => openFillDialog(order)}
-                        disabled={!account || submitting}
-                      >
-                        Fill
-                      </Button>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        )}
-      </CardContent>
-    </Card>
-  );
-
   const getPoolLabel = (poolAddress: string) => {
     if (!poolAddress) return "—";
     const match = pools.find((miningPool) => miningPool.account === poolAddress);
     return match?.name || poolAddress;
   };
 
-  const renderMyOrders = () => (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-lg">My orders</CardTitle>
-        <CardDescription>
-          Open buy and sell orders owned by your connected account.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        {!account ? (
-          <p className="py-8 text-center text-sm text-muted-foreground">
-            Connect your wallet to view your orders.
+  const renderBook = () => {
+    const orders = side === "sell" ? sellOrders : buyOrders;
+    const mine = myOrders.filter((order) => order.buy === (side === "buy"));
+    const others = orders.filter((order) => order.owner !== account);
+    const rows = [...mine, ...others];
+    return (
+      <details className="mt-9 border-t">
+        <summary className="flex cursor-pointer list-none items-center justify-between py-3.5 text-sm text-muted-foreground">
+          <span>Open orders</span>
+          <span className="tabular-nums">{loading ? "…" : rows.length} ›</span>
+        </summary>
+        {error && (
+          <p className="pb-3 text-sm text-muted-foreground">
+            Couldn&apos;t load orders.{" "}
+            <button type="button" className="text-brand" onClick={loadOrders}>Retry</button>
           </p>
-        ) : myOrders.length === 0 ? (
-          <p className="py-8 text-center text-sm text-muted-foreground">
-            You have no open orders.
-          </p>
-        ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Side</TableHead>
-                <TableHead>Price</TableHead>
-                <TableHead>KOIN</TableHead>
-                <TableHead>VHP</TableHead>
-                <TableHead>Pool</TableHead>
-                <TableHead className="text-right">Action</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {myOrders.map((order) => (
-                <TableRow key={`mine-${order.id}`}>
-                  <TableCell className="font-medium">
-                    {order.buy ? "Buy" : "Sell"}
-                  </TableCell>
-                  <TableCell>{formatPrice(order)}</TableCell>
-                  <TableCell>{formatAmount(order.koin_amount)}</TableCell>
-                  <TableCell>{formatAmount(order.vhp_amount)}</TableCell>
-                  <TableCell>{getPoolLabel(order.pool)}</TableCell>
-                  <TableCell className="text-right">
-                    <Button
-                      size="sm"
-                      variant="destructive"
-                      onClick={() => handleCancelOrder(order)}
-                      disabled={submitting}
-                    >
-                      Cancel
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
         )}
-      </CardContent>
-    </Card>
-  );
+        {!error && rows.length === 0 && !loading && (
+          <p className="pb-3 text-sm text-muted-foreground">No open orders.</p>
+        )}
+        {rows.length > 0 && (
+          <table className="w-full text-sm">
+            <tbody>
+              {rows.map((order) => {
+                const isMine = order.owner === account;
+                return (
+                  <tr key={order.id} className="border-t">
+                    <td className={cn("py-2.5", isMine && "text-brand")}>
+                      {isMine ? "Your " : ""}
+                      {order.buy ? "buy" : "sell"} {formatAmount(order.vhp_amount)} VHP
+                      {isMine && order.pool && <span className="text-muted-foreground"> · {getPoolLabel(order.pool)}</span>}
+                    </td>
+                    <td className="py-2.5 text-right tabular-nums text-muted-foreground">
+                      {formatPrice(order)}
+                      {" · "}
+                      {isMine ? (
+                        <button type="button" className="hover:text-foreground" onClick={() => handleCancelOrder(order)} disabled={submitting}>
+                          cancel
+                        </button>
+                      ) : (
+                        <button type="button" className="text-brand" onClick={() => openFillDialog(order)} disabled={!account || submitting}>
+                          fill
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
+      </details>
+    );
+  };
+
+  const payAmount = side === "sell" ? vhpAmount : koinAmount;
+  const getAmount = side === "sell" ? koinAmount : vhpAmount;
+  const paySymbol = side === "sell" ? "VHP" : "KOIN";
+  const getSymbol = side === "sell" ? "KOIN" : "VHP";
 
   return (
-    <div className="container mx-auto px-4 py-10">
-      <div className="mx-auto max-w-5xl space-y-8">
-        <div className="text-center">
-          <div className="mb-3 flex justify-center">
-            <ArrowDownUp className="h-10 w-10 text-primary" />
-          </div>
-          <h1 className="inline-flex flex-wrap items-center justify-center gap-2 text-3xl font-semibold tracking-tight sm:text-4xl">
-            KOIN / VHP order book decentralized exchange
-            <BetaTag />
-          </h1>
-          <p className="mx-auto mt-4 max-w-3xl text-muted-foreground">
-            Trade KOIN and VHP directly through a decentralized order book.
-            You can also create VHP sell orders while your VHP is still mining
-            in a compatible mining pool.
-          </p>
-        </div>
+    <div className="mx-auto w-full max-w-[440px] px-4 py-10">
+      <h1 className="text-2xl font-semibold tracking-tight">Trade</h1>
 
-        {!account && (
-          <Alert>
-            <AlertDescription>
-              Connect your wallet to create or fill an order.
-            </AlertDescription>
-          </Alert>
-        )}
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Create an order</CardTitle>
-            <CardDescription>
-              Set the amounts you pay and receive. The contract derives the
-              order tier from the VHP amount.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div
-              className="grid grid-cols-2 gap-1 rounded-lg bg-muted p-1"
-              role="group"
-              aria-label="Order side"
-            >
-              <button
-                type="button"
-                disabled={submitting}
-                onClick={() => setSide("sell")}
-                className={cn(
-                  "rounded-md px-3 py-2 text-sm font-medium transition-colors",
-                  side === "sell"
-                    ? "bg-background text-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
-                )}
-              >
-                Sell VHP
-              </button>
-              <button
-                type="button"
-                disabled={submitting}
-                onClick={() => {
-                  setSide("buy");
-                  setPool("");
-                }}
-                className={cn(
-                  "rounded-md px-3 py-2 text-sm font-medium transition-colors",
-                  side === "buy"
-                    ? "bg-background text-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
-                )}
-              >
-                Buy VHP
-              </button>
-            </div>
-
-            {side === "sell" && (
-              <div className="space-y-2">
-                <Label htmlFor="dex-pool">Mining pool (optional)</Label>
-                <Select
-                  value={pool || NO_POOL_VALUE}
-                  onValueChange={(value) =>
-                    setPool(value === NO_POOL_VALUE ? "" : value)
-                  }
-                  disabled={submitting || poolsLoading}
-                >
-                  <SelectTrigger id="dex-pool">
-                    <SelectValue
-                      placeholder={
-                        poolsLoading
-                          ? "Loading pools..."
-                          : "Sell VHP from your wallet"
-                      }
-                    />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={NO_POOL_VALUE}>
-                      Sell VHP from your wallet
-                    </SelectItem>
-                    {pools.map((miningPool) => (
-                      <SelectItem
-                        key={miningPool.account}
-                        value={miningPool.account}
-                      >
-                        {miningPool.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">
-                  The pool must support DEX withdrawals and your pool settings
-                  must allow the DEX to unstake VHP.
-                </p>
-              </div>
-            )}
-
-            <div className="space-y-3">
-              <div className="space-y-2">
-                <Label htmlFor="dex-pay-amount">
-                  {side === "sell" ? "VHP to pay" : "KOIN to pay"}
-                </Label>
-                <div className="flex gap-2">
-                  <Input
-                    id="dex-pay-amount"
-                    type="number"
-                    min="0"
-                    step="0.00000001"
-                    placeholder="0"
-                    value={side === "sell" ? vhpAmount : koinAmount}
-                    onChange={(event) =>
-                      side === "sell"
-                        ? setVhpAmount(event.target.value)
-                        : setKoinAmount(event.target.value)
-                    }
-                    disabled={submitting}
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    disabled={
-                      submitting
-                      || !availablePayBalance
-                      || balancesLoading
-                      || BigInt(availablePayBalance || "0") <= BigInt(0)
-                    }
-                    onClick={() => {
-                      if (!availablePayBalance) return;
-                      const maxValue = formatAmountForInput(availablePayBalance);
-                      if (side === "sell") setVhpAmount(maxValue);
-                      else setKoinAmount(maxValue);
-                    }}
-                  >
-                    Max
-                  </Button>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  {!account
-                    ? "Connect your wallet to see available balance"
-                    : balancesLoading
-                      ? "Loading available balance..."
-                      : availablePayBalance !== null
-                        ? `Available: ${formatAmount(availablePayBalance)} ${availablePaySymbol}${
-                            side === "sell" && pool ? " in pool" : ""
-                          }`
-                        : "Available balance unavailable"}
-                </p>
-              </div>
-
-              <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                <div className="h-px flex-1 bg-border" />
-                <span>
-                  {impliedPrice
-                    ? `${impliedPrice} KOIN / VHP`
-                    : "Price appears when both amounts are set"}
-                </span>
-                <div className="h-px flex-1 bg-border" />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="dex-get-amount">
-                  {side === "sell" ? "KOIN to get" : "VHP to get"}
-                </Label>
-                <Input
-                  id="dex-get-amount"
-                  type="number"
-                  min="0"
-                  step="0.00000001"
-                  placeholder="0"
-                  value={side === "sell" ? koinAmount : vhpAmount}
-                  onChange={(event) =>
-                    side === "sell"
-                      ? setKoinAmount(event.target.value)
-                      : setVhpAmount(event.target.value)
-                  }
-                  disabled={submitting}
-                />
-              </div>
-            </div>
-
-            <Button
-              className="w-full"
-              onClick={handleCreateOrder}
-              disabled={!account || submitting}
-            >
-              {submitting
-                ? "Submitting..."
-                : side === "sell"
-                  ? "Create sell order"
-                  : "Create buy order"}
-            </Button>
-          </CardContent>
-        </Card>
-
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-semibold">Order book</h2>
-            <p className="text-sm text-muted-foreground">
-              Up to 20 orders from each of tiers 1–17.
-            </p>
-          </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={loadOrders}
-            disabled={loading}
-          >
-            <RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-            Refresh
-          </Button>
-        </div>
-
-        {error && (
-          <Alert variant="destructive">
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
-
-        {loading ? (
-          <div className="py-12 text-center text-muted-foreground">
-            Loading all order tiers...
-          </div>
-        ) : (
-          <Tabs defaultValue="sell">
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="sell">
-                Sell orders ({sellOrders.length})
-              </TabsTrigger>
-              <TabsTrigger value="buy">
-                Buy orders ({buyOrders.length})
-              </TabsTrigger>
-              <TabsTrigger value="mine">
-                My orders ({myOrders.length})
-              </TabsTrigger>
-            </TabsList>
-            <TabsContent value="sell">
-              {renderOrders(sellOrders, "sell")}
-            </TabsContent>
-            <TabsContent value="buy">
-              {renderOrders(buyOrders, "buy")}
-            </TabsContent>
-            <TabsContent value="mine">{renderMyOrders()}</TabsContent>
-          </Tabs>
-        )}
+      <div className="mt-6 grid grid-cols-2 gap-0.5 rounded-[9px] bg-muted p-[3px]" role="group" aria-label="Order side">
+        <button
+          type="button"
+          disabled={submitting}
+          onClick={() => setSide("sell")}
+          className={cn("rounded-[7px] py-1.5 text-sm transition-colors", side === "sell" ? "bg-background font-medium shadow-sm" : "text-muted-foreground")}
+        >
+          Sell VHP
+        </button>
+        <button
+          type="button"
+          disabled={submitting}
+          onClick={() => { setSide("buy"); setPool(""); }}
+          className={cn("rounded-[7px] py-1.5 text-sm transition-colors", side === "buy" ? "bg-background font-medium shadow-sm" : "text-muted-foreground")}
+        >
+          Buy VHP
+        </button>
       </div>
+
+      <div className="mt-4 flex items-baseline gap-2.5 rounded-xl border px-4 py-3.5">
+        <input
+          id="dex-pay-amount"
+          type="number"
+          min="0"
+          step="0.00000001"
+          placeholder="0"
+          inputMode="decimal"
+          aria-label={`You ${side === "sell" ? "sell" : "pay"}`}
+          className="w-full min-w-0 bg-transparent text-[28px] font-semibold tracking-tight outline-none tabular-nums"
+          value={payAmount}
+          onChange={(event) => (side === "sell" ? setVhpAmount(event.target.value) : setKoinAmount(event.target.value))}
+          disabled={submitting}
+        />
+        <span className="font-medium text-muted-foreground">{paySymbol}</span>
+        <button
+          type="button"
+          className="text-xs font-semibold text-brand disabled:opacity-40"
+          disabled={submitting || !availablePayBalance || balancesLoading || BigInt(availablePayBalance || "0") <= BigInt(0)}
+          onClick={() => {
+            if (!availablePayBalance) return;
+            const maxValue = formatAmountForInput(availablePayBalance);
+            if (side === "sell") setVhpAmount(maxValue);
+            else setKoinAmount(maxValue);
+          }}
+        >
+          Max
+        </button>
+      </div>
+      <div className="mt-2.5 flex items-baseline gap-2.5 rounded-xl border px-4 py-3.5">
+        <input
+          id="dex-get-amount"
+          type="number"
+          min="0"
+          step="0.00000001"
+          placeholder="0"
+          inputMode="decimal"
+          aria-label="You get"
+          className="w-full min-w-0 bg-transparent text-[28px] font-semibold tracking-tight outline-none tabular-nums"
+          value={getAmount}
+          onChange={(event) => (side === "sell" ? setKoinAmount(event.target.value) : setVhpAmount(event.target.value))}
+          disabled={submitting}
+        />
+        <span className="font-medium text-muted-foreground">{getSymbol}</span>
+      </div>
+      <div className="mt-2 flex justify-between px-0.5 text-xs text-muted-foreground">
+        <span className="tabular-nums">{impliedPrice ? `${impliedPrice} KOIN per VHP` : " "}</span>
+        <span>
+          {!account
+            ? ""
+            : balancesLoading
+              ? "Loading balance…"
+              : availablePayBalance !== null
+                ? `Wallet ${formatAmount(availablePayBalance)} ${availablePaySymbol}${side === "sell" && pool ? " in pool" : ""}`
+                : ""}
+        </span>
+      </div>
+
+      {side === "sell" && account && pools.length > 0 && (
+        <div className="mt-3 text-xs text-muted-foreground">
+          <Select value={pool || NO_POOL_VALUE} onValueChange={(value) => setPool(value === NO_POOL_VALUE ? "" : value)} disabled={submitting || poolsLoading}>
+            <SelectTrigger id="dex-pool" className="h-8 w-auto gap-2 border-0 px-0 text-xs text-brand shadow-none">
+              <SelectValue placeholder="Sell from a pool instead" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={NO_POOL_VALUE}>Sell from your wallet</SelectItem>
+              {pools.map((miningPool) => (
+                <SelectItem key={miningPool.account} value={miningPool.account}>
+                  Sell from {miningPool.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+
+      {matchingOrder && (
+        <p className="mt-4 text-xs text-muted-foreground">
+          An open order matches —{" "}
+          <button type="button" className="text-brand" onClick={() => openFillDialog(matchingOrder)} disabled={!account || submitting}>
+            {matchingOrder.buy ? "Sell" : "Buy"} {formatAmount(matchingOrder.vhp_amount)} VHP at {formatPrice(matchingOrder)} ›
+          </button>
+        </p>
+      )}
+
+      {account ? (
+        <Button
+          className="mt-4 h-[42px] w-full rounded-[11px] bg-brand text-brand-foreground hover:bg-brand/90"
+          onClick={handleCreateOrder}
+          disabled={submitting}
+        >
+          {submitting ? "Submitting…" : "Place order"}
+        </Button>
+      ) : (
+        <div className="mt-4">
+          <WalletButton connectLabel="Connect wallet" />
+        </div>
+      )}
+      <p className="mt-2.5 text-center text-xs text-muted-foreground">Waits for a taker. Cancel any time.</p>
+
+      {renderBook()}
 
       <Dialog
         open={Boolean(selectedOrder)}
@@ -1012,7 +816,7 @@ export default function DexPage() {
             </DialogTitle>
             <DialogDescription>
               Price: {selectedOrder ? formatPrice(selectedOrder) : "—"} KOIN
-              per VHP. Partial fills are supported.
+              per VHP. You can fill part of it.
             </DialogDescription>
           </DialogHeader>
           {selectedOrder && (
@@ -1049,7 +853,7 @@ export default function DexPage() {
               Cancel
             </Button>
             <Button onClick={handleFillOrder} disabled={submitting}>
-              {submitting ? "Submitting..." : "Fill order"}
+              {submitting ? "Submitting..." : "Fill"}
             </Button>
           </DialogFooter>
         </DialogContent>

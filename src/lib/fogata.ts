@@ -52,7 +52,7 @@ export function poolHealth(
   if (!input.lastBlockTime) return "paused";
   const age = now.getTime() - input.lastBlockTime.getTime();
   if (age > DAY_MS) return "paused";
-  if (input.expectedTimeToProduce && age > 2 * input.expectedTimeToProduce) return "late";
+  if (input.expectedTimeToProduce && age > 4 * input.expectedTimeToProduce) return "late";
   if (input.effectiveness !== undefined && input.effectiveness < 50) return "late";
   return "producing";
 }

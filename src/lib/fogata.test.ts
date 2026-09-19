@@ -26,9 +26,15 @@ describe("poolHealth", () => {
       "producing"
     );
   });
-  it("is late when the last block is older than 2x the expected time", () => {
+  it("is still producing when the last block is between 2x and 4x the expected time", () => {
     assert.equal(
       poolHealth({ lastBlockTime: new Date(now.getTime() - 3 * tenMin), expectedTimeToProduce: tenMin, effectiveness: 80 }, now),
+      "producing"
+    );
+  });
+  it("is late when the last block is older than 4x the expected time", () => {
+    assert.equal(
+      poolHealth({ lastBlockTime: new Date(now.getTime() - 5 * tenMin), expectedTimeToProduce: tenMin, effectiveness: 80 }, now),
       "late"
     );
   });

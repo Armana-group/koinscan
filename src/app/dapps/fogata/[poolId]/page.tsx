@@ -998,7 +998,7 @@ export default function FogataPoolPage() {
                   <span className="ml-1.5 text-lg font-medium tracking-normal text-muted-foreground">%</span>
                 </p>
                 <div className="mt-6">
-                  <WalletButton />
+                  <WalletButton connectLabel="Connect wallet" />
                 </div>
               </>
             )}

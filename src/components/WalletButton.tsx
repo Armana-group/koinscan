@@ -37,7 +37,7 @@ function shortAddress(address: string): string {
   return `${address.slice(0, 4)}...${address.slice(address.length - 4)}`;
 }
 
-export function WalletButton() {
+export function WalletButton({ connectLabel }: { connectLabel?: string } = {}) {
   const { signer, setSigner, savedAddress, savedWalletType, forgetAddress, isReconnecting, kondorAccounts } = useWallet();
   const addr = (signer as ExtendedSigner)?.getAddress();
   const walletName = (signer as ExtendedSigner)?.name;
@@ -118,6 +118,11 @@ export function WalletButton() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
+        {connectLabel && !displayAddress ? (
+          <Button className="h-[42px] rounded-[11px] bg-brand px-6 text-brand-foreground hover:bg-brand/90">
+            {connectLabel}
+          </Button>
+        ) : (
         <Button
           variant="ghost"
           className="relative flex items-center justify-center gap-2 transition-all w-auto px-3 h-10 rounded-lg focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 hover:bg-background/60 hover:shadow-sm bg-background/40 backdrop-blur-sm border border-border/40"
@@ -164,6 +169,7 @@ export function WalletButton() {
             </svg>
           )}
         </Button>
+        )}
       </DropdownMenuTrigger>
       <DropdownMenuContent 
         align="end" 

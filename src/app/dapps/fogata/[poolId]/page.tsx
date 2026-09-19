@@ -893,7 +893,7 @@ export default function FogataPoolPage() {
   return (
     <div className="container mx-auto px-4 py-10">
       <Link
-        href="/dapps/fogata"
+        href="/dapps"
         className="mb-6 inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
       >
         <ArrowLeft className="h-4 w-4" />

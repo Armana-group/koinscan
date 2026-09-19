@@ -58,6 +58,9 @@
     --logo-color-1: 0 71% 71%;
     --logo-color-2: 48 96% 53%;
     --logo-color-3: 252 76% 54%;
+
+    --brand: 252 76% 54%;
+    --brand-foreground: 0 0% 100%;
   }
 
   .dark {
@@ -103,6 +106,9 @@
     --logo-color-1: 0 60% 50%;
     --logo-color-2: 48 70% 45%;
     --logo-color-3: 252 76% 54%;
+
+    --brand: 250 81% 75%;
+    --brand-foreground: 249 33% 8%;
   }
 }
 

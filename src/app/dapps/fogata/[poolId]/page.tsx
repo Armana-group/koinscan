@@ -10,17 +10,7 @@ import {
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
-import {
-  Activity,
-  ArrowLeft,
-  CalendarClock,
-  Clock,
-  Coins,
-  Hash,
-  Plus,
-  Trash2,
-  Zap,
-} from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 
 import { abiFogata2Pool } from "@/koinos/abis/fogata2Pool";
 import tokenAbi from "@/koinos/abi";
@@ -47,7 +37,10 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { BetaTag } from "@/components/BetaTag";
+import { Skeleton } from "@/components/ui/skeleton";
+import { WalletButton } from "@/components/WalletButton";
+import { cn } from "@/lib/utils";
+import { computePoolApy, formatPayoutPeriod, getNetworkApy, poolHealth } from "@/lib/fogata";
 import * as toast from "@/lib/toast";
 
 type RewardMode = "percentage" | "virtual";
@@ -216,6 +209,31 @@ export default function FogataPoolPage() {
   const [error, setError] = useState<string | null>(null);
   const [poolBalanceError, setPoolBalanceError] = useState<string | null>(null);
   const isOwner = Boolean(account && poolOwner && account === poolOwner);
+
+  const [sheet, setSheet] = useState<"deposit" | "withdraw" | "rewards" | null>(null);
+  const [manageOpen, setManageOpen] = useState(false);
+  const [networkApy, setNetworkApy] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!provider) return;
+    getNetworkApy(provider)
+      .then(setNetworkApy)
+      .catch((err) => console.info("Unable to load network APY:", err));
+  }, [provider]);
+
+  const poolApy =
+    networkApy !== null && poolParams
+      ? computePoolApy(networkApy, poolParams.beneficiaries ?? [])
+      : null;
+  const health = poolHealth(performance);
+  const feePercent = (poolParams?.beneficiaries ?? []).reduce(
+    (sum, beneficiary) => sum + beneficiary.percentage,
+    0
+  ) / 1000;
+  const stakedVhp = poolBalance
+    ? (BigInt(poolBalance.vhp_amount) + BigInt(poolBalance.koin_amount)).toString()
+    : null;
+  const hasStake = stakedVhp !== null && BigInt(stakedVhp) > BigInt(0);
 
   const loadData = useCallback(async () => {
     if (!provider || !poolId) return;
@@ -890,298 +908,179 @@ export default function FogataPoolPage() {
     }
   };
 
+  const healthDot = (
+    <span
+      aria-label={health}
+      className={cn(
+        "inline-block h-2 w-2 shrink-0 rounded-full",
+        health === "producing" && "bg-emerald-500",
+        health === "late" && "bg-amber-500",
+        health === "paused" && "bg-red-500"
+      )}
+    />
+  );
+  const healthWord = health === "producing" ? "Producing" : health === "late" ? "Producing slowly" : "Paused";
+
   return (
-    <div className="container mx-auto px-4 py-10">
-      <Link
-        href="/dapps"
-        className="mb-6 inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
-      >
-        <ArrowLeft className="h-4 w-4" />
-        Back to pools
+    <div className="mx-auto w-full max-w-[640px] px-4 py-10">
+      <Link href="/dapps" className="mb-7 inline-block text-sm text-muted-foreground hover:text-foreground">
+        ‹ Mining pools
       </Link>
 
       {loading && (
-        <div className="text-center text-muted-foreground">Loading pool...</div>
+        <div className="space-y-4" aria-busy="true">
+          <Skeleton className="h-11 w-11 rounded-xl" />
+          <Skeleton className="h-6 w-40" />
+          <Skeleton className="h-12 w-56" />
+        </div>
       )}
 
-      {error && (
-        <Alert variant="destructive" className="mb-6">
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
+      {error && !loading && (
+        <div>
+          <h1 className="break-all font-mono text-lg">{poolId}</h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Couldn&apos;t load this pool.{" "}
+            <button type="button" className="text-brand" onClick={() => loadData()}>
+              Retry
+            </button>
+          </p>
+        </div>
       )}
 
       {!loading && !error && poolParams && (
-        <div className="mx-auto max-w-5xl space-y-6">
-          <Card className="border-border/60">
-            <CardContent className="p-5 sm:p-6">
-              <div className="flex flex-col gap-5 sm:flex-row sm:items-start">
-                <div className="relative flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-xl border bg-muted text-2xl font-semibold text-muted-foreground">
-                  {(poolParams.name || "P").charAt(0).toUpperCase()}
-                  {poolParams.image && (
-                    <>
-                      {/* Pool logo hosts are arbitrary on-chain URLs */}
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={poolParams.image}
-                        alt={`${poolParams.name || "Pool"} logo`}
-                        className="absolute inset-0 h-full w-full bg-background object-contain"
-                        onError={(event) => {
-                          event.currentTarget.style.display = "none";
-                        }}
-                      />
-                    </>
-                  )}
-                </div>
-
-                <div className="min-w-0 flex-1">
-                  <h1 className="inline-flex flex-wrap items-center gap-2 text-2xl font-semibold tracking-tight">
-                    {poolParams.name || "Unnamed Pool"}
-                    <BetaTag />
-                  </h1>
-                  {poolParams.description && (
-                    <p className="mt-2 whitespace-pre-wrap text-sm text-muted-foreground">
-                      {poolParams.description}
-                    </p>
-                  )}
-                  <div className="mt-4 space-y-1 text-sm">
-                    <div>
-                      <span className="text-muted-foreground">
-                        Pool address:{" "}
-                      </span>
-                      <span className="break-all font-mono">{poolId}</span>
-                    </div>
-                    {poolParams.payment_period && (
-                      <div>
-                        <span className="text-muted-foreground">
-                          Payment period:{" "}
-                        </span>
-                        {Number(poolParams.payment_period) / 1000 / 86400} days
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <section aria-labelledby="pool-performance-heading">
-            <h2
-              id="pool-performance-heading"
-              className="mb-3 text-lg font-semibold"
-            >
-              Pool performance
-            </h2>
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">
-                    VHP amount
-                  </CardTitle>
-                  <Hash className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-xl font-semibold">
-                    {formatTokenAmount(performance.vhpAmount, "VHP")}
-                  </div>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Producing stake held by the pool
-                  </p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">
-                    KOIN balance
-                  </CardTitle>
-                  <Coins className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-xl font-semibold">
-                    {formatTokenAmount(performance.koinAmount, "KOIN")}
-                  </div>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Liquid KOIN held by the pool
-                  </p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Mana</CardTitle>
-                  <Zap className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-xl font-semibold">
-                    {performance.manaPercentage !== undefined
-                      ? `${performance.manaPercentage.toFixed(1)}%`
-                      : "Unavailable"}
-                  </div>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Relative to the pool&apos;s KOIN balance
-                  </p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">
-                    Average time to produce
-                  </CardTitle>
-                  <Clock className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-xl font-semibold">
-                    {formatDuration(performance.averageTimeToProduce)}
-                  </div>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Expected{" "}
-                    {formatDuration(performance.expectedTimeToProduce)}
-                  </p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="flex items-center gap-2 text-sm font-medium">
-                    Effectiveness
-                    {performance.effectiveness !== undefined &&
-                      performance.effectiveness > 5 && (
-                        <span
-                          className="h-2.5 w-2.5 rounded-full bg-green-500 shadow-[0_0_0_3px_rgba(34,197,94,0.15)]"
-                          title="Effectiveness is above 5%"
-                        />
-                      )}
-                  </CardTitle>
-                  <Activity className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-xl font-semibold">
-                    {performance.effectiveness !== undefined
-                      ? `${performance.effectiveness.toFixed(1)}%`
-                      : "Unavailable"}
-                  </div>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Based on expected production time
-                  </p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">
-                    Last block produced
-                  </CardTitle>
-                  <Clock className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-xl font-semibold">
-                    {performance.lastBlockHeight !== undefined ? (
-                      <Link
-                        href={`/blocks/${performance.lastBlockHeight}`}
-                        className="hover:underline"
-                      >
-                        #{performance.lastBlockHeight}
-                      </Link>
-                    ) : (
-                      "Unavailable"
-                    )}
-                  </div>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {formatTimeAgo(performance.lastBlockTime)}
-                  </p>
-                </CardContent>
-              </Card>
+        <>
+          <header className="flex items-center gap-4">
+            <span className="relative flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-muted text-base font-semibold text-muted-foreground">
+              {(poolParams.name || "P").charAt(0).toUpperCase()}
+              {poolParams.image && (
+                /* Pool logo hosts are arbitrary on-chain URLs */
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img
+                  src={poolParams.image}
+                  alt=""
+                  className="absolute inset-0 h-full w-full bg-background object-contain"
+                  onError={(event) => {
+                    event.currentTarget.style.display = "none";
+                  }}
+                />
+              )}
+            </span>
+            <div className="min-w-0">
+              <h1 className="flex items-center gap-2.5 text-2xl font-semibold tracking-tight">
+                <span className="truncate">{poolParams.name || "Unnamed pool"}</span>
+                {healthDot}
+              </h1>
+              <p className="text-sm text-muted-foreground">
+                {healthWord}
+                {poolApy !== null && <> · {poolApy.toFixed(1)}% yield</>}
+                {isOwner && (
+                  <>
+                    {" "}·{" "}
+                    <button
+                      type="button"
+                      className="font-medium text-brand"
+                      onClick={() => setManageOpen((open) => !open)}
+                    >
+                      Manage
+                    </button>
+                  </>
+                )}
+              </p>
             </div>
+          </header>
+
+          <section className="mt-11" aria-label={account ? "Your stake" : "Estimated yearly yield"}>
+            {!account && (
+              <>
+                <p className="text-sm text-muted-foreground">Estimated yearly yield</p>
+                <p className="mt-1 text-[44px] font-semibold leading-none tracking-[-0.03em] tabular-nums max-sm:text-4xl">
+                  {poolApy !== null ? poolApy.toFixed(1) : "—"}
+                  <span className="ml-1.5 text-lg font-medium tracking-normal text-muted-foreground">%</span>
+                </p>
+                <div className="mt-6">
+                  <WalletButton />
+                </div>
+              </>
+            )}
+
+            {account && !hasStake && (
+              <>
+                <p className="text-sm text-muted-foreground">Estimated yearly yield</p>
+                <p className="mt-1 text-[44px] font-semibold leading-none tracking-[-0.03em] tabular-nums max-sm:text-4xl">
+                  {poolApy !== null ? poolApy.toFixed(1) : "—"}
+                  <span className="ml-1.5 text-lg font-medium tracking-normal text-muted-foreground">%</span>
+                </p>
+                <p className="mt-2 text-sm text-muted-foreground">You have nothing staked here.</p>
+                <div className="mt-6">
+                  <Button className="h-[42px] rounded-[11px] bg-brand px-6 text-brand-foreground hover:bg-brand/90" onClick={() => setSheet("deposit")}>
+                    Deposit
+                  </Button>
+                </div>
+              </>
+            )}
+
+            {account && hasStake && (
+              <>
+                <p className="text-sm text-muted-foreground">Your stake</p>
+                <p className="mt-1 text-[44px] font-semibold leading-none tracking-[-0.03em] tabular-nums max-sm:text-4xl">
+                  {formatAmount(stakedVhp!)}
+                  <span className="ml-1.5 text-lg font-medium tracking-normal text-muted-foreground">VHP</span>
+                </p>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  {poolBalance && BigInt(poolBalance.koin_amount) > BigInt(0) && (
+                    <>includes {formatAmount(poolBalance.koin_amount)} KOIN being converted · </>
+                  )}
+                  {nextPayment && <>next payout {formatTimeAgo(nextPayment)} · </>}
+                  rewards{" "}
+                  {preferences && BigInt(preferences.all_after_virtual || "0") > BigInt(0)
+                    ? `keep ${formatAmount(preferences.all_after_virtual)} VHP`
+                    : preferences
+                      ? `${Number(preferences.percentage_koin) / 1000}% as KOIN`
+                      : "—"}{" "}
+                  ·{" "}
+                  <button type="button" className="text-brand" onClick={() => setSheet("rewards")}>
+                    change
+                  </button>
+                </p>
+                <div className="mt-6 flex items-center gap-[18px]">
+                  <Button className="h-[42px] rounded-[11px] bg-brand px-6 text-brand-foreground hover:bg-brand/90" onClick={() => setSheet("deposit")}>
+                    Deposit
+                  </Button>
+                  <button type="button" className="text-sm font-medium text-brand" onClick={() => setSheet("withdraw")}>
+                    Withdraw
+                  </button>
+                </div>
+              </>
+            )}
+            {poolBalanceError && account && (
+              <p className="mt-3 text-xs text-muted-foreground">Couldn&apos;t load your balance in this pool.</p>
+            )}
           </section>
 
-          {account && (
-            <section aria-labelledby="pool-position-heading">
-              <h2
-                id="pool-position-heading"
-                className="mb-3 text-lg font-semibold"
-              >
-                Your pool position
-              </h2>
-              <div className="grid gap-4 sm:grid-cols-3">
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">
-                      VHP staked
-                    </CardTitle>
-                    <Hash className="h-4 w-4 text-muted-foreground" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-xl font-semibold">
-                      {poolBalance
-                        ? `${formatAmount(poolBalance.vhp_amount)} VHP`
-                        : "Unavailable"}
-                    </div>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      Changes over time: reburning rewards increases it, while
-                      taking rewards as KOIN reduces it
-                    </p>
-                  </CardContent>
-                </Card>
+          <section className="mt-16">
+            <h2 className="mb-2 text-sm font-medium text-muted-foreground">About this pool</h2>
+            {poolParams.description && (
+              <p className="mb-5 line-clamp-2 text-sm text-muted-foreground">{poolParams.description}</p>
+            )}
+            <dl className="text-sm">
+              {[
+                ["Effectiveness", <span key="e" className="inline-flex items-center gap-2 tabular-nums">{healthDot}{performance.effectiveness !== undefined ? `${performance.effectiveness.toFixed(0)}%` : "—"}</span>],
+                ["Block time", <span key="b" className="tabular-nums">{formatDuration(performance.averageTimeToProduce)}{performance.expectedTimeToProduce !== undefined && <span className="ml-2 text-muted-foreground">expected {formatDuration(performance.expectedTimeToProduce)}</span>}</span>],
+                ["Staked in pool", <span key="s" className="tabular-nums">{formatTokenAmount(performance.vhpAmount, "VHP")}</span>],
+                ["Fee", <span key="f" className="tabular-nums">{feePercent}%</span>],
+                ["Payout", formatPayoutPeriod(poolParams.payment_period)],
+                ["Address", <Link key="a" href={`/address/${poolId}`} className="font-mono text-xs text-brand">{poolId.slice(0, 8)}…{poolId.slice(-6)}</Link>],
+                ["Contract", <Link key="c" href={`/contracts/${poolId}`} className="text-brand">Fogata Pool v2</Link>],
+              ].map(([label, value]) => (
+                <div key={label as string} className="flex items-center justify-between gap-6 border-t py-[11px]">
+                  <dt className="text-muted-foreground">{label}</dt>
+                  <dd className="text-right">{value}</dd>
+                </div>
+              ))}
+            </dl>
+          </section>
 
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">
-                      KOIN balance
-                    </CardTitle>
-                    <Coins className="h-4 w-4 text-muted-foreground" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-xl font-semibold">
-                      {poolBalance
-                        ? `${formatAmount(poolBalance.koin_amount)} KOIN`
-                        : "Unavailable"}
-                    </div>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      Automatically reburned or sent to you according to your
-                      reward configuration
-                    </p>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">
-                      Next payment
-                    </CardTitle>
-                    <CalendarClock className="h-4 w-4 text-muted-foreground" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-base font-semibold">
-                      {nextPayment ? nextPayment.toLocaleString() : "Unavailable"}
-                    </div>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {nextPayment
-                        ? `Scheduled ${formatTimeAgo(nextPayment)}`
-                        : "Pool schedule is unavailable"}
-                    </p>
-                  </CardContent>
-                </Card>
-              </div>
-            </section>
-          )}
-
-          {!account && (
-            <Alert>
-              <AlertDescription>
-                Connect your wallet to deposit, withdraw, or manage this pool.
-              </AlertDescription>
-            </Alert>
-          )}
-
-          {poolBalanceError && (
-            <Alert variant="destructive">
-              <AlertDescription>
-                Unable to load your pool balance: {poolBalanceError}. The rest
-                of the pool data is still available.
-              </AlertDescription>
-            </Alert>
-          )}
+          {/* Tabs block from the original file continues here for now (Tasks 6–7 replace it) */}
 
           <Tabs defaultValue="deposit">
             <TabsList
@@ -1767,7 +1666,7 @@ export default function FogataPoolPage() {
               </TabsContent>
             )}
           </Tabs>
-        </div>
+        </>
       )}
     </div>
   );

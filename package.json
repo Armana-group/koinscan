@@ -11,7 +11,8 @@
     "accuracy:regression": "tsx scripts/regression-address-accuracy.ts",
     "beta-status:regression": "node scripts/regression-beta-status.mjs",
     "changelog:regression": "node scripts/regression-changelog.mjs",
-    "security:regression": "node scripts/regression-security-hardening.mjs"
+    "security:regression": "node scripts/regression-security-hardening.mjs",
+    "dapps-ui:regression": "node scripts/regression-dapps-ui.mjs"
   },
   "dependencies": {
     "@armana/walletconnect-koinos-sdk-js": "^0.1.4",

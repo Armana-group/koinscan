@@ -72,7 +72,10 @@ before it:
 | Cancel own DEX order | existing cancel flow |
 
 Derived display values (APY, health dot, "your stake" as one number) are computed
-from data the pages already fetch; they add no new reads.
+from data the pages already fetch. Read-only helpers that already exist (the network
+APY calculation) may be moved to `src/lib/` and reused by another page; no new
+contract *writes* are introduced anywhere. The only edits inside existing `handle*`
+functions are one-line calls that close the sheet/dialog on success.
 
 ## 4. Information architecture
 
@@ -100,7 +103,9 @@ from data the pages already fetch; they add no new reads.
   - APY = `networkApy × (1 − beneficiaryFee)` as today. Shown to one decimal.
   - Health dot: green = produced a block within 2× expected time; amber = producing
     but late (>2×), or effectiveness < 50%; red = no block in 24 h. Dot only; the
-    word appears on the pool page.
+    word appears on the pool page. **Phase B:** the list page does not fetch block
+    history per pool today; the dot ships on the pool page in Phase A and on the
+    list in Phase B once `usePoolList` loads it.
   - A pool that is not producing shows "paused" in place of the number.
   - Optional small `v1`/`v2` tag, hidden while only one version is listed.
 - Footer, small muted text: "Estimated yearly yield after the pool's fee. Run a
@@ -236,9 +241,11 @@ Logic unchanged (bytecode fetch, batched ops).
 
 - **Type:** Poppins (existing). Sizes: page title 24, hero number 44 (36 on phones),
   body 14, secondary 13, small 12. Tabular numerals on all numbers.
-- **Colour:** existing tokens plus two new ones in `globals.css`:
-  - light `--accent: #522fe3`, `--accent-foreground: #ffffff`
-  - dark `--accent: #9d8bf3`, `--accent-foreground: #0f0d1a`
+- **Colour:** existing tokens plus two new ones in `globals.css`, exposed to
+  Tailwind as `brand` / `brand-foreground` (shadcn already uses `accent` for hover
+  surfaces, so the interactive purple gets its own name):
+  - light `--brand: 252 76% 54%` (#522fe3), `--brand-foreground: 0 0% 100%`
+  - dark `--brand: 250 81% 75%` (#9d8bf3), `--brand-foreground: 249 33% 8%`
   Measured contrast ≥ 6.1:1 for links on both grounds and for button labels in both
   themes. Dark-mode buttons use dark text on light purple, never white.
   Health: green/amber/red from the existing chart/destructive tokens, used only as
@@ -278,9 +285,10 @@ latest-block fallback).
 to hooks, handlers, ABIs or wallet context.
 - Pools: remove hero, landing grid, image cards, "Create a mining pool" CTA block;
   rows as §5.1; footer link.
-- Pool page: hero as §5.2; About list; move Configure tab behind an owner-only
-  "Manage" link (can still render the existing tab content in place for A); remove
-  stat tiles; Deposit/Withdraw as sheets built from the existing tab forms.
+- Pool page: hero as §5.2; About list; the existing Configure content renders
+  below About only when the owner taps "Manage" (a route comes in Phase B); remove
+  stat tiles; Deposit/Withdraw/Reward settings as dialogs wrapping the existing
+  form fields and handlers.
 - Trade: form first; book collapsed with the existing fill/cancel per row; remove
   tier copy.
 - `BetaTag` removed; CSP `img-src` back to an allowlist; `.vercel/` gitignored.

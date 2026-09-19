@@ -35,8 +35,13 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { WalletButton } from "@/components/WalletButton";
 import { cn } from "@/lib/utils";
@@ -212,6 +217,8 @@ export default function FogataPoolPage() {
 
   const [sheet, setSheet] = useState<"deposit" | "withdraw" | "rewards" | null>(null);
   const [manageOpen, setManageOpen] = useState(false);
+  const [depositToken, setDepositToken] = useState<"koin" | "vhp">("koin");
+  const [withdrawToken, setWithdrawToken] = useState<"koin" | "vhp">("vhp");
   const [networkApy, setNetworkApy] = useState<number | null>(null);
 
   useEffect(() => {
@@ -600,6 +607,7 @@ export default function FogataPoolPage() {
       toast.success("Deposit submitted successfully");
       setKoinDeposit("");
       setVhpDeposit("");
+      setSheet(null);
       await loadData();
     } catch (err) {
       console.error("error", err);
@@ -640,6 +648,7 @@ export default function FogataPoolPage() {
       toast.success("Withdrawal submitted successfully");
       setKoinWithdraw("");
       setVhpWithdraw("");
+      setSheet(null);
       await loadData();
     } catch (err) {
       toast.dismiss(loadingToast);
@@ -693,6 +702,7 @@ export default function FogataPoolPage() {
       await transaction?.wait();
       toast.dismiss(loadingToast);
       toast.success("Preferences saved");
+      setSheet(null);
       await loadData();
     } catch (err) {
       toast.dismiss(loadingToast);
@@ -1080,592 +1090,530 @@ export default function FogataPoolPage() {
             </dl>
           </section>
 
-          {/* Tabs block from the original file continues here for now (Tasks 6–7 replace it) */}
-
-          <Tabs defaultValue="deposit">
-            <TabsList
-              className={`grid w-full ${isOwner ? "grid-cols-4" : "grid-cols-3"}`}
-            >
-              <TabsTrigger value="deposit">Deposit</TabsTrigger>
-              <TabsTrigger value="withdraw">Withdraw</TabsTrigger>
-              <TabsTrigger value="rewards">Rewards</TabsTrigger>
-              {isOwner && (
-                <TabsTrigger value="configure">Configure</TabsTrigger>
+          <Dialog open={sheet === "deposit"} onOpenChange={(open) => { if (!open && !submitting) setSheet(null); }}>
+            <DialogContent className="sm:max-w-[400px]">
+              <DialogHeader>
+                <DialogTitle>Deposit to {poolParams.name || "this pool"}</DialogTitle>
+              </DialogHeader>
+              <div className="grid grid-cols-2 gap-0.5 rounded-[9px] bg-muted p-[3px]" role="group" aria-label="Token">
+                {(["koin", "vhp"] as const).map((token) => (
+                  <button
+                    key={token}
+                    type="button"
+                    disabled={submitting}
+                    onClick={() => setDepositToken(token)}
+                    className={cn(
+                      "rounded-[7px] py-1.5 text-sm transition-colors",
+                      depositToken === token ? "bg-background font-medium shadow-sm" : "text-muted-foreground"
+                    )}
+                  >
+                    {token.toUpperCase()}
+                  </button>
+                ))}
+              </div>
+              <div className="flex items-baseline gap-2.5 rounded-xl border px-4 py-3.5">
+                <input
+                  id={depositToken === "koin" ? "koin-deposit" : "vhp-deposit"}
+                  type="number"
+                  min="0"
+                  step="any"
+                  placeholder="0"
+                  inputMode="decimal"
+                  className="w-full min-w-0 bg-transparent text-[28px] font-semibold tracking-tight outline-none tabular-nums"
+                  value={depositToken === "koin" ? koinDeposit : vhpDeposit}
+                  onChange={(e) =>
+                    depositToken === "koin" ? setKoinDeposit(e.target.value) : setVhpDeposit(e.target.value)
+                  }
+                  disabled={submitting}
+                />
+                <span className="font-medium text-muted-foreground">{depositToken.toUpperCase()}</span>
+                <button
+                  type="button"
+                  className="text-xs font-semibold text-brand disabled:opacity-40"
+                  disabled={!walletBalances || submitting}
+                  onClick={() =>
+                    depositToken === "koin"
+                      ? setKoinDeposit(formatAmount(walletBalances!.koin))
+                      : setVhpDeposit(formatAmount(walletBalances!.vhp))
+                  }
+                >
+                  Max
+                </button>
+              </div>
+              <div className="-mt-2 flex justify-between px-0.5 text-xs text-muted-foreground">
+                <span>
+                  Wallet {walletBalances ? formatAmount(depositToken === "koin" ? walletBalances.koin : walletBalances.vhp) : "—"} {depositToken.toUpperCase()}
+                </span>
+                {poolApy !== null && <span className="tabular-nums">≈ {poolApy.toFixed(1)}% yearly</span>}
+              </div>
+              {depositToken === "koin" && (
+                <p className="text-xs leading-relaxed text-muted-foreground">
+                  KOIN becomes VHP over the next {formatPayoutPeriod(poolParams.payment_period).replace(/^Every /, "")}. To get KOIN back later,{" "}
+                  <Link href="/dapps/dex" className="text-brand">trade VHP for KOIN</Link>.
+                </p>
               )}
-            </TabsList>
+              <Button
+                className="h-[42px] w-full rounded-[11px] bg-brand text-brand-foreground hover:bg-brand/90"
+                onClick={handleStake}
+                disabled={!account || submitting}
+              >
+                {submitting
+                  ? "Submitting…"
+                  : `Deposit ${depositToken === "koin" ? koinDeposit || "0" : vhpDeposit || "0"} ${depositToken.toUpperCase()}`}
+              </Button>
+            </DialogContent>
+          </Dialog>
 
-            <TabsContent value="deposit">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Deposit</CardTitle>
-                  <CardDescription>
-                    Stake KOIN or VHP into this mining pool.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <div className="space-y-2">
-                      <Label htmlFor="koin-deposit">KOIN amount</Label>
-                      <div className="flex gap-2">
-                        <Input
-                          id="koin-deposit"
-                          type="number"
-                          min="0"
-                          step="any"
-                          placeholder="0"
-                          value={koinDeposit}
-                          onChange={(e) => setKoinDeposit(e.target.value)}
-                          disabled={!account || submitting}
-                        />
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          disabled={!walletBalances || submitting}
-                          onClick={() =>
-                            setKoinDeposit(formatAmount(walletBalances!.koin))
-                          }
-                        >
-                          Max
-                        </Button>
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        Available: {walletBalances ? formatAmount(walletBalances.koin) : "—"} KOIN
-                      </p>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="vhp-deposit">VHP amount</Label>
-                      <div className="flex gap-2">
-                        <Input
-                          id="vhp-deposit"
-                          type="number"
-                          min="0"
-                          step="any"
-                          placeholder="0"
-                          value={vhpDeposit}
-                          onChange={(e) => setVhpDeposit(e.target.value)}
-                          disabled={!account || submitting}
-                        />
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          disabled={!walletBalances || submitting}
-                          onClick={() =>
-                            setVhpDeposit(formatAmount(walletBalances!.vhp))
-                          }
-                        >
-                          Max
-                        </Button>
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        Available: {walletBalances ? formatAmount(walletBalances.vhp) : "—"} VHP
-                      </p>
-                    </div>
-                  </div>
-                  <Button
-                    className="w-full"
-                    onClick={handleStake}
-                    disabled={!account || submitting}
+          <Dialog open={sheet === "withdraw"} onOpenChange={(open) => { if (!open && !submitting) setSheet(null); }}>
+            <DialogContent className="sm:max-w-[400px]">
+              <DialogHeader>
+                <DialogTitle>Withdraw from {poolParams.name || "this pool"}</DialogTitle>
+              </DialogHeader>
+              <div className="grid grid-cols-2 gap-0.5 rounded-[9px] bg-muted p-[3px]" role="group" aria-label="Token">
+                {(["vhp", "koin"] as const).map((token) => (
+                  <button
+                    key={token}
+                    type="button"
+                    disabled={submitting}
+                    onClick={() => setWithdrawToken(token)}
+                    className={cn(
+                      "rounded-[7px] py-1.5 text-sm transition-colors",
+                      withdrawToken === token ? "bg-background font-medium shadow-sm" : "text-muted-foreground"
+                    )}
                   >
-                    {submitting ? "Submitting..." : "Deposit"}
-                  </Button>
-                </CardContent>
-              </Card>
-            </TabsContent>
+                    {token.toUpperCase()}
+                  </button>
+                ))}
+              </div>
+              <div className="flex items-baseline gap-2.5 rounded-xl border px-4 py-3.5">
+                <input
+                  id={withdrawToken === "koin" ? "koin-withdraw" : "vhp-withdraw"}
+                  type="number"
+                  min="0"
+                  step="any"
+                  placeholder="0"
+                  inputMode="decimal"
+                  className="w-full min-w-0 bg-transparent text-[28px] font-semibold tracking-tight outline-none tabular-nums"
+                  value={withdrawToken === "koin" ? koinWithdraw : vhpWithdraw}
+                  onChange={(e) =>
+                    withdrawToken === "koin" ? setKoinWithdraw(e.target.value) : setVhpWithdraw(e.target.value)
+                  }
+                  disabled={submitting}
+                />
+                <span className="font-medium text-muted-foreground">{withdrawToken.toUpperCase()}</span>
+                <button
+                  type="button"
+                  className="text-xs font-semibold text-brand disabled:opacity-40"
+                  disabled={!poolBalance || submitting}
+                  onClick={() =>
+                    withdrawToken === "koin"
+                      ? setKoinWithdraw(formatAmount(poolBalance!.koin_amount))
+                      : setVhpWithdraw(formatAmount(poolBalance!.vhp_amount))
+                  }
+                >
+                  Max
+                </button>
+              </div>
+              <p className="-mt-2 px-0.5 text-xs text-muted-foreground">
+                In pool {poolBalance ? formatAmount(withdrawToken === "koin" ? poolBalance.koin_amount : poolBalance.vhp_amount) : "—"} {withdrawToken.toUpperCase()}
+              </p>
+              <Button
+                className="h-[42px] w-full rounded-[11px] bg-brand text-brand-foreground hover:bg-brand/90"
+                onClick={handleUnstake}
+                disabled={!account || submitting}
+              >
+                {submitting
+                  ? "Submitting…"
+                  : `Withdraw ${withdrawToken === "koin" ? koinWithdraw || "0" : vhpWithdraw || "0"} ${withdrawToken.toUpperCase()}`}
+              </Button>
+            </DialogContent>
+          </Dialog>
 
-            <TabsContent value="withdraw">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Withdraw</CardTitle>
-                  <CardDescription>
-                    Unstake KOIN or VHP from this mining pool.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <div className="space-y-2">
-                      <Label htmlFor="koin-withdraw">KOIN amount</Label>
-                      <div className="flex gap-2">
-                        <Input
-                          id="koin-withdraw"
-                          type="number"
-                          min="0"
-                          step="any"
-                          placeholder="0"
-                          value={koinWithdraw}
-                          onChange={(e) => setKoinWithdraw(e.target.value)}
-                          disabled={!account || submitting}
-                        />
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          disabled={!poolBalance || submitting}
-                          onClick={() =>
-                            setKoinWithdraw(formatAmount(poolBalance!.koin_amount))
-                          }
-                        >
-                          Max
-                        </Button>
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        Available: {poolBalance ? formatAmount(poolBalance.koin_amount) : "—"} KOIN
-                      </p>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="vhp-withdraw">VHP amount</Label>
-                      <div className="flex gap-2">
-                        <Input
-                          id="vhp-withdraw"
-                          type="number"
-                          min="0"
-                          step="any"
-                          placeholder="0"
-                          value={vhpWithdraw}
-                          onChange={(e) => setVhpWithdraw(e.target.value)}
-                          disabled={!account || submitting}
-                        />
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          disabled={!poolBalance || submitting}
-                          onClick={() =>
-                            setVhpWithdraw(formatAmount(poolBalance!.vhp_amount))
-                          }
-                        >
-                          Max
-                        </Button>
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        Available: {poolBalance ? formatAmount(poolBalance.vhp_amount) : "—"} VHP
-                      </p>
-                    </div>
+          <Dialog open={sheet === "rewards"} onOpenChange={(open) => { if (!open && !submitting) setSheet(null); }}>
+            <DialogContent className="sm:max-w-[400px]">
+              <DialogHeader>
+                <DialogTitle>Reward settings</DialogTitle>
+                <DialogDescription>Rewards are paid in KOIN. Choose what the pool does with them.</DialogDescription>
+              </DialogHeader>
+              <RadioGroup
+                value={rewardMode}
+                onValueChange={(value) =>
+                  setRewardMode(value as RewardMode)
+                }
+                disabled={!account || submitting}
+                className="space-y-4"
+              >
+                <div className="space-y-3 rounded-md border p-4">
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="percentage" id="reward-percentage" />
+                    <Label htmlFor="reward-percentage">
+                      Take a share as KOIN
+                    </Label>
                   </div>
-                  {poolBalance && Number(poolBalance.vapor_amount) > 0 && (
+                  <div className="space-y-2 pl-6">
+                    <Input
+                      id="percentage-koin"
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="0.1"
+                      value={percentageKoin}
+                      onChange={(e) => setPercentageKoin(e.target.value)}
+                      disabled={
+                        !account ||
+                        submitting ||
+                        rewardMode !== "percentage"
+                      }
+                    />
                     <p className="text-xs text-muted-foreground">
-                      Vapor balance: {formatAmount(poolBalance.vapor_amount)} VAPOR
+                      Keep this percentage of earned KOIN and burn the rest
+                      into VHP.
+                      {preferences &&
+                        BigInt(preferences.all_after_virtual || "0") ===
+                          BigInt(0) && (
+                          <>
+                            {" "}
+                            Current:{" "}
+                            {Number(preferences.percentage_koin) / 1000}%
+                          </>
+                        )}
                     </p>
-                  )}
-                  <Button
-                    className="w-full"
-                    onClick={handleUnstake}
-                    disabled={!account || submitting}
-                  >
-                    {submitting ? "Submitting..." : "Withdraw"}
-                  </Button>
-                </CardContent>
-              </Card>
-            </TabsContent>
+                  </div>
+                </div>
 
-            <TabsContent value="rewards">
+                <div className="space-y-3 rounded-md border p-4">
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="virtual" id="reward-virtual" />
+                    <Label htmlFor="reward-virtual">
+                      Keep a VHP amount, take the rest as KOIN
+                    </Label>
+                  </div>
+                  <div className="space-y-2 pl-6">
+                    <Input
+                      id="all-after-virtual"
+                      type="number"
+                      min="0"
+                      step="any"
+                      value={allAfterVirtual}
+                      onChange={(e) => setAllAfterVirtual(e.target.value)}
+                      disabled={
+                        !account || submitting || rewardMode !== "virtual"
+                      }
+                      placeholder="VHP to keep"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Keep this amount of VHP and burn anything above it.
+                      {preferences &&
+                        BigInt(preferences.all_after_virtual || "0") >
+                          BigInt(0) && (
+                          <>
+                            {" "}
+                            Current:{" "}
+                            {formatAmount(preferences.all_after_virtual)}{" "}
+                            VHP
+                          </>
+                        )}
+                    </p>
+                  </div>
+                </div>
+              </RadioGroup>
+              <Button
+                className="h-[42px] w-full rounded-[11px] bg-brand text-brand-foreground hover:bg-brand/90"
+                onClick={handleSavePreferences}
+                disabled={!account || submitting}
+              >
+                {submitting ? "Saving…" : "Save"}
+              </Button>
+            </DialogContent>
+          </Dialog>
+
+          {isOwner && manageOpen && (
+            <section id="manage" className="mt-16 space-y-6">
+              <h2 className="text-sm font-medium text-muted-foreground">Manage pool</h2>
+
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-lg">Reward preferences</CardTitle>
+                  <CardTitle className="text-lg">Pool parameters</CardTitle>
                   <CardDescription>
-                    Choose one option for how rewards are collected.
+                    Update the public details, beneficiaries, and reburn
+                    period using the pool&apos;s set_pool_params function.
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <RadioGroup
-                    value={rewardMode}
-                    onValueChange={(value) =>
-                      setRewardMode(value as RewardMode)
-                    }
-                    disabled={!account || submitting}
-                    className="space-y-4"
-                  >
-                    <div className="space-y-3 rounded-md border p-4">
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="percentage" id="reward-percentage" />
-                        <Label htmlFor="reward-percentage">
-                          KOIN collection percentage
-                        </Label>
-                      </div>
-                      <div className="space-y-2 pl-6">
+                  <div className="space-y-2">
+                    <Label htmlFor="pool-name">Name</Label>
+                    <Input
+                      id="pool-name"
+                      value={poolName}
+                      onChange={(event) => setPoolName(event.target.value)}
+                      disabled={submitting}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="pool-image">Image URL</Label>
+                    <Input
+                      id="pool-image"
+                      type="url"
+                      value={poolImage}
+                      onChange={(event) => setPoolImage(event.target.value)}
+                      disabled={submitting}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="pool-description">Description</Label>
+                    <textarea
+                      id="pool-description"
+                      value={poolDescription}
+                      onChange={(event) =>
+                        setPoolDescription(event.target.value)
+                      }
+                      disabled={submitting}
+                      rows={4}
+                      className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="reburn-period">Reburn period (days)</Label>
+                    <Input
+                      id="reburn-period"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={reburnPeriodDays}
+                      onChange={(event) =>
+                        setReburnPeriodDays(event.target.value)
+                      }
+                      disabled={submitting}
+                    />
+                  </div>
+
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <Label>Beneficiaries</Label>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                          setBeneficiaries((current) => [
+                            ...current,
+                            { address: "", percentage: 0 },
+                          ])
+                        }
+                        disabled={submitting}
+                      >
+                        <Plus className="mr-2 h-4 w-4" />
+                        Add
+                      </Button>
+                    </div>
+                    {beneficiaries.length === 0 && (
+                      <p className="text-sm text-muted-foreground">
+                        No beneficiaries configured.
+                      </p>
+                    )}
+                    {beneficiaries.map((beneficiary, index) => (
+                      <div
+                        key={index}
+                        className="grid gap-2 rounded-md border p-3 sm:grid-cols-[1fr_8rem_auto]"
+                      >
                         <Input
-                          id="percentage-koin"
+                          aria-label={`Beneficiary ${index + 1} address`}
+                          placeholder="Beneficiary address"
+                          value={beneficiary.address}
+                          onChange={(event) =>
+                            setBeneficiaries((current) =>
+                              current.map((item, itemIndex) =>
+                                itemIndex === index
+                                  ? { ...item, address: event.target.value }
+                                  : item
+                              )
+                            )
+                          }
+                          disabled={submitting}
+                        />
+                        <Input
+                          aria-label={`Beneficiary ${index + 1} percentage`}
                           type="number"
                           min="0"
                           max="100"
-                          step="0.1"
-                          value={percentageKoin}
-                          onChange={(e) => setPercentageKoin(e.target.value)}
-                          disabled={
-                            !account ||
-                            submitting ||
-                            rewardMode !== "percentage"
+                          step="0.001"
+                          placeholder="%"
+                          value={beneficiary.percentage / 1000}
+                          onChange={(event) =>
+                            setBeneficiaries((current) =>
+                              current.map((item, itemIndex) =>
+                                itemIndex === index
+                                  ? {
+                                      ...item,
+                                      percentage: Math.round(
+                                        Number(event.target.value) * 1000
+                                      ),
+                                    }
+                                  : item
+                              )
+                            )
                           }
+                          disabled={submitting}
                         />
-                        <p className="text-xs text-muted-foreground">
-                          Keep this percentage of earned KOIN and burn the rest
-                          into VHP.
-                          {preferences &&
-                            BigInt(preferences.all_after_virtual || "0") ===
-                              BigInt(0) && (
-                              <>
-                                {" "}
-                                Current:{" "}
-                                {Number(preferences.percentage_koin) / 1000}%
-                              </>
-                            )}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="space-y-3 rounded-md border p-4">
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="virtual" id="reward-virtual" />
-                        <Label htmlFor="reward-virtual">
-                          Keep a VHP amount
-                        </Label>
-                      </div>
-                      <div className="space-y-2 pl-6">
-                        <Input
-                          id="all-after-virtual"
-                          type="number"
-                          min="0"
-                          step="any"
-                          value={allAfterVirtual}
-                          onChange={(e) => setAllAfterVirtual(e.target.value)}
-                          disabled={
-                            !account || submitting || rewardMode !== "virtual"
-                          }
-                          placeholder="VHP to keep"
-                        />
-                        <p className="text-xs text-muted-foreground">
-                          Keep this amount of VHP and burn anything above it.
-                          {preferences &&
-                            BigInt(preferences.all_after_virtual || "0") >
-                              BigInt(0) && (
-                              <>
-                                {" "}
-                                Current:{" "}
-                                {formatAmount(preferences.all_after_virtual)}{" "}
-                                VHP
-                              </>
-                            )}
-                        </p>
-                      </div>
-                    </div>
-                  </RadioGroup>
-                  <Button
-                    className="w-full"
-                    onClick={handleSavePreferences}
-                    disabled={!account || submitting}
-                  >
-                    {submitting ? "Saving..." : "Save preferences"}
-                  </Button>
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            {isOwner && (
-              <TabsContent value="configure" className="space-y-6">
-                <Alert>
-                  <AlertDescription>
-                    You are connected as this pool&apos;s owner. The settings
-                    below modify the pool on-chain.
-                  </AlertDescription>
-                </Alert>
-
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg">Pool parameters</CardTitle>
-                    <CardDescription>
-                      Update the public details, beneficiaries, and reburn
-                      period using the pool&apos;s set_pool_params function.
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="pool-name">Name</Label>
-                      <Input
-                        id="pool-name"
-                        value={poolName}
-                        onChange={(event) => setPoolName(event.target.value)}
-                        disabled={submitting}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="pool-image">Image URL</Label>
-                      <Input
-                        id="pool-image"
-                        type="url"
-                        value={poolImage}
-                        onChange={(event) => setPoolImage(event.target.value)}
-                        disabled={submitting}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="pool-description">Description</Label>
-                      <textarea
-                        id="pool-description"
-                        value={poolDescription}
-                        onChange={(event) =>
-                          setPoolDescription(event.target.value)
-                        }
-                        disabled={submitting}
-                        rows={4}
-                        className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="reburn-period">Reburn period (days)</Label>
-                      <Input
-                        id="reburn-period"
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={reburnPeriodDays}
-                        onChange={(event) =>
-                          setReburnPeriodDays(event.target.value)
-                        }
-                        disabled={submitting}
-                      />
-                    </div>
-
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between gap-3">
-                        <Label>Beneficiaries</Label>
                         <Button
                           type="button"
-                          variant="outline"
-                          size="sm"
+                          variant="ghost"
+                          size="icon"
+                          aria-label={`Remove beneficiary ${index + 1}`}
                           onClick={() =>
-                            setBeneficiaries((current) => [
-                              ...current,
-                              { address: "", percentage: 0 },
-                            ])
+                            setBeneficiaries((current) =>
+                              current.filter(
+                                (_, itemIndex) => itemIndex !== index
+                              )
+                            )
                           }
                           disabled={submitting}
                         >
-                          <Plus className="mr-2 h-4 w-4" />
-                          Add
+                          <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
-                      {beneficiaries.length === 0 && (
-                        <p className="text-sm text-muted-foreground">
-                          No beneficiaries configured.
-                        </p>
-                      )}
-                      {beneficiaries.map((beneficiary, index) => (
-                        <div
-                          key={index}
-                          className="grid gap-2 rounded-md border p-3 sm:grid-cols-[1fr_8rem_auto]"
-                        >
-                          <Input
-                            aria-label={`Beneficiary ${index + 1} address`}
-                            placeholder="Beneficiary address"
-                            value={beneficiary.address}
-                            onChange={(event) =>
-                              setBeneficiaries((current) =>
-                                current.map((item, itemIndex) =>
-                                  itemIndex === index
-                                    ? { ...item, address: event.target.value }
-                                    : item
-                                )
-                              )
-                            }
-                            disabled={submitting}
-                          />
-                          <Input
-                            aria-label={`Beneficiary ${index + 1} percentage`}
-                            type="number"
-                            min="0"
-                            max="100"
-                            step="0.001"
-                            placeholder="%"
-                            value={beneficiary.percentage / 1000}
-                            onChange={(event) =>
-                              setBeneficiaries((current) =>
-                                current.map((item, itemIndex) =>
-                                  itemIndex === index
-                                    ? {
-                                        ...item,
-                                        percentage: Math.round(
-                                          Number(event.target.value) * 1000
-                                        ),
-                                      }
-                                    : item
-                                )
-                              )
-                            }
-                            disabled={submitting}
-                          />
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            aria-label={`Remove beneficiary ${index + 1}`}
-                            onClick={() =>
-                              setBeneficiaries((current) =>
-                                current.filter(
-                                  (_, itemIndex) => itemIndex !== index
-                                )
-                              )
-                            }
-                            disabled={submitting}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      ))}
-                      <p className="text-xs text-muted-foreground">
-                        Total beneficiary share:{" "}
-                        {beneficiaries.reduce(
-                          (sum, beneficiary) =>
-                            sum + beneficiary.percentage,
-                          0
-                        ) / 1000}
-                        %
-                      </p>
-                    </div>
-
-                    <Button
-                      className="w-full"
-                      onClick={handleSavePoolParams}
-                      disabled={submitting}
-                    >
-                      {submitting ? "Saving..." : "Save pool parameters"}
-                    </Button>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg">
-                      Manage reserved KOIN
-                    </CardTitle>
-                    <CardDescription>
-                      Reserved KOIN provides mana for operating the pool and is
-                      not burned. Lower reburn periods require more frequent
-                      operations, so more reserved KOIN is recommended. As a
-                      base reference, use about 2,000 KOIN for a 4-day reburn
-                      period.
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <p className="text-sm">
-                      <span className="text-muted-foreground">
-                        Currently reserved:{" "}
-                      </span>
-                      {formatAmount(reservedKoin)} KOIN
+                    ))}
+                    <p className="text-xs text-muted-foreground">
+                      Total beneficiary share:{" "}
+                      {beneficiaries.reduce(
+                        (sum, beneficiary) =>
+                          sum + beneficiary.percentage,
+                        0
+                      ) / 1000}
+                      %
                     </p>
-                    <div className="space-y-2">
-                      <Label htmlFor="reserved-koin-amount">KOIN amount</Label>
-                      <Input
-                        id="reserved-koin-amount"
-                        type="number"
-                        min="0"
-                        step="any"
-                        placeholder="0"
-                        value={reservedKoinAmount}
-                        onChange={(event) =>
-                          setReservedKoinAmount(event.target.value)
-                        }
-                        disabled={submitting}
-                      />
-                    </div>
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <Button
-                        onClick={() => handleReservedKoin("add")}
-                        disabled={submitting}
-                      >
-                        Add reserved KOIN
-                      </Button>
-                      <Button
-                        variant="outline"
-                        onClick={() => handleReservedKoin("remove")}
-                        disabled={submitting}
-                      >
-                        Remove reserved KOIN
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
+                  </div>
 
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg">
-                      Register node operator public key
-                    </CardTitle>
-                    <CardDescription>
-                      Register the public key from{" "}
-                      <code>.koinos/block_producer/public.key</code>. Also set
-                      the <code>producer</code> field in the{" "}
-                      <code>block_producer</code> section of your node&apos;s{" "}
-                      <code>config.yml</code> to this pool address.
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    {registeredPublicKey && (
-                      <div className="space-y-1">
-                        <p className="text-xs text-muted-foreground">
-                          Currently registered public key
-                        </p>
-                        <p className="break-all font-mono text-xs">
-                          {registeredPublicKey}
-                        </p>
-                      </div>
-                    )}
-                    <div className="space-y-2">
-                      <Label htmlFor="public-key">Public key</Label>
-                      <Input
-                        id="public-key"
-                        value={publicKey}
-                        onChange={(event) => setPublicKey(event.target.value)}
-                        placeholder="Paste the contents of public.key"
-                        disabled={submitting}
-                      />
-                    </div>
-                    <Button
-                      className="w-full"
-                      onClick={handleRegisterPublicKey}
-                      disabled={submitting}
-                    >
-                      Register public key
-                    </Button>
-                  </CardContent>
-                </Card>
+                  <Button
+                    className="w-full"
+                    onClick={handleSavePoolParams}
+                    disabled={submitting}
+                  >
+                    {submitting ? "Saving..." : "Save pool parameters"}
+                  </Button>
+                </CardContent>
+              </Card>
 
-                <Card className="border-destructive/50">
-                  <CardHeader>
-                    <CardTitle className="text-lg text-destructive">
-                      Remove pool
-                    </CardTitle>
-                    <CardDescription>
-                      Remove this pool from the Fogata pool list. This does not
-                      delete the deployed pool contract. Enter the pool address
-                      to confirm.
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">
+                    Manage reserved KOIN
+                  </CardTitle>
+                  <CardDescription>
+                    Reserved KOIN provides mana for operating the pool and is
+                    not burned. Lower reburn periods require more frequent
+                    operations, so more reserved KOIN is recommended. As a
+                    base reference, use about 2,000 KOIN for a 4-day reburn
+                    period.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <p className="text-sm">
+                    <span className="text-muted-foreground">
+                      Currently reserved:{" "}
+                    </span>
+                    {formatAmount(reservedKoin)} KOIN
+                  </p>
+                  <div className="space-y-2">
+                    <Label htmlFor="reserved-koin-amount">KOIN amount</Label>
                     <Input
-                      aria-label="Pool address confirmation"
-                      value={deleteConfirmation}
+                      id="reserved-koin-amount"
+                      type="number"
+                      min="0"
+                      step="any"
+                      placeholder="0"
+                      value={reservedKoinAmount}
                       onChange={(event) =>
-                        setDeleteConfirmation(event.target.value)
+                        setReservedKoinAmount(event.target.value)
                       }
-                      placeholder={poolId}
                       disabled={submitting}
                     />
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-2">
                     <Button
-                      variant="destructive"
-                      className="w-full"
-                      onClick={handleDeletePool}
-                      disabled={
-                        submitting || deleteConfirmation !== poolId
-                      }
+                      onClick={() => handleReservedKoin("add")}
+                      disabled={submitting}
                     >
-                      Remove pool from Fogata
+                      Add reserved KOIN
                     </Button>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-            )}
-          </Tabs>
+                    <Button
+                      variant="outline"
+                      onClick={() => handleReservedKoin("remove")}
+                      disabled={submitting}
+                    >
+                      Remove reserved KOIN
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">
+                    Register node operator public key
+                  </CardTitle>
+                  <CardDescription>
+                    Register the public key from{" "}
+                    <code>.koinos/block_producer/public.key</code>. Also set
+                    the <code>producer</code> field in the{" "}
+                    <code>block_producer</code> section of your node&apos;s{" "}
+                    <code>config.yml</code> to this pool address.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {registeredPublicKey && (
+                    <div className="space-y-1">
+                      <p className="text-xs text-muted-foreground">
+                        Currently registered public key
+                      </p>
+                      <p className="break-all font-mono text-xs">
+                        {registeredPublicKey}
+                      </p>
+                    </div>
+                  )}
+                  <div className="space-y-2">
+                    <Label htmlFor="public-key">Public key</Label>
+                    <Input
+                      id="public-key"
+                      value={publicKey}
+                      onChange={(event) => setPublicKey(event.target.value)}
+                      placeholder="Paste the contents of public.key"
+                      disabled={submitting}
+                    />
+                  </div>
+                  <Button
+                    className="w-full"
+                    onClick={handleRegisterPublicKey}
+                    disabled={submitting}
+                  >
+                    Register public key
+                  </Button>
+                </CardContent>
+              </Card>
+
+              <details className="border-t pt-3">
+                <summary className="cursor-pointer list-none text-sm text-muted-foreground">Danger zone</summary>
+                <div className="mt-3 space-y-3 text-sm text-muted-foreground">
+                  <p>Removing the pool delists it from Fogata. Stakers keep their funds and can still withdraw. Enter the pool address to confirm.</p>
+                  <Input
+                    aria-label="Pool address confirmation"
+                    value={deleteConfirmation}
+                    onChange={(event) => setDeleteConfirmation(event.target.value)}
+                    placeholder={poolId}
+                    disabled={submitting}
+                  />
+                  <Button
+                    variant="outline"
+                    className="border-destructive text-destructive hover:bg-destructive/10"
+                    onClick={handleDeletePool}
+                    disabled={submitting || deleteConfirmation !== poolId}
+                  >
+                    Remove from Fogata list
+                  </Button>
+                </div>
+              </details>
+            </section>
+          )}
         </>
       )}
     </div>

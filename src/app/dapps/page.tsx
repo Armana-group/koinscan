@@ -382,233 +382,232 @@ export default function FogataPage() {
           </DialogTrigger>
         </p>
 
-        {/* ---- create-pool dialog: paste the existing <DialogContent>…</DialogContent> here, unchanged ---- */}
-          <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>Create a Fogata mining pool</DialogTitle>
-              <DialogDescription>
-                Deploy a new pool contract, configure it, start its first
-                snapshot, and submit it to the Fogata list in one transaction.
-                The connected account becomes the pool owner.
-              </DialogDescription>
-            </DialogHeader>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Create a Fogata mining pool</DialogTitle>
+            <DialogDescription>
+              Deploy a new pool contract, configure it, start its first
+              snapshot, and submit it to the Fogata list in one transaction.
+              The connected account becomes the pool owner.
+            </DialogDescription>
+          </DialogHeader>
 
-            <div className="rounded-md border border-amber-500/50 bg-amber-500/10 p-3 text-sm">
-              Before creating a mining pool, you must already be running a
-              Koinos block producer. A pool coordinates mining work, but it
-              does not set up or run a block producer for you.
+          <div className="rounded-md border border-amber-500/50 bg-amber-500/10 p-3 text-sm">
+            Before creating a mining pool, you must already be running a
+            Koinos block producer. A pool coordinates mining work, but it
+            does not set up or run a block producer for you.
+          </div>
+
+          {!account && (
+            <p className="rounded-md border p-3 text-sm text-muted-foreground">
+              Connect your wallet before creating a pool.
+            </p>
+          )}
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="new-pool-name">Name</Label>
+              <Input
+                id="new-pool-name"
+                value={poolName}
+                onChange={(event) => setPoolName(event.target.value)}
+                disabled={creating}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="new-pool-image">Image URL</Label>
+              <Input
+                id="new-pool-image"
+                type="url"
+                value={poolImage}
+                onChange={(event) => setPoolImage(event.target.value)}
+                disabled={creating}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="new-pool-description">Description</Label>
+              <textarea
+                id="new-pool-description"
+                value={poolDescription}
+                onChange={(event) =>
+                  setPoolDescription(event.target.value)
+                }
+                disabled={creating}
+                rows={4}
+                className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="new-pool-reburn-period">
+                Reburn period (days)
+              </Label>
+              <Input
+                id="new-pool-reburn-period"
+                type="number"
+                min="0"
+                step="0.01"
+                value={reburnPeriodDays}
+                onChange={(event) =>
+                  setReburnPeriodDays(event.target.value)
+                }
+                disabled={creating}
+              />
             </div>
 
-            {!account && (
-              <p className="rounded-md border p-3 text-sm text-muted-foreground">
-                Connect your wallet before creating a pool.
-              </p>
-            )}
-
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="new-pool-name">Name</Label>
-                <Input
-                  id="new-pool-name"
-                  value={poolName}
-                  onChange={(event) => setPoolName(event.target.value)}
-                  disabled={creating}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="new-pool-image">Image URL</Label>
-                <Input
-                  id="new-pool-image"
-                  type="url"
-                  value={poolImage}
-                  onChange={(event) => setPoolImage(event.target.value)}
-                  disabled={creating}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="new-pool-description">Description</Label>
-                <textarea
-                  id="new-pool-description"
-                  value={poolDescription}
-                  onChange={(event) =>
-                    setPoolDescription(event.target.value)
+            <div className="space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <Label>Beneficiaries</Label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    setBeneficiaries((current) => [
+                      ...current,
+                      { address: "", percentage: 0 },
+                    ])
                   }
                   disabled={creating}
-                  rows={4}
-                  className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-                />
+                >
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add
+                </Button>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="new-pool-reburn-period">
-                  Reburn period (days)
-                </Label>
-                <Input
-                  id="new-pool-reburn-period"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={reburnPeriodDays}
-                  onChange={(event) =>
-                    setReburnPeriodDays(event.target.value)
-                  }
-                  disabled={creating}
-                />
-              </div>
-
-              <div className="space-y-3">
-                <div className="flex items-center justify-between gap-3">
-                  <Label>Beneficiaries</Label>
+              {beneficiaries.length === 0 && (
+                <p className="text-sm text-muted-foreground">
+                  No beneficiaries configured.
+                </p>
+              )}
+              {beneficiaries.map((beneficiary, index) => (
+                <div
+                  key={index}
+                  className="grid gap-2 rounded-md border p-3 sm:grid-cols-[1fr_8rem_auto]"
+                >
+                  <Input
+                    aria-label={`Beneficiary ${index + 1} address`}
+                    placeholder="Beneficiary address"
+                    value={beneficiary.address}
+                    onChange={(event) =>
+                      setBeneficiaries((current) =>
+                        current.map((item, itemIndex) =>
+                          itemIndex === index
+                            ? { ...item, address: event.target.value }
+                            : item
+                        )
+                      )
+                    }
+                    disabled={creating}
+                  />
+                  <Input
+                    aria-label={`Beneficiary ${index + 1} percentage`}
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.001"
+                    placeholder="%"
+                    value={beneficiary.percentage / 1000}
+                    onChange={(event) =>
+                      setBeneficiaries((current) =>
+                        current.map((item, itemIndex) =>
+                          itemIndex === index
+                            ? {
+                                ...item,
+                                percentage: Math.round(
+                                  Number(event.target.value) * 1000
+                                ),
+                              }
+                            : item
+                        )
+                      )
+                    }
+                    disabled={creating}
+                  />
                   <Button
                     type="button"
-                    variant="outline"
-                    size="sm"
+                    variant="ghost"
+                    size="icon"
+                    aria-label={`Remove beneficiary ${index + 1}`}
                     onClick={() =>
-                      setBeneficiaries((current) => [
-                        ...current,
-                        { address: "", percentage: 0 },
-                      ])
+                      setBeneficiaries((current) =>
+                        current.filter(
+                          (_, itemIndex) => itemIndex !== index
+                        )
+                      )
                     }
                     disabled={creating}
                   >
-                    <Plus className="mr-2 h-4 w-4" />
-                    Add
+                    <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>
-                {beneficiaries.length === 0 && (
-                  <p className="text-sm text-muted-foreground">
-                    No beneficiaries configured.
-                  </p>
-                )}
-                {beneficiaries.map((beneficiary, index) => (
-                  <div
-                    key={index}
-                    className="grid gap-2 rounded-md border p-3 sm:grid-cols-[1fr_8rem_auto]"
-                  >
-                    <Input
-                      aria-label={`Beneficiary ${index + 1} address`}
-                      placeholder="Beneficiary address"
-                      value={beneficiary.address}
-                      onChange={(event) =>
-                        setBeneficiaries((current) =>
-                          current.map((item, itemIndex) =>
-                            itemIndex === index
-                              ? { ...item, address: event.target.value }
-                              : item
-                          )
-                        )
-                      }
-                      disabled={creating}
-                    />
-                    <Input
-                      aria-label={`Beneficiary ${index + 1} percentage`}
-                      type="number"
-                      min="0"
-                      max="100"
-                      step="0.001"
-                      placeholder="%"
-                      value={beneficiary.percentage / 1000}
-                      onChange={(event) =>
-                        setBeneficiaries((current) =>
-                          current.map((item, itemIndex) =>
-                            itemIndex === index
-                              ? {
-                                  ...item,
-                                  percentage: Math.round(
-                                    Number(event.target.value) * 1000
-                                  ),
-                                }
-                              : item
-                          )
-                        )
-                      }
-                      disabled={creating}
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      aria-label={`Remove beneficiary ${index + 1}`}
-                      onClick={() =>
-                        setBeneficiaries((current) =>
-                          current.filter(
-                            (_, itemIndex) => itemIndex !== index
-                          )
-                        )
-                      }
-                      disabled={creating}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ))}
-                <p className="text-xs text-muted-foreground">
-                  Total beneficiary share:{" "}
-                  {beneficiaries.reduce(
-                    (sum, beneficiary) => sum + beneficiary.percentage,
-                    0
-                  ) / 1000}
-                  %
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="new-pool-reserved-koin">
-                  Reserved KOIN
-                </Label>
-                <Input
-                  id="new-pool-reserved-koin"
-                  type="number"
-                  min="0"
-                  step="any"
-                  placeholder="2000"
-                  value={reservedKoinAmount}
-                  onChange={(event) =>
-                    setReservedKoinAmount(event.target.value)
-                  }
-                  disabled={creating}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Reserved KOIN provides mana for operating the pool and is not
-                  burned. Lower reburn periods require more frequent operations,
-                  so more reserved KOIN is recommended. As a base reference, use
-                  about 2,000 KOIN for a 4-day reburn period.
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="new-pool-public-key">
-                  Node operator public key
-                </Label>
-                <Input
-                  id="new-pool-public-key"
-                  value={publicKey}
-                  onChange={(event) => setPublicKey(event.target.value)}
-                  placeholder="Paste the contents of public.key"
-                  disabled={creating}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Register the public key from{" "}
-                  <code>.koinos/block_producer/public.key</code>. Also set the{" "}
-                  <code>producer</code> field in the{" "}
-                  <code>block_producer</code> section of your node&apos;s{" "}
-                  <code>config.yml</code> to the new pool address after
-                  deployment.
-                </p>
-              </div>
-
-              <Button
-                className="w-full"
-                onClick={handleCreatePool}
-                disabled={!account || !signer || creating}
-              >
-                {creating ? "Deploying..." : "Deploy and submit pool"}
-              </Button>
-              <p className="text-center text-xs text-muted-foreground">
-                A random one-time contract key is generated locally. Ownership
-                is assigned to your connected account during deployment.
+              ))}
+              <p className="text-xs text-muted-foreground">
+                Total beneficiary share:{" "}
+                {beneficiaries.reduce(
+                  (sum, beneficiary) => sum + beneficiary.percentage,
+                  0
+                ) / 1000}
+                %
               </p>
             </div>
-          </DialogContent>
+
+            <div className="space-y-2">
+              <Label htmlFor="new-pool-reserved-koin">
+                Reserved KOIN
+              </Label>
+              <Input
+                id="new-pool-reserved-koin"
+                type="number"
+                min="0"
+                step="any"
+                placeholder="2000"
+                value={reservedKoinAmount}
+                onChange={(event) =>
+                  setReservedKoinAmount(event.target.value)
+                }
+                disabled={creating}
+              />
+              <p className="text-xs text-muted-foreground">
+                Reserved KOIN provides mana for operating the pool and is not
+                burned. Lower reburn periods require more frequent operations,
+                so more reserved KOIN is recommended. As a base reference, use
+                about 2,000 KOIN for a 4-day reburn period.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="new-pool-public-key">
+                Node operator public key
+              </Label>
+              <Input
+                id="new-pool-public-key"
+                value={publicKey}
+                onChange={(event) => setPublicKey(event.target.value)}
+                placeholder="Paste the contents of public.key"
+                disabled={creating}
+              />
+              <p className="text-xs text-muted-foreground">
+                Register the public key from{" "}
+                <code>.koinos/block_producer/public.key</code>. Also set the{" "}
+                <code>producer</code> field in the{" "}
+                <code>block_producer</code> section of your node&apos;s{" "}
+                <code>config.yml</code> to the new pool address after
+                deployment.
+              </p>
+            </div>
+
+            <Button
+              className="w-full"
+              onClick={handleCreatePool}
+              disabled={!account || !signer || creating}
+            >
+              {creating ? "Deploying..." : "Deploy and submit pool"}
+            </Button>
+            <p className="text-center text-xs text-muted-foreground">
+              A random one-time contract key is generated locally. Ownership
+              is assigned to your connected account during deployment.
+            </p>
+          </div>
+        </DialogContent>
       </Dialog>
     </div>
   );

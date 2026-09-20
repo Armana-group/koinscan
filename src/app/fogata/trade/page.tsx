@@ -1,6 +1,7 @@
 "use client";
 
 import { Contract, Multicall, ProviderInterface, utils } from "koilib";
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -34,7 +35,7 @@ import {
   VHP_CONTRACT_ID,
 } from "@/koinos/constants";
 import { findMatchingOrder } from "@/lib/fogata";
-import { SectionNav } from "@/components/fogata/SectionNav";
+import { HowItWorks } from "@/components/fogata/HowItWorks";
 import { cn } from "@/lib/utils";
 import * as toast from "@/lib/toast";
 
@@ -682,9 +683,12 @@ export default function DexPage() {
   const getSymbol = side === "sell" ? "KOIN" : "VHP";
 
   return (
-    <div className="mx-auto w-full max-w-[440px] px-4 py-10">
+    <div className="mx-auto w-full max-w-[640px] px-4 py-10">
+      <Link href="/fogata" className="mb-7 inline-block text-sm text-muted-foreground hover:text-foreground">
+        ‹ Fogata
+      </Link>
       <h1 className="text-2xl font-semibold tracking-tight">Trade</h1>
-      <SectionNav active="trade">
+      <HowItWorks>
         <p>
           Staked VHP doesn&apos;t turn back into KOIN by itself. Post an order to sell VHP for KOIN, or
           buy VHP with KOIN; it fills when another trader accepts it.
@@ -693,130 +697,132 @@ export default function DexPage() {
           If your pool allows it, you can sell straight from the pool and keep earning until the
           order fills.
         </p>
-      </SectionNav>
+      </HowItWorks>
 
-      <div className="mt-6 grid grid-cols-2 gap-0.5 rounded-[9px] bg-muted p-[3px]" role="group" aria-label="Order side">
-        <button
-          type="button"
-          disabled={submitting}
-          aria-pressed={side === "sell"}
-          onClick={() => setSide("sell")}
-          className={cn("rounded-[7px] py-1.5 text-sm transition-colors", side === "sell" ? "bg-background font-medium shadow-sm" : "text-muted-foreground")}
-        >
-          Sell VHP
-        </button>
-        <button
-          type="button"
-          disabled={submitting}
-          aria-pressed={side === "buy"}
-          onClick={() => { setSide("buy"); setPool(""); }}
-          className={cn("rounded-[7px] py-1.5 text-sm transition-colors", side === "buy" ? "bg-background font-medium shadow-sm" : "text-muted-foreground")}
-        >
-          Buy VHP
-        </button>
-      </div>
-
-      <div className="mt-4 flex items-baseline gap-2.5 rounded-xl border px-4 py-3.5 focus-within:ring-2 focus-within:ring-brand/40">
-        <input
-          id="dex-pay-amount"
-          type="number"
-          min="0"
-          step="0.00000001"
-          placeholder="0"
-          inputMode="decimal"
-          aria-label={`You ${side === "sell" ? "sell" : "pay"}`}
-          className="w-full min-w-0 bg-transparent text-[28px] font-semibold tracking-tight outline-none tabular-nums"
-          value={payAmount}
-          onChange={(event) => (side === "sell" ? setVhpAmount(event.target.value) : setKoinAmount(event.target.value))}
-          disabled={submitting}
-        />
-        <span className="font-medium text-muted-foreground">{paySymbol}</span>
-        <button
-          type="button"
-          className="text-xs font-semibold text-brand disabled:opacity-40"
-          disabled={submitting || !availablePayBalance || balancesLoading || BigInt(availablePayBalance || "0") <= BigInt(0)}
-          onClick={() => {
-            if (!availablePayBalance) return;
-            const maxValue = formatAmountForInput(availablePayBalance);
-            if (side === "sell") setVhpAmount(maxValue);
-            else setKoinAmount(maxValue);
-          }}
-        >
-          Max
-        </button>
-      </div>
-      <div className="mt-2.5 flex items-baseline gap-2.5 rounded-xl border px-4 py-3.5 focus-within:ring-2 focus-within:ring-brand/40">
-        <input
-          id="dex-get-amount"
-          type="number"
-          min="0"
-          step="0.00000001"
-          placeholder="0"
-          inputMode="decimal"
-          aria-label="You get"
-          className="w-full min-w-0 bg-transparent text-[28px] font-semibold tracking-tight outline-none tabular-nums"
-          value={getAmount}
-          onChange={(event) => (side === "sell" ? setKoinAmount(event.target.value) : setVhpAmount(event.target.value))}
-          disabled={submitting}
-        />
-        <span className="font-medium text-muted-foreground">{getSymbol}</span>
-      </div>
-      <div className="mt-2 flex justify-between px-0.5 text-xs text-muted-foreground">
-        <span className="tabular-nums">{impliedPrice ? `${impliedPrice} KOIN per VHP` : " "}</span>
-        <span>
-          {!account
-            ? ""
-            : balancesLoading
-              ? "Loading balance…"
-              : availablePayBalance !== null
-                ? `Wallet ${formatAmount(availablePayBalance)} ${availablePaySymbol}${side === "sell" && pool ? " in pool" : ""}`
-                : ""}
-        </span>
-      </div>
-
-      {side === "sell" && account && pools.length > 0 && (
-        <div className="mt-3 text-xs text-muted-foreground">
-          <Select value={pool || NO_POOL_VALUE} onValueChange={(value) => setPool(value === NO_POOL_VALUE ? "" : value)} disabled={submitting || poolsLoading}>
-            <SelectTrigger id="dex-pool" className="h-8 w-auto gap-2 border-0 px-0 text-xs text-brand shadow-none">
-              <SelectValue placeholder="Sell from a pool instead" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={NO_POOL_VALUE}>Sell from your wallet</SelectItem>
-              {pools.map((miningPool) => (
-                <SelectItem key={miningPool.account} value={miningPool.account}>
-                  Sell from {miningPool.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      )}
-
-      {matchingOrder && (
-        <p className="mt-4 text-xs text-muted-foreground">
-          An open order matches —{" "}
-          <button type="button" className="text-brand" onClick={() => { openFillDialog(matchingOrder); setFillAmount(side === "sell" ? vhpAmount : koinAmount); }} disabled={!account || submitting}>
-            {matchingOrder.buy ? "Sell" : "Buy"} {formatAmount(matchingOrder.vhp_amount)} VHP at {formatPrice(matchingOrder)} ›
+      <div className="max-w-[440px]">
+        <div className="mt-6 grid grid-cols-2 gap-0.5 rounded-[9px] bg-muted p-[3px]" role="group" aria-label="Order side">
+          <button
+            type="button"
+            disabled={submitting}
+            aria-pressed={side === "sell"}
+            onClick={() => setSide("sell")}
+            className={cn("rounded-[7px] py-1.5 text-sm transition-colors", side === "sell" ? "bg-background font-medium shadow-sm" : "text-muted-foreground")}
+          >
+            Sell VHP
           </button>
-        </p>
-      )}
-
-      {account ? (
-        <Button
-          className="mt-4 h-[42px] w-full rounded-[11px] bg-brand text-brand-foreground hover:bg-brand/90"
-          onClick={handleCreateOrder}
-          disabled={submitting}
-        >
-          {submitting ? "Submitting…" : "Place order"}
-        </Button>
-      ) : (
-        <div className="mt-4">
-          <WalletButton connectLabel="Connect wallet" />
+          <button
+            type="button"
+            disabled={submitting}
+            aria-pressed={side === "buy"}
+            onClick={() => { setSide("buy"); setPool(""); }}
+            className={cn("rounded-[7px] py-1.5 text-sm transition-colors", side === "buy" ? "bg-background font-medium shadow-sm" : "text-muted-foreground")}
+          >
+            Buy VHP
+          </button>
         </div>
-      )}
-      <p className="mt-2.5 text-center text-xs text-muted-foreground">Waits for a taker. Cancel any time.</p>
 
-      {renderBook()}
+        <div className="mt-4 flex items-baseline gap-2.5 rounded-xl border px-4 py-3.5 focus-within:ring-2 focus-within:ring-brand/40">
+          <input
+            id="dex-pay-amount"
+            type="number"
+            min="0"
+            step="0.00000001"
+            placeholder="0"
+            inputMode="decimal"
+            aria-label={`You ${side === "sell" ? "sell" : "pay"}`}
+            className="w-full min-w-0 bg-transparent text-[28px] font-semibold tracking-tight outline-none tabular-nums"
+            value={payAmount}
+            onChange={(event) => (side === "sell" ? setVhpAmount(event.target.value) : setKoinAmount(event.target.value))}
+            disabled={submitting}
+          />
+          <span className="font-medium text-muted-foreground">{paySymbol}</span>
+          <button
+            type="button"
+            className="text-xs font-semibold text-brand disabled:opacity-40"
+            disabled={submitting || !availablePayBalance || balancesLoading || BigInt(availablePayBalance || "0") <= BigInt(0)}
+            onClick={() => {
+              if (!availablePayBalance) return;
+              const maxValue = formatAmountForInput(availablePayBalance);
+              if (side === "sell") setVhpAmount(maxValue);
+              else setKoinAmount(maxValue);
+            }}
+          >
+            Max
+          </button>
+        </div>
+        <div className="mt-2.5 flex items-baseline gap-2.5 rounded-xl border px-4 py-3.5 focus-within:ring-2 focus-within:ring-brand/40">
+          <input
+            id="dex-get-amount"
+            type="number"
+            min="0"
+            step="0.00000001"
+            placeholder="0"
+            inputMode="decimal"
+            aria-label="You get"
+            className="w-full min-w-0 bg-transparent text-[28px] font-semibold tracking-tight outline-none tabular-nums"
+            value={getAmount}
+            onChange={(event) => (side === "sell" ? setKoinAmount(event.target.value) : setVhpAmount(event.target.value))}
+            disabled={submitting}
+          />
+          <span className="font-medium text-muted-foreground">{getSymbol}</span>
+        </div>
+        <div className="mt-2 flex justify-between px-0.5 text-xs text-muted-foreground">
+          <span className="tabular-nums">{impliedPrice ? `${impliedPrice} KOIN per VHP` : " "}</span>
+          <span>
+            {!account
+              ? ""
+              : balancesLoading
+                ? "Loading balance…"
+                : availablePayBalance !== null
+                  ? `Wallet ${formatAmount(availablePayBalance)} ${availablePaySymbol}${side === "sell" && pool ? " in pool" : ""}`
+                  : ""}
+          </span>
+        </div>
+
+        {side === "sell" && account && pools.length > 0 && (
+          <div className="mt-3 text-xs text-muted-foreground">
+            <Select value={pool || NO_POOL_VALUE} onValueChange={(value) => setPool(value === NO_POOL_VALUE ? "" : value)} disabled={submitting || poolsLoading}>
+              <SelectTrigger id="dex-pool" className="h-8 w-auto gap-2 border-0 px-0 text-xs text-brand shadow-none">
+                <SelectValue placeholder="Sell from a pool instead" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={NO_POOL_VALUE}>Sell from your wallet</SelectItem>
+                {pools.map((miningPool) => (
+                  <SelectItem key={miningPool.account} value={miningPool.account}>
+                    Sell from {miningPool.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+
+        {matchingOrder && (
+          <p className="mt-4 text-xs text-muted-foreground">
+            An open order matches —{" "}
+            <button type="button" className="text-brand" onClick={() => { openFillDialog(matchingOrder); setFillAmount(side === "sell" ? vhpAmount : koinAmount); }} disabled={!account || submitting}>
+              {matchingOrder.buy ? "Sell" : "Buy"} {formatAmount(matchingOrder.vhp_amount)} VHP at {formatPrice(matchingOrder)} ›
+            </button>
+          </p>
+        )}
+
+        {account ? (
+          <Button
+            className="mt-4 h-[42px] w-full rounded-[11px] bg-brand text-brand-foreground hover:bg-brand/90"
+            onClick={handleCreateOrder}
+            disabled={submitting}
+          >
+            {submitting ? "Submitting…" : "Place order"}
+          </Button>
+        ) : (
+          <div className="mt-4">
+            <WalletButton connectLabel="Connect wallet" />
+          </div>
+        )}
+        <p className="mt-2.5 text-center text-xs text-muted-foreground">Waits for a taker. Cancel any time.</p>
+
+        {renderBook()}
+      </div>
 
       <Dialog
         open={Boolean(selectedOrder)}

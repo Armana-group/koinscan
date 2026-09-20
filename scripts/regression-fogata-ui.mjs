@@ -22,7 +22,9 @@ assert.doesNotMatch(pools, /Discover dApps|Fogata 2 empowers|Mining pools</, "/f
 assert.doesNotMatch(pools, /Create a mining pool/, "the operator CTA block is gone");
 assert.match(pools, /Start a pool/, "operators still have a link");
 assert.match(pools, /How it works/, "pools page has the how-it-works disclosure");
-assert.match(pools, /href="\/fogata\/trade"/, "pools page links to trade");
+assert.match(pools, /href="\/fogata\/trade"/, "pools page has the Trade row");
+assert.match(pools, /Trade VHP ↔ KOIN/, "the Trade row is labelled");
+assert.doesNotMatch(pools, /aria-current="page"/, "no tab-style sub-nav on the pools page");
 
 const trade = await page("/fogata/trade");
 assert.match(trade, />Trade</, "trade page has the short title");
@@ -30,7 +32,7 @@ assert.doesNotMatch(trade, /order book decentralized exchange/i, "trade page has
 assert.doesNotMatch(visible(trade), /\btiers?\b/i, "the word tier is not in trade copy");
 assert.match(trade, /Waits for a taker/, "the order-placement sentence is present");
 assert.match(trade, /How it works/, "trade page has the how-it-works disclosure");
-assert.match(trade, /href="\/fogata"/, "trade page links back to pools");
+assert.match(trade, /href="\/fogata"[^>]*>[^<]*Fogata/, "trade page has a back link to Fogata");
 
 await redirectsTo("/dapps", "/fogata");
 await redirectsTo("/dapps/fogata", "/fogata");

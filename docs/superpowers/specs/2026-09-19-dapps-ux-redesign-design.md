@@ -88,13 +88,14 @@ functions are one-line calls that close the sheet/dialog on success.
 ```
 
 The section is named **Fogata** in the nav (decided 2026-09-19: Koinscan is Fogata v2's
-home, so "dApps" promised a directory it isn't). `/fogata` and `/fogata/trade` share a
-`Pools · Trade` segmented sub-nav under the title, each followed by a collapsed
-"How it works" disclosure with three sentences of plain-language explanation.
+home, so "dApps" promised a directory it isn't). Both top-level pages carry a collapsed
+"How it works" disclosure under the title. Trade is the last row of the Fogata list —
+same row language as the pools — rather than a tab; a switch that navigates between two
+pages of different shape jumped around, so it was dropped (2026-09-19).
 
 - Section routes are `/fogata`, `/fogata/[poolId]`, `/fogata/trade`; every former `/dapps/*` path redirects to its new location.
-- Trade is reachable from the section sub-nav on both top-level pages, from the pool
-  page sub-line, and from the Deposit sheet — not from a landing grid.
+- Trade is reachable from the Trade row at the end of the Fogata list, from the pool
+  page sub-line, and from the Deposit sheet — not from a landing grid or a tab.
 
 ## 5. Screens
 
@@ -102,7 +103,7 @@ home, so "dApps" promised a directory it isn't). `/fogata` and `/fogata/trade` s
 
 **Question:** which pool?
 
-- Title: "Fogata". Under it the `Pools · Trade` sub-nav and the collapsed "How it works"
+- Title: "Fogata". Under it the collapsed "How it works"
   disclosure (three sentences: pools run nodes for stakers and pay rewards each period;
   staked KOIN becomes VHP, rewards arrive as KOIN, Trade turns VHP back into KOIN; v2 lives
   on Koinscan, v1 stays at fogata.io). No paragraph outside the disclosure.
@@ -116,6 +117,9 @@ home, so "dApps" promised a directory it isn't). `/fogata` and `/fogata/trade` s
     list in Phase B once `usePoolList` loads it.
   - A pool that is not producing shows "paused" in place of the number.
   - Optional small `v1`/`v2` tag, hidden while only one version is listed.
+- After the pool rows, one more row in the same style: brand-tinted ⇅ mark ·
+  **Trade VHP ↔ KOIN** · "Sell VHP for KOIN, or buy VHP" · › → `/fogata/trade`. It is
+  always present, even while pools load or when none are listed.
 - Footer, small muted text: "Estimated yearly yield after the pool's fee. Run a
   node? Start a pool" — the link opens the create-pool dialog (`/fogata/new` in Phase B).
 - Empty (0 pools): "No pools are listed yet." + the same footer.
@@ -221,7 +225,7 @@ Logic unchanged (bytecode fetch, batched ops).
 
 **Question:** how much KOIN do I get for this VHP (or vice versa)?
 
-- Title "Trade", then the `Pools · Trade` sub-nav and a collapsed "How it works"
+- Back link "‹ Fogata", title "Trade", then a collapsed "How it works"
   (VHP doesn't turn back into KOIN by itself; post an order, it fills when a trader
   accepts; sell straight from a pool if it allows it). Then segmented **Sell VHP / Buy VHP**.
 - Two amount fields: "You sell" (editable, Max, wallet balance under it) and "You get"
@@ -273,7 +277,7 @@ New, under `src/components/fogata/` (where `SectionNav` already lives):
 
 | Component | Used by |
 |---|---|
-| `PoolRow` | Pools list |
+| `PoolRow` | Pools list (pool rows and the Trade row) |
 | `PoolHeader` | Pool page, Manage |
 | `PositionHero` | Pool page (all wallet states) |
 | `KeyValueList` | About this pool, Manage status |

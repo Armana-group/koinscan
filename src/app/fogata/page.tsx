@@ -3,7 +3,7 @@
 import { Contract, Multicall, Signer, utils } from "koilib";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronRight, Trash2, Plus } from "lucide-react";
+import { ArrowDownUp, ChevronRight, Trash2, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,7 +23,7 @@ import { useEffect, useState } from "react";
 import { abiFogata2Pool } from "@/koinos/abis/fogata2Pool";
 import { abiPob } from "@/koinos/abis";
 import { computePoolApy, getNetworkApy } from "@/lib/fogata";
-import { SectionNav } from "@/components/fogata/SectionNav";
+import { HowItWorks } from "@/components/fogata/HowItWorks";
 import * as toast from "@/lib/toast";
 
 interface Pool {
@@ -304,7 +304,7 @@ export default function FogataPage() {
     <div className="mx-auto w-full max-w-[640px] px-4 py-10">
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <h1 className="text-2xl font-semibold tracking-tight">Fogata</h1>
-        <SectionNav active="pools">
+        <HowItWorks>
           <p>
             Fogata pools run Koinos nodes on behalf of their stakers. Stake KOIN or VHP with a pool;
             the node produces blocks and the pool pays you a share of the rewards every payout period.
@@ -318,7 +318,7 @@ export default function FogataPage() {
             Fogata v2 pools live here on Koinscan; v1 pools remain at{" "}
             <a href="https://fogata.io" target="_blank" rel="noopener noreferrer" className="text-brand">fogata.io</a>.
           </p>
-        </SectionNav>
+        </HowItWorks>
 
         {loading && (
           <ul className="mt-7 divide-y border-t" aria-busy="true">
@@ -342,7 +342,7 @@ export default function FogataPage() {
         )}
 
         {!loading && !error && pools.length === 0 && (
-          <p className="mt-7 text-sm text-muted-foreground">No pools are listed yet.</p>
+          <p className="mt-7 pb-4 text-sm text-muted-foreground">No pools are listed yet.</p>
         )}
 
         {!loading && !error && pools.length > 0 && (
@@ -389,6 +389,24 @@ export default function FogataPage() {
               ))}
           </ul>
         )}
+
+        <ul className="border-t">
+          <li>
+            <Link
+              href="/fogata/trade"
+              className="-mx-3 flex items-center gap-4 rounded-[10px] px-3 py-[18px] transition-colors hover:bg-muted/60"
+            >
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] bg-brand/10 text-brand">
+                <ArrowDownUp className="h-4 w-4" aria-hidden />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate font-medium">Trade VHP ↔ KOIN</span>
+                <span className="block truncate text-xs text-muted-foreground">Sell VHP for KOIN, or buy VHP</span>
+              </span>
+              <ChevronRight className="h-4 w-4 text-muted-foreground/60" aria-hidden />
+            </Link>
+          </li>
+        </ul>
 
         <p className="mt-7 text-xs text-muted-foreground/80">
           Estimated yearly yield after the pool&apos;s fee. Run a node?{" "}

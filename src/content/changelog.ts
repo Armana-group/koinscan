@@ -10,6 +10,23 @@ export interface ChangelogEntry {
 
 export const changelogEntries = [
   {
+    date: "2026-09-19",
+    displayDate: "September 19, 2026",
+    title: "Fogata staking pools and VHP trading",
+    summary:
+      "Fogata v2 mining pools now live on Koinscan with a one-thing-per-screen design: a pools list, a pool page, and a place to trade VHP for KOIN.",
+    changes: [
+      "List Fogata v2 pools with their estimated yearly yield after fees, total VHP staked, and the pools' share of network production.",
+      "Show each pool's yield or your stake first, with deposit, withdraw, and reward settings a tap away and pool details below.",
+      "Trade VHP for KOIN, or KOIN for VHP, by placing an order; a matching open order is offered as a shortcut.",
+      "Explain how pools and trading work in plain language on each page, collapsed by default.",
+      "Replace native number inputs with decimal amount fields, so there are no spinner arrows or exponent notation.",
+      "Redirect the earlier dApps addresses to the new Fogata section.",
+    ],
+    contributors: ["Ron Hamenahem", "Julian Gonzalez"],
+    commits: ["2add423", "5115a88", "761e8a9"],
+  },
+  {
     date: "2026-08-30",
     displayDate: "August 30, 2026",
     title: "Accurate balances and market pricing",

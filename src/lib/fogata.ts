@@ -8,11 +8,18 @@ import {
   VHP_CONTRACT_ID,
 } from "@/koinos/constants";
 
+export interface NetworkStaking {
+  /** Base yearly yield for producing VHP, before any pool fee. */
+  apy: number;
+  /** VHP currently producing blocks across the whole network. */
+  vhpProducing: number;
+}
+
 /**
  * APY = 2% * virtual supply / VHP producing
  * Same formula as src/app/network/page.tsx
  */
-export async function getNetworkApy(provider: ProviderInterface): Promise<number> {
+export async function getNetworkStaking(provider: ProviderInterface): Promise<NetworkStaking> {
   const vhpContract = new Contract({ id: VHP_CONTRACT_ID, provider, abi: tokenAbi });
   const { result: resultVhp } = await vhpContract.functions.totalSupply();
   const totalVhp = Number(resultVhp!.value) / 1e8;
@@ -27,7 +34,30 @@ export async function getNetworkApy(provider: ProviderInterface): Promise<number
     "0x" + utils.toHexString(utils.decodeBase64url(resultPob!.value.difficulty))
   );
   const vhpProducing = 10 * difficulty / 3000 / 1e8;
-  return 2 * (totalVhp + totalKoin) / vhpProducing;
+  return { apy: 2 * (totalVhp + totalKoin) / vhpProducing, vhpProducing };
+}
+
+export async function getNetworkApy(provider: ProviderInterface): Promise<number> {
+  return (await getNetworkStaking(provider)).apy;
+}
+
+/**
+ * The one line under the Fogata title: how much VHP the listed pools hold
+ * and what share of the network's producing VHP that is.
+ */
+export function summarizeFogata(
+  poolVhp: (number | undefined)[],
+  vhpProducing: number | undefined
+): { totalStaked: number; share: number | null } {
+  const totalStaked = poolVhp.reduce<number>((sum, vhp) => sum + (vhp ?? 0), 0);
+  const share = vhpProducing && vhpProducing > 0 ? (totalStaked * 100) / vhpProducing : null;
+  return { totalStaked, share };
+}
+
+export function formatCompactVhp(amount: number): string {
+  if (amount >= 1e6) return `${(amount / 1e6).toFixed(1)}M`;
+  if (amount >= 1e3) return `${(amount / 1e3).toFixed(1)}K`;
+  return Math.round(amount).toString();
 }
 
 export function computePoolApy(

@@ -17,12 +17,12 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { useWallet } from "@/contexts/WalletContext";
-import { FOGATA2_LIST_POOLS_CONTRACT_ID, POB_CONTRACT_ID, KOIN_CONTRACT_ID } from "@/koinos/constants";
+import { FOGATA2_LIST_POOLS_CONTRACT_ID, POB_CONTRACT_ID, KOIN_CONTRACT_ID, VHP_CONTRACT_ID } from "@/koinos/constants";
 import { abiFogata2ListPools } from "@/koinos/abis/fogata2ListPools";
 import { useEffect, useState } from "react";
 import { abiFogata2Pool } from "@/koinos/abis/fogata2Pool";
 import { abiPob } from "@/koinos/abis";
-import { computePoolApy, getNetworkApy } from "@/lib/fogata";
+import { computePoolApy, formatCompactVhp, getNetworkStaking, summarizeFogata, type NetworkStaking } from "@/lib/fogata";
 import { HowItWorks } from "@/components/fogata/HowItWorks";
 import { pageColumn, pageTitle, quietLink } from "@/components/fogata/styles";
 import * as toast from "@/lib/toast";
@@ -42,6 +42,8 @@ interface Pool {
   payment_period: string;
   submission_time: string;
   approval_time: string;
+  /** VHP held by the pool, in whole VHP; undefined when the read failed. */
+  vhp?: number;
 }
 
 interface Beneficiary {
@@ -63,7 +65,8 @@ export default function FogataPage() {
   const { provider, signer, savedAddress } = useWallet();
   const account = signer?.getAddress() ?? savedAddress ?? null;
   const [pools, setPools] = useState<Pool[]>([]);
-  const [networkApy, setNetworkApy] = useState<number | null>(null);
+  const [network, setNetwork] = useState<NetworkStaking | null>(null);
+  const networkApy = network?.apy ?? null;
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
@@ -273,26 +276,36 @@ export default function FogataPage() {
           direction: 0, // ascending
         });
 
+        const listed: { account: string }[] = listPoolsResult?.value ?? [];
+        const poolContracts = listed.map((pool) => new Contract({
+          id: pool.account,
+          provider,
+          abi: abiFogata2Pool,
+        }));
+        const vhpContract = new Contract({ id: VHP_CONTRACT_ID, provider, abi: utils.tokenAbi });
         const multicall = new Multicall({
           provider,
-          contracts: listPoolsResult?.value.map((pool: { account: string }) => new Contract({
-            id: pool.account,
-            provider,
-            abi: abiFogata2Pool,
-          })),
+          contracts: [...poolContracts, vhpContract],
         });
-        for (const contract of multicall.contracts) {
+        for (const contract of poolContracts) {
           await multicall.add(contract.functions.get_pool_params, {});
         }
-        const poolParams = (await multicall.call()).map((result, i) => {
-          return {
-            ...result,
-            ...listPoolsResult?.value[i],
-          } as Pool;
+        // One VHP balance per pool, appended after the params so the two
+        // halves of the result line up by index.
+        for (const pool of listed) {
+          await multicall.add(vhpContract.functions.balanceOf, { owner: pool.account });
+        }
+        const results = await multicall.call();
+        const poolParams = listed.map((pool, i) => {
+          const balance = results[listed.length + i];
+          const vhp =
+            balance instanceof Error || balance?.value === undefined
+              ? undefined
+              : Number(balance.value) / 1e8;
+          return { ...results[i], ...pool, vhp } as Pool;
         });
-        const apy = await getNetworkApy(provider);
-        setNetworkApy(apy);
         setPools(poolParams);
+        setNetwork(await getNetworkStaking(provider));
       } catch (err) {
         console.error("Error fetching pools:", err);
         setError(err instanceof Error ? err.message : "Failed to fetch pools");
@@ -303,6 +316,8 @@ export default function FogataPage() {
 
     fetchPools();
   }, [provider, reloadKey]);
+
+  const summary = summarizeFogata(pools.map((pool) => pool.vhp), network?.vhpProducing);
 
   return (
     <div className={pageColumn}>
@@ -323,6 +338,18 @@ export default function FogataPage() {
             <a href="https://fogata.io" target="_blank" rel="noopener noreferrer" className={quietLink}>fogata.io</a>.
           </p>
         </HowItWorks>
+
+        {!loading && !error && pools.length > 0 && (
+          <p className="mt-6 text-[13px] text-muted-foreground tabular-nums">
+            <span className="text-foreground">{formatCompactVhp(summary.totalStaked)} VHP</span> staked across{" "}
+            {pools.length === 1 ? "one pool" : `${pools.length} pools`}
+            {summary.share !== null && (
+              <>
+                {" "}· <span className="text-foreground">{summary.share.toFixed(1)}%</span> of network production
+              </>
+            )}
+          </p>
+        )}
 
         <ul className="mt-8 border-t border-border">
           <li className="border-b border-border">

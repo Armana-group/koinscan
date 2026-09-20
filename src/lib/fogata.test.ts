@@ -6,6 +6,8 @@ import {
   formatPayoutPeriod,
   poolHealth,
   sanitizeDecimalInput,
+  summarizeFogata,
+  formatCompactVhp,
 } from "./fogata";
 
 describe("computePoolApy", () => {
@@ -142,5 +144,31 @@ describe("sanitizeDecimalInput", () => {
   });
   it("passes empty through", () => {
     assert.equal(sanitizeDecimalInput(""), "");
+  });
+});
+
+describe("summarizeFogata", () => {
+  it("sums the pools' VHP and takes the share of the network's producing VHP", () => {
+    const summary = summarizeFogata([35_400, 12_000, 0], 250_000);
+    assert.equal(summary.totalStaked, 47_400);
+    assert.ok(summary.share !== null && Math.abs(summary.share - 18.96) < 1e-9);
+  });
+  it("skips pools whose balance is unknown", () => {
+    const summary = summarizeFogata([35_400, undefined, 12_000], 250_000);
+    assert.equal(summary.totalStaked, 47_400);
+  });
+  it("has no share when the network figure is unavailable", () => {
+    assert.equal(summarizeFogata([100], undefined).share, null);
+    assert.equal(summarizeFogata([100], 0).share, null);
+  });
+});
+
+describe("formatCompactVhp", () => {
+  it("abbreviates thousands and millions with one decimal", () => {
+    assert.equal(formatCompactVhp(35_432), "35.4K");
+    assert.equal(formatCompactVhp(1_250_000), "1.3M");
+  });
+  it("leaves small numbers whole", () => {
+    assert.equal(formatCompactVhp(812.6), "813");
   });
 });

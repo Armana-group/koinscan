@@ -2,7 +2,7 @@
 
 **Date:** 2026-09-19
 **Status:** approved design, pending implementation plan
-**Scope:** `src/app/dapps/**` on the `fogata` branch (Fogata v2 pools + KOIN/VHP DEX)
+**Scope:** `src/app/fogata/**` on the `fogata` branch (Fogata v2 pools + KOIN/VHP DEX)
 **Mockup:** https://claude.ai/artifact/KMnpAvCyF6B5yyrxKAmqyB (private; wallet-state switch on the pool page)
 
 ## 1. Why
@@ -41,7 +41,7 @@ out of VHP, and the design treats it that way.
    of cards. Semantic colour (green/amber/red) only for health; one accent for
    interaction.
 5. **It is Koinscan.** Poppins, the explorer's tokens and components, cross-links to
-   `/address`, `/contracts`, `/blocks`. `/dapps` is a section of the explorer, not an
+   `/address`, `/contracts`, `/blocks`. `/fogata` is a section of the explorer, not an
    embedded app.
 6. **Copy says what will happen.** Buttons carry the outcome and the amount
    ("Deposit 100 KOIN", "Withdraw 50 VHP"). No contract vocabulary
@@ -80,24 +80,32 @@ functions are one-line calls that close the sheet/dialog on success.
 ## 4. Information architecture
 
 ```
-/dapps                      Pools list  (no landing page)
-/dapps/fogata/[poolId]      Pool page   (+ Deposit / Withdraw / Reward sheets)
-/dapps/fogata/[poolId]/manage   Owner screen (params, reserved KOIN, node key, danger zone)
-/dapps/fogata/new           Create-a-pool wizard (existing dialog, moved to a route)
-/dapps/dex                  Trade
+/fogata                     Pools list, titled "Fogata"  (no landing page)
+/fogata/[poolId]            Pool page   (+ Deposit / Withdraw / Reward sheets)
+/fogata/[poolId]/manage     Owner screen (params, reserved KOIN, node key, danger zone) — Phase B
+/fogata/new                 Create-a-pool wizard (existing dialog, moved to a route) — Phase B
+/fogata/trade               Trade
 ```
 
-- `/dapps/fogata` redirects to `/dapps`.
-- Nav item stays "dApps". Trade is reachable from the nav item's page (Pools footer),
-  from the Deposit sheet, and from the pool page sub-line — not from a landing grid.
+The section is named **Fogata** in the nav (decided 2026-09-19: Koinscan is Fogata v2's
+home, so "dApps" promised a directory it isn't). `/fogata` and `/fogata/trade` share a
+`Pools · Trade` segmented sub-nav under the title, each followed by a collapsed
+"How it works" disclosure with three sentences of plain-language explanation.
+
+- Section routes are `/fogata`, `/fogata/[poolId]`, `/fogata/trade`; every former `/dapps/*` path redirects to its new location.
+- Trade is reachable from the section sub-nav on both top-level pages, from the pool
+  page sub-line, and from the Deposit sheet — not from a landing grid.
 
 ## 5. Screens
 
-### 5.1 Pools — `/dapps`
+### 5.1 Pools — `/fogata`
 
 **Question:** which pool?
 
-- Title: "Mining pools". No paragraph.
+- Title: "Fogata". Under it the `Pools · Trade` sub-nav and the collapsed "How it works"
+  disclosure (three sentences: pools run nodes for stakers and pay rewards each period;
+  staked KOIN becomes VHP, rewards arrive as KOIN, Trade turns VHP back into KOIN; v2 lives
+  on Koinscan, v1 stays at fogata.io). No paragraph outside the disclosure.
 - List of rows, hairline-separated, ordered by APY desc then name. A row is:
   `logo · name · health dot · APY · ›`. Whole row is the link.
   - APY = `networkApy × (1 − beneficiaryFee)` as today. Shown to one decimal.
@@ -109,12 +117,12 @@ functions are one-line calls that close the sheet/dialog on success.
   - A pool that is not producing shows "paused" in place of the number.
   - Optional small `v1`/`v2` tag, hidden while only one version is listed.
 - Footer, small muted text: "Estimated yearly yield after the pool's fee. Run a
-  node? Start a pool" — the link opens `/dapps/fogata/new`.
+  node? Start a pool" — the link opens the create-pool dialog (`/fogata/new` in Phase B).
 - Empty (0 pools): "No pools are listed yet." + the same footer.
 - Error: inline line "Couldn't load pools. Retry" — no red box.
 - Loading: three skeleton rows.
 
-### 5.2 Pool page — `/dapps/fogata/[poolId]`
+### 5.2 Pool page — `/fogata/[poolId]`
 
 **Question:** what's mine here, and what can I do?
 
@@ -163,8 +171,8 @@ Opened from **Deposit**. Sheet/dialog, 380 px.
 - Segmented KOIN / VHP. Default: whichever the wallet has more of.
 - One large amount field with unit and **Max**; under it, `Wallet 312.40 KOIN` left,
   `≈ 24.5% yearly` right.
-- KOIN tab only, one sentence: "KOIN becomes VHP over the next {reburn period}. To get
-  KOIN back later, trade VHP for KOIN." — "trade" links to `/dapps/dex`.
+- KOIN tab only, one sentence: "KOIN becomes VHP over the next {reburn period}. Rewards
+  are paid in KOIN; to sell VHP itself, use Trade." — "Trade" links to `/fogata/trade`.
 - Button: "Deposit {amount} {unit}". Disabled only while amount is empty/invalid/over
   balance, with the reason under the field.
 - Calls `stake` as today. On success: close, toast "Deposited 100 KOIN", hero refreshes.
@@ -186,7 +194,7 @@ Opened from "change" in the hero sub-line. Two options as a segmented control:
 Button "Save". Calls `set_collect_koin_preferences`. The current setting is the
 default selection.
 
-### 5.6 Manage — `/dapps/fogata/[poolId]/manage` (owner only)
+### 5.6 Manage — `/fogata/[poolId]/manage` (owner only)
 
 Non-owners hitting the route get the pool page. Title "Manage {name}", back link to the
 pool. Sections down the page, each a plain form with a Save button:
@@ -202,18 +210,20 @@ pool. Sections down the page, each a plain form with a Save button:
    their funds and can still withdraw." Button "Remove from list", confirm dialog.
    Existing delete flow.
 
-### 5.7 Create a pool — `/dapps/fogata/new`
+### 5.7 Create a pool — `/fogata/new`
 
 The existing creation dialog's fields, as a page with the same sections as Manage §1–3
 plus the reserved KOIN amount, and one primary button "Create pool". Requires a
 connected wallet; disconnected users see the Connect prompt instead of the form.
 Logic unchanged (bytecode fetch, batched ops).
 
-### 5.8 Trade — `/dapps/dex`
+### 5.8 Trade — `/fogata/trade`
 
 **Question:** how much KOIN do I get for this VHP (or vice versa)?
 
-- Title "Trade". Segmented **Sell VHP / Buy VHP**.
+- Title "Trade", then the `Pools · Trade` sub-nav and a collapsed "How it works"
+  (VHP doesn't turn back into KOIN by itself; post an order, it fills when a trader
+  accepts; sell straight from a pool if it allows it). Then segmented **Sell VHP / Buy VHP**.
 - Two amount fields: "You sell" (editable, Max, wallet balance under it) and "You get"
   (editable). Under them: the implied price `0.96 KOIN per VHP`. Same inputs as the
   existing create-order form, re-laid-out.
@@ -259,7 +269,7 @@ Logic unchanged (bytecode fetch, batched ops).
 
 ## 7. Components (phase B)
 
-New, under `src/components/dapps/`:
+New, under `src/components/fogata/` (where `SectionNav` already lives):
 
 | Component | Used by |
 |---|---|

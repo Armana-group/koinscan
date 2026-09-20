@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
 
-export default function FogataIndexPage() {
-  redirect("/dapps");
+export default function DappsFogataRedirect() {
+  redirect("/fogata");
 }

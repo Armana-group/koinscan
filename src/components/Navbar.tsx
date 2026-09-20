@@ -26,7 +26,7 @@ const menuItems = [
   { name: "Tokens", href: "/tokens" },
   { name: "Contracts", href: "/contracts" },
   { name: "Network", href: "/network" },
-  { name: "dApps", href: "/dapps" },
+  { name: "Fogata", href: "/fogata" },
 ];
 
 export function Navbar() {

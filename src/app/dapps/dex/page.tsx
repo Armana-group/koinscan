@@ -624,52 +624,54 @@ export default function DexPage() {
     const others = orders.filter((order) => order.owner !== account);
     const rows = [...mine, ...others];
     return (
-      <details className="mt-9 border-t">
-        <summary className="flex cursor-pointer list-none items-center justify-between py-3.5 text-sm text-muted-foreground">
-          <span>Open orders</span>
-          <span className="tabular-nums">{loading ? "…" : rows.length} ›</span>
-        </summary>
+      <>
         {error && (
-          <p className="pb-3 text-sm text-muted-foreground">
+          <p className="mt-9 text-sm text-muted-foreground">
             Couldn&apos;t load orders.{" "}
             <button type="button" className="text-brand" onClick={loadOrders}>Retry</button>
           </p>
         )}
-        {!error && rows.length === 0 && !loading && (
-          <p className="pb-3 text-sm text-muted-foreground">No open orders.</p>
-        )}
-        {rows.length > 0 && (
-          <table className="w-full text-sm">
-            <tbody>
-              {rows.map((order) => {
-                const isMine = order.owner === account;
-                return (
-                  <tr key={order.id} className="border-t">
-                    <td className={cn("py-2.5", isMine && "text-brand")}>
-                      {isMine ? "Your " : ""}
-                      {order.buy ? "buy" : "sell"} {formatAmount(order.vhp_amount)} VHP
-                      {isMine && order.pool && <span className="text-muted-foreground"> · {getPoolLabel(order.pool)}</span>}
-                    </td>
-                    <td className="py-2.5 text-right tabular-nums text-muted-foreground">
-                      {formatPrice(order)}
-                      {" · "}
-                      {isMine ? (
-                        <button type="button" className="hover:text-foreground" onClick={() => handleCancelOrder(order)} disabled={submitting}>
-                          cancel
-                        </button>
-                      ) : (
-                        <button type="button" className="text-brand" onClick={() => openFillDialog(order)} disabled={!account || submitting}>
-                          fill
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        )}
-      </details>
+        <details className={cn("border-t", error ? "mt-3" : "mt-9")}>
+          <summary className="flex cursor-pointer list-none items-center justify-between py-3.5 text-sm text-muted-foreground [&::-webkit-details-marker]:hidden">
+            <span>Open orders</span>
+            <span className="tabular-nums">{loading ? "…" : rows.length} ›</span>
+          </summary>
+          {!error && rows.length === 0 && !loading && (
+            <p className="pb-3 text-sm text-muted-foreground">No open orders.</p>
+          )}
+          {rows.length > 0 && (
+            <table className="w-full text-sm">
+              <tbody>
+                {rows.map((order) => {
+                  const isMine = order.owner === account;
+                  return (
+                    <tr key={order.id} className="border-t">
+                      <td className={cn("py-2.5", isMine && "text-brand")}>
+                        {isMine ? "Your " : ""}
+                        {order.buy ? "buy" : "sell"} {formatAmount(order.vhp_amount)} VHP
+                        {isMine && order.pool && <span className="text-muted-foreground"> · {getPoolLabel(order.pool)}</span>}
+                      </td>
+                      <td className="py-2.5 text-right tabular-nums text-muted-foreground">
+                        {formatPrice(order)}
+                        {" · "}
+                        {isMine ? (
+                          <button type="button" className="hover:text-foreground" onClick={() => handleCancelOrder(order)} disabled={submitting}>
+                            cancel
+                          </button>
+                        ) : (
+                          <button type="button" className="text-brand" onClick={() => openFillDialog(order)} disabled={!account || submitting}>
+                            fill
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+        </details>
+      </>
     );
   };
 
@@ -686,6 +688,7 @@ export default function DexPage() {
         <button
           type="button"
           disabled={submitting}
+          aria-pressed={side === "sell"}
           onClick={() => setSide("sell")}
           className={cn("rounded-[7px] py-1.5 text-sm transition-colors", side === "sell" ? "bg-background font-medium shadow-sm" : "text-muted-foreground")}
         >
@@ -694,6 +697,7 @@ export default function DexPage() {
         <button
           type="button"
           disabled={submitting}
+          aria-pressed={side === "buy"}
           onClick={() => { setSide("buy"); setPool(""); }}
           className={cn("rounded-[7px] py-1.5 text-sm transition-colors", side === "buy" ? "bg-background font-medium shadow-sm" : "text-muted-foreground")}
         >
@@ -701,7 +705,7 @@ export default function DexPage() {
         </button>
       </div>
 
-      <div className="mt-4 flex items-baseline gap-2.5 rounded-xl border px-4 py-3.5">
+      <div className="mt-4 flex items-baseline gap-2.5 rounded-xl border px-4 py-3.5 focus-within:ring-2 focus-within:ring-brand/40">
         <input
           id="dex-pay-amount"
           type="number"
@@ -730,7 +734,7 @@ export default function DexPage() {
           Max
         </button>
       </div>
-      <div className="mt-2.5 flex items-baseline gap-2.5 rounded-xl border px-4 py-3.5">
+      <div className="mt-2.5 flex items-baseline gap-2.5 rounded-xl border px-4 py-3.5 focus-within:ring-2 focus-within:ring-brand/40">
         <input
           id="dex-get-amount"
           type="number"
@@ -780,7 +784,7 @@ export default function DexPage() {
       {matchingOrder && (
         <p className="mt-4 text-xs text-muted-foreground">
           An open order matches —{" "}
-          <button type="button" className="text-brand" onClick={() => openFillDialog(matchingOrder)} disabled={!account || submitting}>
+          <button type="button" className="text-brand" onClick={() => { openFillDialog(matchingOrder); setFillAmount(side === "sell" ? vhpAmount : koinAmount); }} disabled={!account || submitting}>
             {matchingOrder.buy ? "Sell" : "Buy"} {formatAmount(matchingOrder.vhp_amount)} VHP at {formatPrice(matchingOrder)} ›
           </button>
         </p>

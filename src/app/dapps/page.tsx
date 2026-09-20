@@ -61,6 +61,7 @@ export default function FogataPage() {
   const [networkApy, setNetworkApy] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
   const [createOpen, setCreateOpen] = useState(false);
   const [creating, setCreating] = useState(false);
   const [poolName, setPoolName] = useState("");
@@ -296,7 +297,7 @@ export default function FogataPage() {
     };
 
     fetchPools();
-  }, [provider]);
+  }, [provider, reloadKey]);
 
   return (
     <div className="mx-auto w-full max-w-[640px] px-4 py-10">
@@ -318,7 +319,7 @@ export default function FogataPage() {
         {error && !loading && (
           <p className="mt-7 text-sm text-muted-foreground">
             Couldn&apos;t load pools.{" "}
-            <button type="button" className="text-brand" onClick={() => router.refresh()}>
+            <button type="button" className="text-brand" onClick={() => setReloadKey((k) => k + 1)}>
               Retry
             </button>
           </p>
@@ -380,6 +381,8 @@ export default function FogataPage() {
               Start a pool
             </button>
           </DialogTrigger>
+          {" · "}
+          <Link href="/dapps/dex" className="text-brand">Trade VHP ↔ KOIN</Link>
         </p>
 
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">

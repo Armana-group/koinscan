@@ -123,52 +123,52 @@ export function WalletButton({ connectLabel }: { connectLabel?: string } = {}) {
             {connectLabel}
           </Button>
         ) : (
-        <Button
-          variant="ghost"
-          className="relative flex items-center justify-center gap-2 transition-all w-auto px-3 h-10 rounded-lg focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 hover:bg-background/60 hover:shadow-sm bg-background/40 backdrop-blur-sm border border-border/40"
-        >
-          {displayAddress ? (
-            <>
-              <div className="flex items-center gap-2 max-w-[160px]">
-                <div className="flex-shrink-0 w-5 h-5 rounded-full p-0.5 bg-background">
-                  <Image
-                    src={
-                      walletName === "kondor"
-                        ? kondorLogo
-                        : walletName === "walletConnect"
-                        ? walletConnectLogo
-                        : savedWalletType === "kondor"
-                        ? kondorLogo
-                        : savedWalletType === "walletConnect"
-                        ? walletConnectLogo
-                        : kondorLogo
-                    }
-                    alt="wallet"
-                    width={16}
-                    height={16}
-                    className="w-full h-full object-contain rounded-full"
-                  />
+          <Button
+            variant="ghost"
+            className="relative flex items-center justify-center gap-2 transition-all w-auto px-3 h-10 rounded-lg focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 hover:bg-background/60 hover:shadow-sm bg-background/40 backdrop-blur-sm border border-border/40"
+          >
+            {displayAddress ? (
+              <>
+                <div className="flex items-center gap-2 max-w-[160px]">
+                  <div className="flex-shrink-0 w-5 h-5 rounded-full p-0.5 bg-background">
+                    <Image
+                      src={
+                        walletName === "kondor"
+                          ? kondorLogo
+                          : walletName === "walletConnect"
+                          ? walletConnectLogo
+                          : savedWalletType === "kondor"
+                          ? kondorLogo
+                          : savedWalletType === "walletConnect"
+                          ? walletConnectLogo
+                          : kondorLogo
+                      }
+                      alt="wallet"
+                      width={16}
+                      height={16}
+                      className="w-full h-full object-contain rounded-full"
+                    />
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <div className={`w-2 h-2 rounded-full flex-shrink-0 ${isConnected ? 'bg-[hsl(var(--logo-color-2))]' : 'bg-amber-500'}`}></div>
+                    <span className="text-sm font-medium truncate">{shortAddress(displayAddress)}</span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-1.5">
-                  <div className={`w-2 h-2 rounded-full flex-shrink-0 ${isConnected ? 'bg-[hsl(var(--logo-color-2))]' : 'bg-amber-500'}`}></div>
-                  <span className="text-sm font-medium truncate">{shortAddress(displayAddress)}</span>
-                </div>
-              </div>
-              <ChevronDown className="w-4 h-4 ml-1 text-muted-foreground flex-shrink-0" />
-            </>
-          ) : (
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 512 512"
-              className="h-5 w-5"
-            >
-              <path
-                fill="currentColor"
-                d="M24 32L0 32 0 56 0 456l0 24 24 0 464 0 24 0 0-24 0-304 0-24-24 0-368 0-24 0 0 48 24 0 344 0 0 256L48 432 48 80l408 0 24 0 0-48-24 0L24 32zM384 336a32 32 0 1 0 0-64 32 32 0 1 0 0 64z"
-              />
-            </svg>
-          )}
-        </Button>
+                <ChevronDown className="w-4 h-4 ml-1 text-muted-foreground flex-shrink-0" />
+              </>
+            ) : (
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 512 512"
+                className="h-5 w-5"
+              >
+                <path
+                  fill="currentColor"
+                  d="M24 32L0 32 0 56 0 456l0 24 24 0 464 0 24 0 0-24 0-304 0-24-24 0-368 0-24 0 0 48 24 0 344 0 0 256L48 432 48 80l408 0 24 0 0-48-24 0L24 32zM384 336a32 32 0 1 0 0-64 32 32 0 1 0 0 64z"
+                />
+              </svg>
+            )}
+          </Button>
         )}
       </DropdownMenuTrigger>
       <DropdownMenuContent 

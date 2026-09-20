@@ -47,10 +47,6 @@ const nextConfig = {
         protocol: 'https',
         hostname: 'koinscan.com',
       },
-      {
-        protocol: 'https',
-        hostname: 'iili.io',
-      },
     ],
   },
   async headers() {

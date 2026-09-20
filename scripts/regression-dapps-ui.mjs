@@ -21,7 +21,8 @@ assert.match(redirect.headers.get("location") ?? "", /\/dapps$/, "…to /dapps")
 const dex = await page("/dapps/dex");
 assert.match(dex, />Trade</, "trade page has the short title");
 assert.doesNotMatch(dex, /order book decentralized exchange/i, "trade page has no hero title");
-assert.doesNotMatch(dex, /tiers? \d/i, "the word tier is not in trade copy");
+const dexVisibleText = dex.replace(/<[^>]+>/g, " ");
+assert.doesNotMatch(dexVisibleText, /\btiers?\b/i, "the word tier is not in trade copy");
 assert.match(dex, /Waits for a taker/, "the order-placement sentence is present");
 
 for (const html of [pools, dex]) {

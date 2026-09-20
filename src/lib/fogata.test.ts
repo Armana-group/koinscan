@@ -15,6 +15,12 @@ describe("computePoolApy", () => {
     // 5500 = 5.5%
     assert.ok(Math.abs(computePoolApy(25.9, [{ percentage: 5500 }]) - 24.4755) < 1e-9);
   });
+  it("sums multiple beneficiaries' shares", () => {
+    // 3000 + 2500 = 5500 = 5.5%
+    assert.ok(
+      Math.abs(computePoolApy(25.9, [{ percentage: 3000 }, { percentage: 2500 }]) - 24.4755) < 1e-9
+    );
+  });
 });
 
 describe("poolHealth", () => {
@@ -62,6 +68,9 @@ describe("formatPayoutPeriod", () => {
   it("formats one day without a plural", () => {
     assert.equal(formatPayoutPeriod(String(86400 * 1000)), "Every day");
   });
+  it("formats fractional days with one decimal", () => {
+    assert.equal(formatPayoutPeriod(String(1.5 * 86400 * 1000)), "Every 1.5 days");
+  });
   it("returns a dash when unknown", () => {
     assert.equal(formatPayoutPeriod(undefined), "—");
   });
@@ -95,5 +104,13 @@ describe("findMatchingOrder", () => {
   it("returns null for empty or invalid amounts", () => {
     assert.equal(findMatchingOrder("sell", "", "380", orders, null), null);
     assert.equal(findMatchingOrder("sell", "abc", "380", orders, null), null);
+  });
+  it("picks the best of two eligible buy orders", () => {
+    const twoEligible = [
+      { id: "4", buy: true, owner: "X", vhp_amount: "50000000000", koin_amount: "48000000000" }, // 500 VHP at 0.96
+      { id: "5", buy: true, owner: "Y", vhp_amount: "50000000000", koin_amount: "47500000000" }, // 500 VHP at 0.95 (worse)
+    ];
+    // selling 400 VHP asking 380 KOIN → wanted price 0.95; both orders are eligible, the better price wins
+    assert.equal(findMatchingOrder("sell", "400", "380", twoEligible, null)?.id, "4");
   });
 });

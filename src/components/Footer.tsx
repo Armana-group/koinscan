@@ -9,9 +9,10 @@ export function Footer() {
   const buildLabel = appVersion && buildCommit ? `v${appVersion} · ${buildCommit}` : null;
 
   return (
-    <footer className="w-full py-4 text-sm text-muted-foreground">
-      <div className="container mx-auto grid items-center gap-3 px-4 text-center lg:grid-cols-[1fr_auto_1fr] lg:text-left">
-        <div className="flex flex-wrap items-baseline justify-center gap-x-3 gap-y-1 lg:justify-self-start">
+    <footer className="w-full py-6 text-sm text-muted-foreground">
+      <div className="container mx-auto flex flex-col items-center gap-3 px-4 text-center">
+        <BetaBanner className="max-w-xl px-2" />
+        <div className="flex flex-wrap items-baseline justify-center gap-x-3 gap-y-1">
           <p className="leading-none">
             © 2025{' '}
             <Link
@@ -35,7 +36,6 @@ export function Footer() {
             Changelog
           </Link>
         </div>
-        <BetaBanner className="max-w-xl justify-self-center px-2" />
       </div>
     </footer>
   )

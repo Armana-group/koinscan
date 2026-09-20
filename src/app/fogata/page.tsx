@@ -24,6 +24,7 @@ import { abiFogata2Pool } from "@/koinos/abis/fogata2Pool";
 import { abiPob } from "@/koinos/abis";
 import { computePoolApy, formatCompactVhp, getNetworkStaking, summarizeFogata, type NetworkStaking } from "@/lib/fogata";
 import { HowItWorks } from "@/components/fogata/HowItWorks";
+import { ShareBar } from "@/components/fogata/ShareBar";
 import { pageColumn, pageTitle, quietLink } from "@/components/fogata/styles";
 import * as toast from "@/lib/toast";
 
@@ -349,6 +350,20 @@ export default function FogataPage() {
               </>
             )}
           </p>
+        )}
+        {!loading && !error && pools.length > 0 && network && network.vhpProducing > 0 && (
+          <ShareBar
+            className="mt-4"
+            remainderLabel="Rest of network"
+            segments={[...pools]
+              .filter((pool) => pool.vhp !== undefined && pool.vhp > 0)
+              .sort((a, b) => (b.vhp ?? 0) - (a.vhp ?? 0))
+              .map((pool) => ({
+                label: pool.name || "Unnamed pool",
+                share: ((pool.vhp ?? 0) * 100) / network.vhpProducing,
+                detail: `${formatCompactVhp(pool.vhp ?? 0)} VHP`,
+              }))}
+          />
         )}
 
         <ul className="mt-8 border-t border-border">

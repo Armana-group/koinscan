@@ -1,5 +1,7 @@
 import { SignerInterface } from "koilib";
 import * as kondor from "kondor-js";
+import { Messenger } from "kondor-js";
+import { version as kondorJsVersion } from "kondor-js/package.json";
 import {
   ChainIds,
   Methods,
@@ -31,6 +33,51 @@ let kondorConnectionPromise: Promise<void> | null = null;
 // Add new storage key for accounts
 export const KONDOR_ACCOUNTS_KEY = "koinos-explorer-kondor-accounts";
 export const WALLET_CONNECT_SESSION_KEY = "koinos-explorer-wc-session";
+/** The account the user last chose here, so a reload or reconnect keeps it. */
+export const CHOSEN_ADDRESS_KEY = "koinos-explorer-address";
+
+export interface KondorAccount {
+  name?: string;
+  address: string;
+}
+
+export function getChosenAddress(): string | null {
+  try {
+    return localStorage.getItem(CHOSEN_ADDRESS_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export function rememberChosenAddress(address: string) {
+  localStorage.setItem(CHOSEN_ADDRESS_KEY, address);
+}
+
+/**
+ * The account to use out of what Kondor shared: the one chosen here before,
+ * if it is still shared, otherwise the first.
+ */
+export function pickKondorAccount<T extends { address: string }>(
+  accounts: T[],
+  chosen: string | null
+): T | undefined {
+  return accounts.find((account) => account.address === chosen) ?? accounts[0];
+}
+
+/**
+ * Ask Kondor to show its account picker even though this site is already
+ * connected. Sends the same DOM message kondor.getAccounts() does plus a
+ * `prompt` flag; Kondor 2 honours it, older Kondor ignores it and simply
+ * returns the accounts it already shares.
+ */
+export async function requestKondorAccountPicker(): Promise<KondorAccount[]> {
+  const messenger = new Messenger();
+  const accounts = await messenger.sendDomMessage<KondorAccount[]>("popup", "getAccounts", {
+    kondorVersion: kondorJsVersion,
+    prompt: true,
+  });
+  return accounts ?? [];
+}
 
 async function ensureKondorConnection() {
   // If already connecting, wait for the existing connection attempt
@@ -122,7 +169,7 @@ export async function connectWallet(walletName: WalletName): Promise<string> {
         
         isKondorConnecting = false;
         kondorConnectionPromise = null;
-        return accounts[0].address;
+        return pickKondorAccount(accounts, getChosenAddress())!.address;
       } catch (e) {
         isKondorConnecting = false;
         kondorConnectionPromise = null;

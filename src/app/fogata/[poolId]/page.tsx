@@ -1026,7 +1026,7 @@ export default function FogataPoolPage() {
               <>
                 <p className="text-xs text-muted-foreground">Estimated yearly yield</p>
                 <p className="mt-1.5 text-[56px] font-semibold leading-none tracking-[-0.05em] tabular-nums max-sm:text-[44px]">
-                  {poolApy !== null ? poolApy.toFixed(1) : "—"}
+                  {poolApy !== null ? poolApy.toFixed(1) : <span className="font-normal text-muted-foreground/40">—</span>}
                   <span className="ml-2 text-lg font-medium tracking-normal text-muted-foreground">%</span>
                 </p>
                 <div className="mt-7 flex">
@@ -1039,7 +1039,7 @@ export default function FogataPoolPage() {
               <>
                 <p className="text-xs text-muted-foreground">Estimated yearly yield</p>
                 <p className="mt-1.5 text-[56px] font-semibold leading-none tracking-[-0.05em] tabular-nums max-sm:text-[44px]">
-                  {poolApy !== null ? poolApy.toFixed(1) : "—"}
+                  {poolApy !== null ? poolApy.toFixed(1) : <span className="font-normal text-muted-foreground/40">—</span>}
                   <span className="ml-2 text-lg font-medium tracking-normal text-muted-foreground">%</span>
                 </p>
                 <p className="mt-2.5 text-[13px] text-muted-foreground">You have nothing staked here.</p>
@@ -1092,7 +1092,7 @@ export default function FogataPoolPage() {
           </section>
 
           <section className="mt-14">
-            <h2 className="text-xs text-muted-foreground">About this pool</h2>
+            <h2 className="text-xs font-normal text-muted-foreground">About this pool</h2>
             {poolParams.description && (
               <p className="mt-2 mb-4 line-clamp-2 text-[13px] text-muted-foreground">{poolParams.description}</p>
             )}
@@ -1344,7 +1344,7 @@ export default function FogataPoolPage() {
           {isOwner && manageOpen && (
             <section id="manage" className="mt-14 space-y-10">
               <div>
-                <h2 className="text-xs text-muted-foreground">Manage pool</h2>
+                <h2 className="text-xs font-normal text-muted-foreground">Manage pool</h2>
                 <LineList className="mt-2">
                   <LineRow label="Liquid KOIN"><span className="tabular-nums">{formatTokenAmount(performance.koinAmount, "KOIN")}</span></LineRow>
                   <LineRow label="Mana">

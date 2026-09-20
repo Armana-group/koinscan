@@ -55,8 +55,8 @@ export function Navbar() {
   };
 
   return (
-    <header className="w-full border-b border-border bg-background/80 backdrop-blur-sm">
-      <div className="container mx-auto flex items-center justify-between px-4 py-4 md:px-6">
+    <header className="w-full bg-background/80 backdrop-blur-sm">
+      <div className="mx-auto flex w-full max-w-[1920px] items-center justify-between px-4 py-4 md:px-8">
         {/* Mobile Menu (Left) */}
         <div className="md:hidden">
           <DropdownMenu>

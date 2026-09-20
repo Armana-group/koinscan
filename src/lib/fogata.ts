@@ -138,3 +138,14 @@ export function sanitizeDecimalInput(raw: string): string {
   const fraction = cleaned.slice(dot + 1).replace(/\./g, "").slice(0, 8);
   return `${whole}.${fraction}`;
 }
+
+/**
+ * The decoded value of one call in a koilib Multicall result, or undefined
+ * when that call failed (koilib puts an Error in the slot). Callers must
+ * not turn undefined into "0": a read that failed is not a zero balance.
+ */
+export function multicallValue(result: unknown): string | undefined {
+  if (result instanceof Error || result === null || typeof result !== "object") return undefined;
+  const value = (result as { value?: unknown }).value;
+  return typeof value === "string" ? value : undefined;
+}

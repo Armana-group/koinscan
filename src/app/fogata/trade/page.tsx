@@ -30,7 +30,7 @@ import {
   KOIN_VHP_DEX_CONTRACT_ID,
   VHP_CONTRACT_ID,
 } from "@/koinos/constants";
-import { findMatchingOrder } from "@/lib/fogata";
+import { findMatchingOrder, multicallValue } from "@/lib/fogata";
 import { AmountField } from "@/components/fogata/AmountField";
 import { HowItWorks } from "@/components/fogata/HowItWorks";
 import { LineList, LineRow } from "@/components/fogata/LineRow";
@@ -258,13 +258,13 @@ async function fetchWalletBalances(
   await multicall.add(koinContract.functions.balanceOf, { owner });
   await multicall.add(vhpContract.functions.balanceOf, { owner });
   const results = await multicall.call();
-  const koinResult = results[0] as { value?: string } | undefined;
-  const vhpResult = results[1] as { value?: string } | undefined;
-
-  return {
-    koin: koinResult?.value ?? "0",
-    vhp: vhpResult?.value ?? "0",
-  };
+  const koin = multicallValue(results[0]);
+  const vhp = multicallValue(results[1]);
+  // A failed read is a failure, never a zero balance.
+  if (koin === undefined || vhp === undefined) {
+    throw new Error("Couldn't read wallet balances");
+  }
+  return { koin, vhp };
 }
 
 async function fetchPoolBalance(
@@ -300,6 +300,7 @@ export default function DexPage() {
   const [loading, setLoading] = useState(true);
   const [poolsLoading, setPoolsLoading] = useState(false);
   const [balancesLoading, setBalancesLoading] = useState(false);
+  const [balancesError, setBalancesError] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -369,6 +370,7 @@ export default function DexPage() {
     }
 
     setBalancesLoading(true);
+    setBalancesError(false);
     try {
       const [wallet, staked] = await Promise.all([
         fetchWalletBalances(provider, account),
@@ -382,6 +384,7 @@ export default function DexPage() {
       console.error("Failed to load balances:", err);
       setWalletBalances(null);
       setPoolBalance(null);
+      setBalancesError(true);
     } finally {
       setBalancesLoading(false);
     }
@@ -760,7 +763,14 @@ export default function DexPage() {
               ? "Loading balance…"
               : availablePayBalance !== null
                 ? `Wallet ${formatAmount(availablePayBalance)} ${availablePaySymbol}${side === "sell" && pool ? " in pool" : ""}`
-                : ""}
+                : balancesError
+                  ? (
+                    <>
+                      Couldn&apos;t read your balance.{" "}
+                      <button type="button" className={quietLink} onClick={loadBalances}>Retry</button>
+                    </>
+                  )
+                  : ""}
         </span>
       </div>
 

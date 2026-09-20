@@ -8,6 +8,7 @@ import {
   sanitizeDecimalInput,
   summarizeFogata,
   formatCompactVhp,
+  multicallValue,
 } from "./fogata";
 
 describe("computePoolApy", () => {
@@ -170,5 +171,16 @@ describe("formatCompactVhp", () => {
   });
   it("leaves small numbers whole", () => {
     assert.equal(formatCompactVhp(812.6), "813");
+  });
+});
+
+describe("multicallValue", () => {
+  it("returns the value of a successful call", () => {
+    assert.equal(multicallValue({ value: "100525220" }), "100525220");
+  });
+  it("returns undefined for a failed call rather than a zero", () => {
+    assert.equal(multicallValue(new Error("user code cannot access system space")), undefined);
+    assert.equal(multicallValue(undefined), undefined);
+    assert.equal(multicallValue({}), undefined);
   });
 });

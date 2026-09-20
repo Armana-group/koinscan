@@ -24,7 +24,11 @@ import { abiFogata2Pool } from "@/koinos/abis/fogata2Pool";
 import { abiPob } from "@/koinos/abis";
 import { computePoolApy, getNetworkApy } from "@/lib/fogata";
 import { HowItWorks } from "@/components/fogata/HowItWorks";
+import { pageColumn, pageTitle, quietLink } from "@/components/fogata/styles";
 import * as toast from "@/lib/toast";
+
+const listRow =
+  "-mx-3 flex items-center gap-4 rounded-xl px-3 py-[18px] transition-colors hover:bg-muted/50";
 
 interface Pool {
   account: string;
@@ -301,9 +305,9 @@ export default function FogataPage() {
   }, [provider, reloadKey]);
 
   return (
-    <div className="mx-auto w-full max-w-[640px] px-4 py-10">
+    <div className={pageColumn}>
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-        <h1 className="text-2xl font-semibold tracking-tight">Fogata</h1>
+        <h1 className={pageTitle}>Fogata</h1>
         <HowItWorks>
           <p>
             Fogata pools run Koinos nodes on behalf of their stakers. Stake KOIN or VHP with a pool;
@@ -312,41 +316,56 @@ export default function FogataPage() {
           <p>
             KOIN you stake is converted into VHP so it can produce. Rewards arrive as KOIN — take
             them, or let the pool convert them too. To turn VHP itself back into KOIN, use{" "}
-            <Link href="/fogata/trade" className="text-brand">Trade</Link>.
+            <Link href="/fogata/trade" className={quietLink}>Trade</Link>.
           </p>
           <p>
             Fogata v2 pools live here on Koinscan; v1 pools remain at{" "}
-            <a href="https://fogata.io" target="_blank" rel="noopener noreferrer" className="text-brand">fogata.io</a>.
+            <a href="https://fogata.io" target="_blank" rel="noopener noreferrer" className={quietLink}>fogata.io</a>.
           </p>
         </HowItWorks>
 
+        <ul className="mt-8 border-t border-border">
+          <li className="border-b border-border">
+            <Link href="/fogata/trade" className={listRow}>
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-border text-foreground">
+                <ArrowDownUp className="h-4 w-4" aria-hidden />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-[15px] font-medium">Trade</span>
+                <span className="block truncate text-[12.5px] text-muted-foreground">Sell VHP for KOIN, or buy VHP</span>
+              </span>
+              <ChevronRight className="h-4 w-4 text-muted-foreground/60" aria-hidden />
+            </Link>
+          </li>
+        </ul>
+
         {loading && (
-          <ul className="mt-7 divide-y border-t" aria-busy="true">
+          <ul aria-busy="true">
             {[0, 1, 2].map((i) => (
-              <li key={i} className="flex items-center gap-4 py-[18px]">
-                <Skeleton className="h-10 w-10 rounded-[10px]" />
+              <li key={i} className="flex items-center gap-4 border-b border-border py-[18px]">
+                <Skeleton className="h-10 w-10 rounded-xl" />
                 <Skeleton className="h-4 flex-1" />
-                <Skeleton className="h-4 w-14" />
+                <Skeleton className="h-5 w-14" />
               </li>
             ))}
           </ul>
         )}
 
         {error && !loading && (
-          <p className="mt-7 text-sm text-muted-foreground">
+          <p className="mt-6 text-sm text-muted-foreground">
             Couldn&apos;t load pools.{" "}
-            <button type="button" className="text-brand" onClick={() => setReloadKey((k) => k + 1)}>
+            <button type="button" className={quietLink} onClick={() => setReloadKey((k) => k + 1)}>
               Retry
             </button>
           </p>
         )}
 
         {!loading && !error && pools.length === 0 && (
-          <p className="mt-7 pb-4 text-sm text-muted-foreground">No pools are listed yet.</p>
+          <p className="mt-6 text-sm text-muted-foreground">No pools are listed yet.</p>
         )}
 
         {!loading && !error && pools.length > 0 && (
-          <ul className="mt-7 divide-y border-t">
+          <ul>
             {[...pools]
               .map((pool) => ({
                 pool,
@@ -357,12 +376,9 @@ export default function FogataPage() {
               }))
               .sort((a, b) => (b.apy ?? -1) - (a.apy ?? -1) || a.pool.name.localeCompare(b.pool.name))
               .map(({ pool, apy }) => (
-                <li key={pool.account}>
-                  <Link
-                    href={`/fogata/${pool.account}`}
-                    className="-mx-3 flex items-center gap-4 rounded-[10px] px-3 py-[18px] transition-colors hover:bg-muted/60"
-                  >
-                    <span className="relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-[10px] bg-muted text-sm font-semibold text-muted-foreground">
+                <li key={pool.account} className="border-b border-border">
+                  <Link href={`/fogata/${pool.account}`} className={listRow}>
+                    <span className="relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-muted text-sm font-semibold text-muted-foreground">
                       {(pool.name || "P").charAt(0).toUpperCase()}
                       {pool.image && (
                         /* Pool logo hosts are arbitrary on-chain URLs */
@@ -377,11 +393,18 @@ export default function FogataPage() {
                         />
                       )}
                     </span>
-                    <span className="min-w-0 flex-1 truncate font-medium">
+                    <span className="min-w-0 flex-1 truncate text-[15px] font-medium">
                       {pool.name || "Unnamed pool"}
                     </span>
-                    <span className="text-base font-semibold tabular-nums">
-                      {apy !== null ? `${apy.toFixed(1)}%` : "—"}
+                    <span className="text-xl font-semibold tracking-[-0.02em] tabular-nums">
+                      {apy !== null ? (
+                        <>
+                          {apy.toFixed(1)}
+                          <span className="ml-0.5 text-[13px] font-medium text-muted-foreground">%</span>
+                        </>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
                     </span>
                     <ChevronRight className="h-4 w-4 text-muted-foreground/60" aria-hidden />
                   </Link>
@@ -390,28 +413,10 @@ export default function FogataPage() {
           </ul>
         )}
 
-        <ul className="border-t">
-          <li>
-            <Link
-              href="/fogata/trade"
-              className="-mx-3 flex items-center gap-4 rounded-[10px] px-3 py-[18px] transition-colors hover:bg-muted/60"
-            >
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] bg-brand/10 text-brand">
-                <ArrowDownUp className="h-4 w-4" aria-hidden />
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block truncate font-medium">Trade VHP ↔ KOIN</span>
-                <span className="block truncate text-xs text-muted-foreground">Sell VHP for KOIN, or buy VHP</span>
-              </span>
-              <ChevronRight className="h-4 w-4 text-muted-foreground/60" aria-hidden />
-            </Link>
-          </li>
-        </ul>
-
-        <p className="mt-7 text-xs text-muted-foreground/80">
+        <p className="mt-6 text-[12.5px] text-muted-foreground/80">
           Estimated yearly yield after the pool&apos;s fee. Run a node?{" "}
           <DialogTrigger asChild>
-            <button type="button" className="text-muted-foreground underline-offset-2 hover:underline">
+            <button type="button" className={quietLink}>
               Start a pool
             </button>
           </DialogTrigger>
@@ -478,9 +483,8 @@ export default function FogataPage() {
               </Label>
               <Input
                 id="new-pool-reburn-period"
-                type="number"
-                min="0"
-                step="0.01"
+                type="text"
+                inputMode="decimal"
                 value={reburnPeriodDays}
                 onChange={(event) =>
                   setReburnPeriodDays(event.target.value)
@@ -535,10 +539,8 @@ export default function FogataPage() {
                   />
                   <Input
                     aria-label={`Beneficiary ${index + 1} percentage`}
-                    type="number"
-                    min="0"
-                    max="100"
-                    step="0.001"
+                    type="text"
+                    inputMode="decimal"
                     placeholder="%"
                     value={beneficiary.percentage / 1000}
                     onChange={(event) =>
@@ -591,9 +593,8 @@ export default function FogataPage() {
               </Label>
               <Input
                 id="new-pool-reserved-koin"
-                type="number"
-                min="0"
-                step="any"
+                type="text"
+                inputMode="decimal"
                 placeholder="2000"
                 value={reservedKoinAmount}
                 onChange={(event) =>

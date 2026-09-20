@@ -25,13 +25,6 @@ import {
 } from "@/koinos/constants";
 import { useWallet } from "@/contexts/WalletContext";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -45,7 +38,18 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { WalletButton } from "@/components/WalletButton";
 import { cn } from "@/lib/utils";
-import { computePoolApy, formatPayoutPeriod, getNetworkApy, poolHealth } from "@/lib/fogata";
+import { computePoolApy, formatPayoutPeriod, getNetworkApy, poolHealth, sanitizeDecimalInput } from "@/lib/fogata";
+import { AmountField } from "@/components/fogata/AmountField";
+import { LineList, LineRow } from "@/components/fogata/LineRow";
+import { WordTabs } from "@/components/fogata/WordTabs";
+import {
+  backLink,
+  footnote,
+  ghostButton,
+  pageColumn,
+  primaryButton,
+  quietLink,
+} from "@/components/fogata/styles";
 import * as toast from "@/lib/toast";
 
 type RewardMode = "percentage" | "virtual";
@@ -947,9 +951,9 @@ export default function FogataPoolPage() {
   );
 
   return (
-    <div className="mx-auto w-full max-w-[640px] px-4 py-10">
-      <Link href="/fogata" className="mb-7 inline-block text-sm text-muted-foreground hover:text-foreground">
-        ‹ Mining pools
+    <div className={pageColumn}>
+      <Link href="/fogata" className={backLink}>
+        ‹ Fogata
       </Link>
 
       {loading && (
@@ -965,7 +969,7 @@ export default function FogataPoolPage() {
           <h1 className="break-all font-mono text-lg">{poolId}</h1>
           <p className="mt-2 text-sm text-muted-foreground">
             Couldn&apos;t load this pool.{" "}
-            <button type="button" className="text-brand" onClick={() => loadData()}>
+            <button type="button" className={quietLink} onClick={() => loadData()}>
               Retry
             </button>
           </p>
@@ -975,7 +979,7 @@ export default function FogataPoolPage() {
       {!loading && !error && poolParams && (
         <>
           <header className="flex items-center gap-4">
-            <span className="relative flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-muted text-base font-semibold text-muted-foreground">
+            <span className="relative flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-[13px] bg-muted text-base font-semibold text-muted-foreground">
               {(poolParams.name || "P").charAt(0).toUpperCase()}
               {poolParams.image && (
                 /* Pool logo hosts are arbitrary on-chain URLs */
@@ -991,24 +995,22 @@ export default function FogataPoolPage() {
               )}
             </span>
             <div className="min-w-0">
-              <h1 className="flex items-center gap-2.5 text-2xl font-semibold tracking-tight">
+              <h1 className="flex items-center gap-2.5 text-[22px] font-semibold leading-tight tracking-[-0.02em]">
                 <span className="truncate">{poolParams.name || "Unnamed pool"}</span>
                 {healthDot}
               </h1>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-[13px] text-muted-foreground">
                 {healthWord}
                 {health === "paused" && performance.lastBlockTime && (
                   <> · last block {formatTimeAgo(performance.lastBlockTime)}</>
                 )}
                 {poolApy !== null && <> · {poolApy.toFixed(1)}% yield</>}
-                {" "}·{" "}
-                <Link href="/fogata/trade" className="text-brand">Trade VHP</Link>
                 {isOwner && (
                   <>
                     {" "}·{" "}
                     <button
                       type="button"
-                      className="font-medium text-brand"
+                      className={quietLink}
                       onClick={() => setManageOpen((open) => !open)}
                     >
                       Manage
@@ -1019,44 +1021,44 @@ export default function FogataPoolPage() {
             </div>
           </header>
 
-          <section className="mt-11" aria-label={account && hasStake ? "Your stake" : "Estimated yearly yield"}>
+          <section className="mt-12" aria-label={account && hasStake ? "Your stake" : "Estimated yearly yield"}>
             {!account && (
               <>
-                <p className="text-sm text-muted-foreground">Estimated yearly yield</p>
-                <p className="mt-1 text-[44px] font-semibold leading-none tracking-[-0.03em] tabular-nums max-sm:text-4xl">
+                <p className="text-xs text-muted-foreground">Estimated yearly yield</p>
+                <p className="mt-1.5 text-[56px] font-semibold leading-none tracking-[-0.05em] tabular-nums max-sm:text-[44px]">
                   {poolApy !== null ? poolApy.toFixed(1) : "—"}
-                  <span className="ml-1.5 text-lg font-medium tracking-normal text-muted-foreground">%</span>
+                  <span className="ml-2 text-lg font-medium tracking-normal text-muted-foreground">%</span>
                 </p>
-                <div className="mt-6">
-                  <WalletButton connectLabel="Connect wallet" />
+                <div className="mt-7 flex">
+                  <WalletButton connectLabel="Connect wallet" connectClassName={cn(primaryButton, "w-auto")} />
                 </div>
               </>
             )}
 
             {account && !hasStake && (
               <>
-                <p className="text-sm text-muted-foreground">Estimated yearly yield</p>
-                <p className="mt-1 text-[44px] font-semibold leading-none tracking-[-0.03em] tabular-nums max-sm:text-4xl">
+                <p className="text-xs text-muted-foreground">Estimated yearly yield</p>
+                <p className="mt-1.5 text-[56px] font-semibold leading-none tracking-[-0.05em] tabular-nums max-sm:text-[44px]">
                   {poolApy !== null ? poolApy.toFixed(1) : "—"}
-                  <span className="ml-1.5 text-lg font-medium tracking-normal text-muted-foreground">%</span>
+                  <span className="ml-2 text-lg font-medium tracking-normal text-muted-foreground">%</span>
                 </p>
-                <p className="mt-2 text-sm text-muted-foreground">You have nothing staked here.</p>
-                <div className="mt-6">
-                  <Button className="h-[42px] rounded-[11px] bg-brand px-6 text-brand-foreground hover:bg-brand/90" onClick={openDeposit}>
+                <p className="mt-2.5 text-[13px] text-muted-foreground">You have nothing staked here.</p>
+                <div className="mt-7 flex">
+                  <button type="button" className={cn(primaryButton, "w-auto")} onClick={openDeposit}>
                     Deposit
-                  </Button>
+                  </button>
                 </div>
               </>
             )}
 
             {account && hasStake && (
               <>
-                <p className="text-sm text-muted-foreground">Your stake</p>
-                <p className="mt-1 text-[44px] font-semibold leading-none tracking-[-0.03em] tabular-nums max-sm:text-4xl">
+                <p className="text-xs text-muted-foreground">Your stake</p>
+                <p className="mt-1.5 text-[56px] font-semibold leading-none tracking-[-0.05em] tabular-nums max-sm:text-[44px]">
                   {formatAmount(stakedVhp!)}
-                  <span className="ml-1.5 text-lg font-medium tracking-normal text-muted-foreground">VHP</span>
+                  <span className="ml-2 text-lg font-medium tracking-normal text-muted-foreground">VHP</span>
                 </p>
-                <p className="mt-2 text-sm text-muted-foreground">
+                <p className="mt-2.5 text-[13px] text-muted-foreground">
                   {poolBalance && BigInt(poolBalance.koin_amount) > BigInt(0) && (
                     <>includes {formatAmount(poolBalance.koin_amount)} KOIN being converted · </>
                   )}
@@ -1070,15 +1072,15 @@ export default function FogataPoolPage() {
                         ? `${Number(preferences.percentage_koin) / 1000}% as KOIN`
                         : "—"}{" "}
                   ·{" "}
-                  <button type="button" className="text-brand" onClick={() => setSheet("rewards")}>
+                  <button type="button" className={quietLink} onClick={() => setSheet("rewards")}>
                     change
                   </button>
                 </p>
-                <div className="mt-6 flex items-center gap-[18px]">
-                  <Button className="h-[42px] rounded-[11px] bg-brand px-6 text-brand-foreground hover:bg-brand/90" onClick={openDeposit}>
+                <div className="mt-7 flex items-center gap-2.5">
+                  <button type="button" className={cn(primaryButton, "w-auto")} onClick={openDeposit}>
                     Deposit
-                  </Button>
-                  <button type="button" className="text-sm font-medium text-brand" onClick={openWithdraw}>
+                  </button>
+                  <button type="button" className={cn(ghostButton, "w-auto")} onClick={openWithdraw}>
                     Withdraw
                   </button>
                 </div>
@@ -1089,184 +1091,153 @@ export default function FogataPoolPage() {
             )}
           </section>
 
-          <section className="mt-16">
-            <h2 className="mb-2 text-sm font-medium text-muted-foreground">About this pool</h2>
+          <section className="mt-14">
+            <h2 className="text-xs text-muted-foreground">About this pool</h2>
             {poolParams.description && (
-              <p className="mb-5 line-clamp-2 text-sm text-muted-foreground">{poolParams.description}</p>
+              <p className="mt-2 mb-4 line-clamp-2 text-[13px] text-muted-foreground">{poolParams.description}</p>
             )}
-            <dl className="text-sm">
-              {[
-                ["Effectiveness", <span key="e" className="inline-flex items-center gap-2 tabular-nums">{healthDot}{performance.effectiveness !== undefined ? `${performance.effectiveness.toFixed(0)}%` : "—"}</span>],
-                ["Block time", <span key="b" className="tabular-nums">{formatDuration(performance.averageTimeToProduce)}{performance.expectedTimeToProduce !== undefined && <span className="ml-2 text-muted-foreground">expected {formatDuration(performance.expectedTimeToProduce)}</span>}</span>],
-                ["Staked in pool", <span key="s" className="tabular-nums">{formatTokenAmount(performance.vhpAmount, "VHP")}</span>],
-                ["Fee", <span key="f" className="tabular-nums">{feePercent}%</span>],
-                ["Payout", formatPayoutPeriod(poolParams.payment_period)],
-                ["Address", <Link key="a" href={`/address/${poolId}`} className="font-mono text-xs text-brand">{poolId.slice(0, 8)}…{poolId.slice(-6)}</Link>],
-                ["Contract", <Link key="c" href={`/contracts/${poolId}`} className="text-brand">Fogata Pool v2</Link>],
-              ].map(([label, value]) => (
-                <div key={label as string} className="flex items-center justify-between gap-6 border-t py-[11px]">
-                  <dt className="text-muted-foreground">{label}</dt>
-                  <dd className="text-right">{value}</dd>
-                </div>
-              ))}
-            </dl>
+            <LineList className={poolParams.description ? "" : "mt-2"}>
+              <LineRow label="Effectiveness">
+                <span className="inline-flex items-center gap-2 tabular-nums">{healthDot}{performance.effectiveness !== undefined ? `${performance.effectiveness.toFixed(0)}%` : "—"}</span>
+              </LineRow>
+              <LineRow label="Block time">
+                <span className="tabular-nums">
+                  {formatDuration(performance.averageTimeToProduce)}
+                  {performance.expectedTimeToProduce !== undefined && <span className="ml-2 text-muted-foreground">expected {formatDuration(performance.expectedTimeToProduce)}</span>}
+                </span>
+              </LineRow>
+              <LineRow label="Staked in pool"><span className="tabular-nums">{formatTokenAmount(performance.vhpAmount, "VHP")}</span></LineRow>
+              <LineRow label="Fee"><span className="tabular-nums">{feePercent}%</span></LineRow>
+              <LineRow label="Payout">{formatPayoutPeriod(poolParams.payment_period)}</LineRow>
+              <LineRow label="Address" href={`/address/${poolId}`}>
+                <span className="font-mono text-xs">{poolId.slice(0, 8)}…{poolId.slice(-6)}</span>
+              </LineRow>
+              <LineRow label="Contract" href={`/contracts/${poolId}`}>Fogata Pool v2</LineRow>
+              <LineRow label="Trade" href="/fogata/trade">Sell VHP for KOIN</LineRow>
+            </LineList>
           </section>
 
           <Dialog open={sheet === "deposit"} onOpenChange={(open) => { if (!open && !submitting) setSheet(null); }}>
-            <DialogContent className="sm:max-w-[400px]">
+            <DialogContent className="rounded-[22px] p-7 sm:max-w-[400px]">
               <DialogHeader>
-                <DialogTitle>Deposit to {poolParams.name || "this pool"}</DialogTitle>
+                <DialogTitle className="text-xl tracking-[-0.02em]">Deposit to {poolParams.name || "this pool"}</DialogTitle>
               </DialogHeader>
-              <div className="grid grid-cols-2 gap-0.5 rounded-[9px] bg-muted p-[3px]" role="group" aria-label="Token">
-                {(["koin", "vhp"] as const).map((token) => (
-                  <button
-                    key={token}
-                    type="button"
-                    disabled={submitting}
-                    aria-pressed={depositToken === token}
-                    onClick={() => {
-                      setDepositToken(token);
-                      setKoinDeposit("");
-                      setVhpDeposit("");
-                    }}
-                    className={cn(
-                      "rounded-[7px] py-1.5 text-sm transition-colors",
-                      depositToken === token ? "bg-background font-medium shadow-sm" : "text-muted-foreground"
-                    )}
-                  >
-                    {token.toUpperCase()}
-                  </button>
-                ))}
-              </div>
-              <div className="flex items-baseline gap-2.5 rounded-xl border px-4 py-3.5 focus-within:ring-2 focus-within:ring-brand/40">
-                <input
+              <WordTabs
+                size="md"
+                ariaLabel="Token"
+                value={depositToken}
+                disabled={submitting}
+                options={[
+                  { value: "koin", label: "KOIN" },
+                  { value: "vhp", label: "VHP" },
+                ]}
+                onChange={(token) => {
+                  setDepositToken(token);
+                  setKoinDeposit("");
+                  setVhpDeposit("");
+                }}
+              />
+              <div className="mt-4">
+                <AmountField
                   id={depositToken === "koin" ? "koin-deposit" : "vhp-deposit"}
-                  type="number"
-                  min="0"
-                  step="any"
-                  placeholder="0"
-                  inputMode="decimal"
-                  aria-label="Amount"
-                  className="w-full min-w-0 bg-transparent text-[28px] font-semibold tracking-tight outline-none tabular-nums"
+                  size="md"
+                  label="Amount"
+                  unit={depositToken.toUpperCase()}
                   value={depositToken === "koin" ? koinDeposit : vhpDeposit}
-                  onChange={(e) =>
-                    depositToken === "koin" ? setKoinDeposit(e.target.value) : setVhpDeposit(e.target.value)
-                  }
+                  onChange={(value) => (depositToken === "koin" ? setKoinDeposit(value) : setVhpDeposit(value))}
                   disabled={submitting}
-                />
-                <span className="font-medium text-muted-foreground">{depositToken.toUpperCase()}</span>
-                <button
-                  type="button"
-                  className="text-xs font-semibold text-brand disabled:opacity-40"
-                  disabled={!walletBalances || submitting}
-                  onClick={() =>
+                  onMax={() =>
                     depositToken === "koin"
                       ? setKoinDeposit(formatAmount(walletBalances!.koin))
                       : setVhpDeposit(formatAmount(walletBalances!.vhp))
                   }
-                >
-                  Max
-                </button>
+                  maxDisabled={!walletBalances}
+                  autoFocus
+                />
               </div>
-              <div className="-mt-2 flex justify-between px-0.5 text-xs text-muted-foreground">
+              <div className={cn(footnote, "flex justify-between tabular-nums")}>
                 <span>
                   Wallet {walletBalances ? formatAmount(depositToken === "koin" ? walletBalances.koin : walletBalances.vhp) : "—"} {depositToken.toUpperCase()}
                 </span>
-                {poolApy !== null && <span className="tabular-nums">≈ {poolApy.toFixed(1)}% yearly</span>}
+                {poolApy !== null && <span>≈ {poolApy.toFixed(1)}% yearly</span>}
               </div>
               {depositToken === "koin" && formatPayoutPeriod(poolParams.payment_period) !== "—" && (
-                <p className="text-xs leading-relaxed text-muted-foreground">
+                <p className="mt-2 text-[13px] leading-relaxed text-muted-foreground">
                   KOIN becomes VHP over the next {formatPayoutPeriod(poolParams.payment_period).replace(/^Every /, "")}. Rewards are paid in KOIN; to sell VHP itself, use{" "}
-                  <Link href="/fogata/trade" className="text-brand">Trade</Link>.
+                  <Link href="/fogata/trade" className={quietLink}>Trade</Link>.
                 </p>
               )}
-              <Button
-                className="h-[42px] w-full rounded-[11px] bg-brand text-brand-foreground hover:bg-brand/90"
+              <button
+                type="button"
+                className={cn(primaryButton, "mt-3")}
                 onClick={handleStake}
                 disabled={!account || submitting || !(Number(depositToken === "koin" ? koinDeposit : vhpDeposit) > 0)}
               >
                 {submitting
                   ? "Submitting…"
                   : `Deposit ${depositToken === "koin" ? koinDeposit || "0" : vhpDeposit || "0"} ${depositToken.toUpperCase()}`}
-              </Button>
+              </button>
             </DialogContent>
           </Dialog>
 
           <Dialog open={sheet === "withdraw"} onOpenChange={(open) => { if (!open && !submitting) setSheet(null); }}>
-            <DialogContent className="sm:max-w-[400px]">
+            <DialogContent className="rounded-[22px] p-7 sm:max-w-[400px]">
               <DialogHeader>
-                <DialogTitle>Withdraw from {poolParams.name || "this pool"}</DialogTitle>
+                <DialogTitle className="text-xl tracking-[-0.02em]">Withdraw from {poolParams.name || "this pool"}</DialogTitle>
               </DialogHeader>
-              <div className="grid grid-cols-2 gap-0.5 rounded-[9px] bg-muted p-[3px]" role="group" aria-label="Token">
-                {(["vhp", "koin"] as const).map((token) => (
-                  <button
-                    key={token}
-                    type="button"
-                    disabled={submitting}
-                    aria-pressed={withdrawToken === token}
-                    onClick={() => {
-                      setWithdrawToken(token);
-                      setKoinWithdraw("");
-                      setVhpWithdraw("");
-                    }}
-                    className={cn(
-                      "rounded-[7px] py-1.5 text-sm transition-colors",
-                      withdrawToken === token ? "bg-background font-medium shadow-sm" : "text-muted-foreground"
-                    )}
-                  >
-                    {token.toUpperCase()}
-                  </button>
-                ))}
-              </div>
-              <div className="flex items-baseline gap-2.5 rounded-xl border px-4 py-3.5 focus-within:ring-2 focus-within:ring-brand/40">
-                <input
+              <WordTabs
+                size="md"
+                ariaLabel="Token"
+                value={withdrawToken}
+                disabled={submitting}
+                options={[
+                  { value: "vhp", label: "VHP" },
+                  { value: "koin", label: "KOIN" },
+                ]}
+                onChange={(token) => {
+                  setWithdrawToken(token);
+                  setKoinWithdraw("");
+                  setVhpWithdraw("");
+                }}
+              />
+              <div className="mt-4">
+                <AmountField
                   id={withdrawToken === "koin" ? "koin-withdraw" : "vhp-withdraw"}
-                  type="number"
-                  min="0"
-                  step="any"
-                  placeholder="0"
-                  inputMode="decimal"
-                  aria-label="Amount"
-                  className="w-full min-w-0 bg-transparent text-[28px] font-semibold tracking-tight outline-none tabular-nums"
+                  size="md"
+                  label="Amount"
+                  unit={withdrawToken.toUpperCase()}
                   value={withdrawToken === "koin" ? koinWithdraw : vhpWithdraw}
-                  onChange={(e) =>
-                    withdrawToken === "koin" ? setKoinWithdraw(e.target.value) : setVhpWithdraw(e.target.value)
-                  }
+                  onChange={(value) => (withdrawToken === "koin" ? setKoinWithdraw(value) : setVhpWithdraw(value))}
                   disabled={submitting}
-                />
-                <span className="font-medium text-muted-foreground">{withdrawToken.toUpperCase()}</span>
-                <button
-                  type="button"
-                  className="text-xs font-semibold text-brand disabled:opacity-40"
-                  disabled={!poolBalance || submitting}
-                  onClick={() =>
+                  onMax={() =>
                     withdrawToken === "koin"
                       ? setKoinWithdraw(formatAmount(poolBalance!.koin_amount))
                       : setVhpWithdraw(formatAmount(poolBalance!.vhp_amount))
                   }
-                >
-                  Max
-                </button>
+                  maxDisabled={!poolBalance}
+                  autoFocus
+                />
               </div>
-              <p className="-mt-2 px-0.5 text-xs text-muted-foreground">
+              <p className={cn(footnote, "tabular-nums")}>
                 In pool {poolBalance ? formatAmount(withdrawToken === "koin" ? poolBalance.koin_amount : poolBalance.vhp_amount) : "—"} {withdrawToken.toUpperCase()}
               </p>
-              <Button
-                className="h-[42px] w-full rounded-[11px] bg-brand text-brand-foreground hover:bg-brand/90"
+              <button
+                type="button"
+                className={cn(primaryButton, "mt-3")}
                 onClick={handleUnstake}
                 disabled={!account || submitting || !(Number(withdrawToken === "koin" ? koinWithdraw : vhpWithdraw) > 0)}
               >
                 {submitting
                   ? "Submitting…"
                   : `Withdraw ${withdrawToken === "koin" ? koinWithdraw || "0" : vhpWithdraw || "0"} ${withdrawToken.toUpperCase()}`}
-              </Button>
+              </button>
             </DialogContent>
           </Dialog>
 
           <Dialog open={sheet === "rewards"} onOpenChange={(open) => { if (!open && !submitting) setSheet(null); }}>
-            <DialogContent className="sm:max-w-[400px]">
+            <DialogContent className="rounded-[22px] p-7 sm:max-w-[400px]">
               <DialogHeader>
-                <DialogTitle>Reward settings</DialogTitle>
+                <DialogTitle className="text-xl tracking-[-0.02em]">Reward settings</DialogTitle>
                 <DialogDescription>Rewards are paid in KOIN. Choose what the pool does with them.</DialogDescription>
               </DialogHeader>
               <RadioGroup
@@ -1275,31 +1246,35 @@ export default function FogataPoolPage() {
                   setRewardMode(value as RewardMode)
                 }
                 disabled={!account || submitting}
-                className="space-y-4"
+                className="mt-2 gap-0 border-t border-border"
               >
-                <div className="space-y-3 rounded-md border p-4">
-                  <div className="flex items-center space-x-2">
+                <div className="border-b border-border py-4">
+                  <div className="flex items-center gap-2.5">
                     <RadioGroupItem value="percentage" id="reward-percentage" />
-                    <Label htmlFor="reward-percentage">
+                    <Label htmlFor="reward-percentage" className="text-sm font-medium">
                       Take a share as KOIN
                     </Label>
                   </div>
-                  <div className="space-y-2 pl-6">
-                    <Input
-                      id="percentage-koin"
-                      type="number"
-                      min="0"
-                      max="100"
-                      step="0.1"
-                      value={percentageKoin}
-                      onChange={(e) => setPercentageKoin(e.target.value)}
-                      disabled={
-                        !account ||
-                        submitting ||
-                        rewardMode !== "percentage"
-                      }
-                    />
-                    <p className="text-xs text-muted-foreground">
+                  <div className={cn("mt-3 pl-[26px] transition-opacity", rewardMode !== "percentage" && "opacity-40")}>
+                    <div className="flex items-baseline gap-2 border-b border-border pb-2 focus-within:border-foreground">
+                      <input
+                        id="percentage-koin"
+                        type="text"
+                        inputMode="decimal"
+                        aria-label="Percentage of rewards taken as KOIN"
+                        className="w-full min-w-0 bg-transparent text-2xl font-semibold tracking-[-0.03em] tabular-nums outline-none placeholder:text-muted-foreground/50"
+                        placeholder="0"
+                        value={percentageKoin}
+                        onChange={(e) => setPercentageKoin(sanitizeDecimalInput(e.target.value))}
+                        disabled={
+                          !account ||
+                          submitting ||
+                          rewardMode !== "percentage"
+                        }
+                      />
+                      <span className="text-sm font-medium text-muted-foreground">%</span>
+                    </div>
+                    <p className={cn(footnote, "mt-2")}>
                       Keep this percentage of earned KOIN and burn the rest
                       into VHP.
                       {preferences &&
@@ -1315,27 +1290,31 @@ export default function FogataPoolPage() {
                   </div>
                 </div>
 
-                <div className="space-y-3 rounded-md border p-4">
-                  <div className="flex items-center space-x-2">
+                <div className="border-b border-border py-4">
+                  <div className="flex items-center gap-2.5">
                     <RadioGroupItem value="virtual" id="reward-virtual" />
-                    <Label htmlFor="reward-virtual">
+                    <Label htmlFor="reward-virtual" className="text-sm font-medium">
                       Keep a VHP amount, take the rest as KOIN
                     </Label>
                   </div>
-                  <div className="space-y-2 pl-6">
-                    <Input
-                      id="all-after-virtual"
-                      type="number"
-                      min="0"
-                      step="any"
-                      value={allAfterVirtual}
-                      onChange={(e) => setAllAfterVirtual(e.target.value)}
-                      disabled={
-                        !account || submitting || rewardMode !== "virtual"
-                      }
-                      placeholder="VHP to keep"
-                    />
-                    <p className="text-xs text-muted-foreground">
+                  <div className={cn("mt-3 pl-[26px] transition-opacity", rewardMode !== "virtual" && "opacity-40")}>
+                    <div className="flex items-baseline gap-2 border-b border-border pb-2 focus-within:border-foreground">
+                      <input
+                        id="all-after-virtual"
+                        type="text"
+                        inputMode="decimal"
+                        aria-label="VHP to keep"
+                        className="w-full min-w-0 bg-transparent text-2xl font-semibold tracking-[-0.03em] tabular-nums outline-none placeholder:text-muted-foreground/50"
+                        placeholder="0"
+                        value={allAfterVirtual}
+                        onChange={(e) => setAllAfterVirtual(sanitizeDecimalInput(e.target.value))}
+                        disabled={
+                          !account || submitting || rewardMode !== "virtual"
+                        }
+                      />
+                      <span className="text-sm font-medium text-muted-foreground">VHP</span>
+                    </div>
+                    <p className={cn(footnote, "mt-2")}>
                       Keep this amount of VHP and burn anything above it.
                       {preferences &&
                         BigInt(preferences.all_after_virtual || "0") >
@@ -1351,65 +1330,48 @@ export default function FogataPoolPage() {
                   </div>
                 </div>
               </RadioGroup>
-              <Button
-                className="h-[42px] w-full rounded-[11px] bg-brand text-brand-foreground hover:bg-brand/90"
+              <button
+                type="button"
+                className={cn(primaryButton, "mt-3")}
                 onClick={handleSavePreferences}
                 disabled={!account || submitting}
               >
                 {submitting ? "Saving…" : "Save"}
-              </Button>
+              </button>
             </DialogContent>
           </Dialog>
 
           {isOwner && manageOpen && (
-            <section id="manage" className="mt-16 space-y-6">
-              <h2 className="text-sm font-medium text-muted-foreground">Manage pool</h2>
+            <section id="manage" className="mt-14 space-y-10">
+              <div>
+                <h2 className="text-xs text-muted-foreground">Manage pool</h2>
+                <LineList className="mt-2">
+                  <LineRow label="Liquid KOIN"><span className="tabular-nums">{formatTokenAmount(performance.koinAmount, "KOIN")}</span></LineRow>
+                  <LineRow label="Mana">
+                    <span className="tabular-nums">{performance.manaPercentage !== undefined ? `${performance.manaPercentage.toFixed(1)}%` : "—"}</span>
+                  </LineRow>
+                  {performance.lastBlockHeight !== undefined ? (
+                    <LineRow label="Last block" href={`/blocks/${performance.lastBlockHeight}`}>
+                      <span className="tabular-nums">
+                        #{performance.lastBlockHeight}
+                        {performance.lastBlockTime && <span className="text-muted-foreground"> · {formatTimeAgo(performance.lastBlockTime)}</span>}
+                      </span>
+                    </LineRow>
+                  ) : (
+                    <LineRow label="Last block">—</LineRow>
+                  )}
+                  <LineRow label="Next snapshot">{nextPayment ? formatTimeAgo(nextPayment) : "—"}</LineRow>
+                  <LineRow label="Reserved KOIN"><span className="tabular-nums">{formatAmount(reservedKoin)} KOIN</span></LineRow>
+                </LineList>
+              </div>
 
-              <dl className="text-sm">
-                <div className="flex items-center justify-between gap-6 border-t py-[11px]">
-                  <dt className="text-muted-foreground">Liquid KOIN</dt>
-                  <dd className="text-right">{formatTokenAmount(performance.koinAmount, "KOIN")}</dd>
-                </div>
-                <div className="flex items-center justify-between gap-6 border-t py-[11px]">
-                  <dt className="text-muted-foreground">Mana</dt>
-                  <dd className="text-right">
-                    {performance.manaPercentage !== undefined ? `${performance.manaPercentage.toFixed(1)}%` : "—"}
-                  </dd>
-                </div>
-                <div className="flex items-center justify-between gap-6 border-t py-[11px]">
-                  <dt className="text-muted-foreground">Last block</dt>
-                  <dd className="text-right">
-                    {performance.lastBlockHeight !== undefined ? (
-                      <>
-                        <Link href={`/blocks/${performance.lastBlockHeight}`} className="text-brand">
-                          #{performance.lastBlockHeight}
-                        </Link>
-                        {performance.lastBlockTime && <> · {formatTimeAgo(performance.lastBlockTime)}</>}
-                      </>
-                    ) : (
-                      "—"
-                    )}
-                  </dd>
-                </div>
-                <div className="flex items-center justify-between gap-6 border-t py-[11px]">
-                  <dt className="text-muted-foreground">Next snapshot</dt>
-                  <dd className="text-right">{nextPayment ? formatTimeAgo(nextPayment) : "—"}</dd>
-                </div>
-                <div className="flex items-center justify-between gap-6 border-t py-[11px]">
-                  <dt className="text-muted-foreground">Reserved KOIN</dt>
-                  <dd className="text-right">{formatAmount(reservedKoin)} KOIN</dd>
-                </div>
-              </dl>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Pool parameters</CardTitle>
-                  <CardDescription>
-                    Update the public details, beneficiaries, and reburn
-                    period using the pool&apos;s set_pool_params function.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
+              <section className="border-t border-border pt-5">
+                <h3 className="text-base font-semibold tracking-[-0.01em]">Pool parameters</h3>
+                <p className={cn(footnote, "mt-1")}>
+                  Update the public details, beneficiaries, and reburn
+                  period using the pool&apos;s set_pool_params function.
+                </p>
+                <div className="mt-5 space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="pool-name">Name</Label>
                     <Input
@@ -1446,9 +1408,8 @@ export default function FogataPoolPage() {
                     <Label htmlFor="reburn-period">Reburn period (days)</Label>
                     <Input
                       id="reburn-period"
-                      type="number"
-                      min="0"
-                      step="0.01"
+                      type="text"
+                      inputMode="decimal"
                       value={reburnPeriodDays}
                       onChange={(event) =>
                         setReburnPeriodDays(event.target.value)
@@ -1503,10 +1464,8 @@ export default function FogataPoolPage() {
                         />
                         <Input
                           aria-label={`Beneficiary ${index + 1} percentage`}
-                          type="number"
-                          min="0"
-                          max="100"
-                          step="0.001"
+                          type="text"
+                          inputMode="decimal"
                           placeholder="%"
                           value={beneficiary.percentage / 1000}
                           onChange={(event) =>
@@ -1554,30 +1513,27 @@ export default function FogataPoolPage() {
                     </p>
                   </div>
 
-                  <Button
-                    className="w-full"
+                  <button
+                    type="button"
+                    className={primaryButton}
                     onClick={handleSavePoolParams}
                     disabled={submitting}
                   >
-                    {submitting ? "Saving..." : "Save pool parameters"}
-                  </Button>
-                </CardContent>
-              </Card>
+                    {submitting ? "Saving…" : "Save pool parameters"}
+                  </button>
+                </div>
+              </section>
 
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">
-                    Manage reserved KOIN
-                  </CardTitle>
-                  <CardDescription>
-                    Reserved KOIN provides mana for operating the pool and is
-                    not burned. Lower reburn periods require more frequent
-                    operations, so more reserved KOIN is recommended. As a
-                    base reference, use about 2,000 KOIN for a 4-day reburn
-                    period.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
+              <section className="border-t border-border pt-5">
+                <h3 className="text-base font-semibold tracking-[-0.01em]">Reserved KOIN</h3>
+                <p className={cn(footnote, "mt-1")}>
+                  Reserved KOIN provides mana for operating the pool and is
+                  not burned. Lower reburn periods require more frequent
+                  operations, so more reserved KOIN is recommended. As a
+                  base reference, use about 2,000 KOIN for a 4-day reburn
+                  period.
+                </p>
+                <div className="mt-5 space-y-4">
                   <p className="text-sm">
                     <span className="text-muted-foreground">
                       Currently reserved:{" "}
@@ -1588,9 +1544,8 @@ export default function FogataPoolPage() {
                     <Label htmlFor="reserved-koin-amount">KOIN amount</Label>
                     <Input
                       id="reserved-koin-amount"
-                      type="number"
-                      min="0"
-                      step="any"
+                      type="text"
+                      inputMode="decimal"
                       placeholder="0"
                       value={reservedKoinAmount}
                       onChange={(event) =>
@@ -1599,38 +1554,37 @@ export default function FogataPoolPage() {
                       disabled={submitting}
                     />
                   </div>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <Button
+                  <div className="grid gap-2.5 sm:grid-cols-2">
+                    <button
+                      type="button"
+                      className={primaryButton}
                       onClick={() => handleReservedKoin("add")}
                       disabled={submitting}
                     >
                       Add reserved KOIN
-                    </Button>
-                    <Button
-                      variant="outline"
+                    </button>
+                    <button
+                      type="button"
+                      className={ghostButton}
                       onClick={() => handleReservedKoin("remove")}
                       disabled={submitting}
                     >
                       Remove reserved KOIN
-                    </Button>
+                    </button>
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+              </section>
 
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">
-                    Register node operator public key
-                  </CardTitle>
-                  <CardDescription>
-                    Register the public key from{" "}
-                    <code>.koinos/block_producer/public.key</code>. Also set
-                    the <code>producer</code> field in the{" "}
-                    <code>block_producer</code> section of your node&apos;s{" "}
-                    <code>config.yml</code> to this pool address.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
+              <section className="border-t border-border pt-5">
+                <h3 className="text-base font-semibold tracking-[-0.01em]">Node operator public key</h3>
+                <p className={cn(footnote, "mt-1")}>
+                  Register the public key from{" "}
+                  <code>.koinos/block_producer/public.key</code>. Also set
+                  the <code>producer</code> field in the{" "}
+                  <code>block_producer</code> section of your node&apos;s{" "}
+                  <code>config.yml</code> to this pool address.
+                </p>
+                <div className="mt-5 space-y-4">
                   {registeredPublicKey && (
                     <div className="space-y-1">
                       <p className="text-xs text-muted-foreground">
@@ -1651,18 +1605,19 @@ export default function FogataPoolPage() {
                       disabled={submitting}
                     />
                   </div>
-                  <Button
-                    className="w-full"
+                  <button
+                    type="button"
+                    className={primaryButton}
                     onClick={handleRegisterPublicKey}
                     disabled={submitting}
                   >
                     Register public key
-                  </Button>
-                </CardContent>
-              </Card>
+                  </button>
+                </div>
+              </section>
 
-              <details className="border-t pt-3">
-                <summary className="cursor-pointer list-none text-sm text-muted-foreground [&::-webkit-details-marker]:hidden">Danger zone</summary>
+              <details className="border-t border-border pt-4">
+                <summary className="cursor-pointer list-none text-sm text-muted-foreground hover:text-foreground [&::-webkit-details-marker]:hidden">Danger zone ›</summary>
                 <div className="mt-3 space-y-3 text-sm text-muted-foreground">
                   <p>Removing the pool delists it from Fogata. Stakers keep their funds and can still withdraw. Enter the pool address to confirm.</p>
                   <Input
@@ -1672,14 +1627,14 @@ export default function FogataPoolPage() {
                     placeholder={poolId}
                     disabled={submitting}
                   />
-                  <Button
-                    variant="outline"
-                    className="border-destructive text-destructive hover:bg-destructive/10"
+                  <button
+                    type="button"
+                    className={cn(ghostButton, "w-auto border-destructive/60 text-destructive hover:bg-destructive/10")}
                     onClick={handleDeletePool}
                     disabled={submitting || deleteConfirmation !== poolId}
                   >
                     Remove from Fogata list
-                  </Button>
+                  </button>
                 </div>
               </details>
             </section>

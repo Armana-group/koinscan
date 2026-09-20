@@ -37,7 +37,14 @@ function shortAddress(address: string): string {
   return `${address.slice(0, 4)}...${address.slice(address.length - 4)}`;
 }
 
-export function WalletButton({ connectLabel }: { connectLabel?: string } = {}) {
+export function WalletButton({
+  connectLabel,
+  connectClassName,
+}: {
+  connectLabel?: string;
+  /** Overrides the connect button's classes so a page can match its own button shape. */
+  connectClassName?: string;
+} = {}) {
   const { signer, setSigner, savedAddress, savedWalletType, forgetAddress, isReconnecting, kondorAccounts } = useWallet();
   const addr = (signer as ExtendedSigner)?.getAddress();
   const walletName = (signer as ExtendedSigner)?.name;
@@ -119,7 +126,7 @@ export function WalletButton({ connectLabel }: { connectLabel?: string } = {}) {
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         {connectLabel && !displayAddress ? (
-          <Button className="h-[42px] rounded-[11px] bg-brand px-6 text-brand-foreground hover:bg-brand/90">
+          <Button className={connectClassName ?? "h-[42px] rounded-[11px] bg-brand px-6 text-brand-foreground hover:bg-brand/90"}>
             {connectLabel}
           </Button>
         ) : (

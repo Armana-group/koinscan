@@ -23,7 +23,11 @@ assert.doesNotMatch(pools, /Create a mining pool/, "the operator CTA block is go
 assert.match(pools, /Start a pool/, "operators still have a link");
 assert.match(pools, /How it works/, "pools page has the how-it-works disclosure");
 assert.match(pools, /href="\/fogata\/trade"/, "pools page has the Trade row");
-assert.match(pools, /Trade VHP ↔ KOIN/, "the Trade row is labelled");
+assert.match(pools, /Sell VHP for KOIN, or buy VHP/, "the Trade row is labelled");
+assert.ok(
+  pools.indexOf('href="/fogata/trade"') < pools.search(/No pools are listed yet|\/fogata\/1[1-9A-HJ-NP-Za-km-z]{25,}/),
+  "the Trade row comes before the pools"
+);
 assert.doesNotMatch(pools, /aria-current="page"/, "no tab-style sub-nav on the pools page");
 
 const trade = await page("/fogata/trade");
@@ -40,6 +44,9 @@ await redirectsTo("/dapps/dex", "/fogata/trade");
 await redirectsTo("/dapps/fogata/1GGxRhLN7Ek54xycG5XaZBE4bCgwV2xtvk", "/fogata/1GGxRhLN7Ek54xycG5XaZBE4bCgwV2xtvk");
 
 for (const html of [pools, trade]) {
+  assert.doesNotMatch(html, /type="number"/, "no native number inputs (spinners, exponent notation)");
+  assert.doesNotMatch(html, /max-w-\[640px\]|max-w-\[440px\]/, "one 520px column, no nested narrower column");
+  assert.match(html, /max-w-\[520px\]/, "the page uses the shared Fogata column");
   const h1s = [...html.matchAll(/<h1[^>]*>([\s\S]*?)<\/h1>/g)].map((m) => m[1]);
   assert.ok(h1s.length > 0, "page has a title");
   for (const h1 of h1s) assert.doesNotMatch(h1, /beta/i, "no beta tag inside page titles");

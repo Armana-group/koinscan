@@ -4,17 +4,13 @@ import { Contract, Multicall, ProviderInterface, utils } from "koilib";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -35,7 +31,18 @@ import {
   VHP_CONTRACT_ID,
 } from "@/koinos/constants";
 import { findMatchingOrder } from "@/lib/fogata";
+import { AmountField } from "@/components/fogata/AmountField";
 import { HowItWorks } from "@/components/fogata/HowItWorks";
+import { LineList, LineRow } from "@/components/fogata/LineRow";
+import { WordTabs } from "@/components/fogata/WordTabs";
+import {
+  backLink,
+  footnote,
+  pageColumn,
+  pageTitle,
+  primaryButton,
+  quietLink,
+} from "@/components/fogata/styles";
 import { cn } from "@/lib/utils";
 import * as toast from "@/lib/toast";
 
@@ -628,49 +635,47 @@ export default function DexPage() {
     return (
       <>
         {error && (
-          <p className="mt-9 text-sm text-muted-foreground">
+          <p className="mt-10 text-sm text-muted-foreground">
             Couldn&apos;t load orders.{" "}
-            <button type="button" className="text-brand" onClick={loadOrders}>Retry</button>
+            <button type="button" className={quietLink} onClick={loadOrders}>Retry</button>
           </p>
         )}
-        <details className={cn("border-t", error ? "mt-3" : "mt-9")}>
-          <summary className="flex cursor-pointer list-none items-center justify-between py-3.5 text-sm text-muted-foreground [&::-webkit-details-marker]:hidden">
+        <details className={cn("border-t border-border", error ? "mt-3" : "mt-10")}>
+          <summary className="flex cursor-pointer list-none items-center justify-between border-b border-border py-3.5 text-sm text-muted-foreground hover:text-foreground [&::-webkit-details-marker]:hidden">
             <span>Open orders</span>
             <span className="tabular-nums">{loading ? "…" : rows.length} ›</span>
           </summary>
           {!error && rows.length === 0 && !loading && (
-            <p className="pb-3 text-sm text-muted-foreground">No open orders.</p>
+            <p className="py-3.5 text-sm text-muted-foreground">No open orders.</p>
           )}
           {rows.length > 0 && (
-            <table className="w-full text-sm">
-              <tbody>
-                {rows.map((order) => {
-                  const isMine = order.owner === account;
-                  return (
-                    <tr key={order.id} className="border-t">
-                      <td className={cn("py-2.5", isMine && "text-brand")}>
-                        {isMine ? "Your " : ""}
-                        {order.buy ? "buy" : "sell"} {formatAmount(order.vhp_amount)} VHP
-                        {isMine && order.pool && <span className="text-muted-foreground"> · {getPoolLabel(order.pool)}</span>}
-                      </td>
-                      <td className="py-2.5 text-right tabular-nums text-muted-foreground">
-                        {formatPrice(order)}
-                        {" · "}
-                        {isMine ? (
-                          <button type="button" className="hover:text-foreground" onClick={() => handleCancelOrder(order)} disabled={submitting}>
-                            cancel
-                          </button>
-                        ) : (
-                          <button type="button" className="text-brand" onClick={() => openFillDialog(order)} disabled={!account || submitting}>
-                            fill
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+            <div>
+              {rows.map((order) => {
+                const isMine = order.owner === account;
+                return (
+                  <div key={order.id} className="flex items-center justify-between gap-6 border-b border-border py-3.5 text-sm">
+                    <span className={cn("min-w-0 truncate", isMine ? "text-foreground" : "text-muted-foreground")}>
+                      {isMine ? "Your " : ""}
+                      {order.buy ? "buy" : "sell"} {formatAmount(order.vhp_amount)} VHP
+                      {isMine && order.pool && <span className="text-muted-foreground"> from {getPoolLabel(order.pool)}</span>}
+                    </span>
+                    <span className="shrink-0 tabular-nums text-muted-foreground">
+                      {formatPrice(order)}
+                      <span className="mx-2 text-muted-foreground/50">·</span>
+                      {isMine ? (
+                        <button type="button" className={quietLink} onClick={() => handleCancelOrder(order)} disabled={submitting}>
+                          cancel
+                        </button>
+                      ) : (
+                        <button type="button" className={cn(quietLink, "disabled:opacity-50")} onClick={() => openFillDialog(order)} disabled={!account || submitting}>
+                          fill
+                        </button>
+                      )}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
           )}
         </details>
       </>
@@ -683,11 +688,11 @@ export default function DexPage() {
   const getSymbol = side === "sell" ? "KOIN" : "VHP";
 
   return (
-    <div className="mx-auto w-full max-w-[640px] px-4 py-10">
-      <Link href="/fogata" className="mb-7 inline-block text-sm text-muted-foreground hover:text-foreground">
+    <div className={pageColumn}>
+      <Link href="/fogata" className={backLink}>
         ‹ Fogata
       </Link>
-      <h1 className="text-2xl font-semibold tracking-tight">Trade</h1>
+      <h1 className={pageTitle}>Trade</h1>
       <HowItWorks>
         <p>
           Staked VHP doesn&apos;t turn back into KOIN by itself. Post an order to sell VHP for KOIN, or
@@ -699,130 +704,112 @@ export default function DexPage() {
         </p>
       </HowItWorks>
 
-      <div className="max-w-[440px]">
-        <div className="mt-6 grid grid-cols-2 gap-0.5 rounded-[9px] bg-muted p-[3px]" role="group" aria-label="Order side">
-          <button
-            type="button"
-            disabled={submitting}
-            aria-pressed={side === "sell"}
-            onClick={() => setSide("sell")}
-            className={cn("rounded-[7px] py-1.5 text-sm transition-colors", side === "sell" ? "bg-background font-medium shadow-sm" : "text-muted-foreground")}
-          >
-            Sell VHP
-          </button>
-          <button
-            type="button"
-            disabled={submitting}
-            aria-pressed={side === "buy"}
-            onClick={() => { setSide("buy"); setPool(""); }}
-            className={cn("rounded-[7px] py-1.5 text-sm transition-colors", side === "buy" ? "bg-background font-medium shadow-sm" : "text-muted-foreground")}
-          >
-            Buy VHP
-          </button>
-        </div>
-
-        <div className="mt-4 flex items-baseline gap-2.5 rounded-xl border px-4 py-3.5 focus-within:ring-2 focus-within:ring-brand/40">
-          <input
-            id="dex-pay-amount"
-            type="number"
-            min="0"
-            step="0.00000001"
-            placeholder="0"
-            inputMode="decimal"
-            aria-label={`You ${side === "sell" ? "sell" : "pay"}`}
-            className="w-full min-w-0 bg-transparent text-[28px] font-semibold tracking-tight outline-none tabular-nums"
-            value={payAmount}
-            onChange={(event) => (side === "sell" ? setVhpAmount(event.target.value) : setKoinAmount(event.target.value))}
-            disabled={submitting}
-          />
-          <span className="font-medium text-muted-foreground">{paySymbol}</span>
-          <button
-            type="button"
-            className="text-xs font-semibold text-brand disabled:opacity-40"
-            disabled={submitting || !availablePayBalance || balancesLoading || BigInt(availablePayBalance || "0") <= BigInt(0)}
-            onClick={() => {
-              if (!availablePayBalance) return;
-              const maxValue = formatAmountForInput(availablePayBalance);
-              if (side === "sell") setVhpAmount(maxValue);
-              else setKoinAmount(maxValue);
-            }}
-          >
-            Max
-          </button>
-        </div>
-        <div className="mt-2.5 flex items-baseline gap-2.5 rounded-xl border px-4 py-3.5 focus-within:ring-2 focus-within:ring-brand/40">
-          <input
-            id="dex-get-amount"
-            type="number"
-            min="0"
-            step="0.00000001"
-            placeholder="0"
-            inputMode="decimal"
-            aria-label="You get"
-            className="w-full min-w-0 bg-transparent text-[28px] font-semibold tracking-tight outline-none tabular-nums"
-            value={getAmount}
-            onChange={(event) => (side === "sell" ? setKoinAmount(event.target.value) : setVhpAmount(event.target.value))}
-            disabled={submitting}
-          />
-          <span className="font-medium text-muted-foreground">{getSymbol}</span>
-        </div>
-        <div className="mt-2 flex justify-between px-0.5 text-xs text-muted-foreground">
-          <span className="tabular-nums">{impliedPrice ? `${impliedPrice} KOIN per VHP` : " "}</span>
-          <span>
-            {!account
-              ? ""
-              : balancesLoading
-                ? "Loading balance…"
-                : availablePayBalance !== null
-                  ? `Wallet ${formatAmount(availablePayBalance)} ${availablePaySymbol}${side === "sell" && pool ? " in pool" : ""}`
-                  : ""}
-          </span>
-        </div>
-
-        {side === "sell" && account && pools.length > 0 && (
-          <div className="mt-3 text-xs text-muted-foreground">
-            <Select value={pool || NO_POOL_VALUE} onValueChange={(value) => setPool(value === NO_POOL_VALUE ? "" : value)} disabled={submitting || poolsLoading}>
-              <SelectTrigger id="dex-pool" className="h-8 w-auto gap-2 border-0 px-0 text-xs text-brand shadow-none">
-                <SelectValue placeholder="Sell from a pool instead" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={NO_POOL_VALUE}>Sell from your wallet</SelectItem>
-                {pools.map((miningPool) => (
-                  <SelectItem key={miningPool.account} value={miningPool.account}>
-                    Sell from {miningPool.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        )}
-
-        {matchingOrder && (
-          <p className="mt-4 text-xs text-muted-foreground">
-            An open order matches —{" "}
-            <button type="button" className="text-brand" onClick={() => { openFillDialog(matchingOrder); setFillAmount(side === "sell" ? vhpAmount : koinAmount); }} disabled={!account || submitting}>
-              {matchingOrder.buy ? "Sell" : "Buy"} {formatAmount(matchingOrder.vhp_amount)} VHP at {formatPrice(matchingOrder)} ›
-            </button>
-          </p>
-        )}
-
-        {account ? (
-          <Button
-            className="mt-4 h-[42px] w-full rounded-[11px] bg-brand text-brand-foreground hover:bg-brand/90"
-            onClick={handleCreateOrder}
-            disabled={submitting}
-          >
-            {submitting ? "Submitting…" : "Place order"}
-          </Button>
-        ) : (
-          <div className="mt-4">
-            <WalletButton connectLabel="Connect wallet" />
-          </div>
-        )}
-        <p className="mt-2.5 text-center text-xs text-muted-foreground">Waits for a taker. Cancel any time.</p>
-
-        {renderBook()}
+      <div className="mt-7">
+        <WordTabs
+          ariaLabel="Order side"
+          value={side}
+          disabled={submitting}
+          options={[
+            { value: "sell", label: "Sell VHP" },
+            { value: "buy", label: "Buy VHP" },
+          ]}
+          onChange={(next) => {
+            setSide(next);
+            if (next === "buy") setPool("");
+          }}
+        />
       </div>
+
+      <div className="mt-8">
+        <AmountField
+          id="dex-pay-amount"
+          label={side === "sell" ? "You sell" : "You pay"}
+          unit={paySymbol}
+          value={payAmount}
+          onChange={(value) => (side === "sell" ? setVhpAmount(value) : setKoinAmount(value))}
+          disabled={submitting}
+          onMax={
+            account
+              ? () => {
+                  if (!availablePayBalance) return;
+                  const maxValue = formatAmountForInput(availablePayBalance);
+                  if (side === "sell") setVhpAmount(maxValue);
+                  else setKoinAmount(maxValue);
+                }
+              : undefined
+          }
+          maxDisabled={!availablePayBalance || balancesLoading || BigInt(availablePayBalance || "0") <= BigInt(0)}
+        />
+      </div>
+      <div className="mt-5">
+        <AmountField
+          id="dex-get-amount"
+          label="You get"
+          unit={getSymbol}
+          value={getAmount}
+          onChange={(value) => (side === "sell" ? setKoinAmount(value) : setVhpAmount(value))}
+          disabled={submitting}
+        />
+      </div>
+      <div className="mt-3 flex justify-between text-xs text-muted-foreground">
+        <span className="tabular-nums">{impliedPrice ? `${impliedPrice} KOIN per VHP` : " "}</span>
+        <span className="tabular-nums">
+          {!account
+            ? ""
+            : balancesLoading
+              ? "Loading balance…"
+              : availablePayBalance !== null
+                ? `Wallet ${formatAmount(availablePayBalance)} ${availablePaySymbol}${side === "sell" && pool ? " in pool" : ""}`
+                : ""}
+        </span>
+      </div>
+
+      {((side === "sell" && account && pools.length > 0) || matchingOrder) && (
+        <LineList className="mt-7">
+          {side === "sell" && account && pools.length > 0 && (
+            <LineRow label="From">
+              <Select value={pool || NO_POOL_VALUE} onValueChange={(value) => setPool(value === NO_POOL_VALUE ? "" : value)} disabled={submitting || poolsLoading}>
+                <SelectTrigger id="dex-pool" className="h-auto w-auto gap-2 border-0 p-0 text-sm text-foreground shadow-none focus:ring-0">
+                  <SelectValue placeholder="Your wallet" />
+                </SelectTrigger>
+                <SelectContent align="end">
+                  <SelectItem value={NO_POOL_VALUE}>Your wallet</SelectItem>
+                  {pools.map((miningPool) => (
+                    <SelectItem key={miningPool.account} value={miningPool.account}>
+                      {miningPool.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </LineRow>
+          )}
+          {matchingOrder && (
+            <LineRow
+              label="Matching order"
+              disabled={!account || submitting}
+              onClick={() => { openFillDialog(matchingOrder); setFillAmount(side === "sell" ? vhpAmount : koinAmount); }}
+            >
+              <span className="tabular-nums">
+                {matchingOrder.buy ? "Sell" : "Buy"} {formatAmount(matchingOrder.vhp_amount)} VHP at {formatPrice(matchingOrder)}
+              </span>
+            </LineRow>
+          )}
+        </LineList>
+      )}
+
+      <div className="mt-8">
+        {account ? (
+          <button type="button" className={primaryButton} onClick={handleCreateOrder} disabled={submitting}>
+            {submitting ? "Submitting…" : "Place order"}
+          </button>
+        ) : (
+          <WalletButton connectLabel="Connect wallet" connectClassName={primaryButton} />
+        )}
+      </div>
+      <p className={cn(footnote, "mt-3 text-center")}>Waits for a taker. Cancel any time.</p>
+
+      {renderBook()}
+
 
       <Dialog
         open={Boolean(selectedOrder)}
@@ -830,9 +817,9 @@ export default function DexPage() {
           if (!open && !submitting) setSelectedOrder(null);
         }}
       >
-        <DialogContent>
+        <DialogContent className="rounded-[22px] sm:max-w-[400px]">
           <DialogHeader>
-            <DialogTitle>
+            <DialogTitle className="text-xl tracking-[-0.02em]">
               Fill {selectedOrder?.buy ? "buy" : "sell"} order
             </DialogTitle>
             <DialogDescription>
@@ -841,21 +828,19 @@ export default function DexPage() {
             </DialogDescription>
           </DialogHeader>
           {selectedOrder && (
-            <div className="space-y-2">
-              <Label htmlFor="dex-fill-amount">
-                You pay ({selectedOrder.buy ? "VHP" : "KOIN"})
-              </Label>
-              <Input
+            <div className="pt-2">
+              <AmountField
                 id="dex-fill-amount"
-                type="number"
-                min="0"
-                step="0.00000001"
+                size="md"
+                label="You pay"
+                unit={selectedOrder.buy ? "VHP" : "KOIN"}
                 value={fillAmount}
-                onChange={(event) => setFillAmount(event.target.value)}
+                onChange={setFillAmount}
                 disabled={submitting}
+                autoFocus
               />
-              <p className="text-xs text-muted-foreground">
-                Maximum:{" "}
+              <p className={cn(footnote, "mt-3 tabular-nums")}>
+                Up to{" "}
                 {formatAmount(
                   selectedOrder.buy
                     ? selectedOrder.vhp_amount
@@ -865,18 +850,19 @@ export default function DexPage() {
               </p>
             </div>
           )}
-          <DialogFooter>
-            <Button
-              variant="outline"
+          <div className="mt-2">
+            <button type="button" className={primaryButton} onClick={handleFillOrder} disabled={submitting}>
+              {submitting ? "Submitting…" : "Fill order"}
+            </button>
+            <button
+              type="button"
+              className="mt-3 block w-full text-center text-sm text-muted-foreground hover:text-foreground disabled:opacity-50"
               onClick={() => setSelectedOrder(null)}
               disabled={submitting}
             >
               Cancel
-            </Button>
-            <Button onClick={handleFillOrder} disabled={submitting}>
-              {submitting ? "Submitting..." : "Fill"}
-            </Button>
-          </DialogFooter>
+            </button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

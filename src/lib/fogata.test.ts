@@ -5,6 +5,7 @@ import {
   findMatchingOrder,
   formatPayoutPeriod,
   poolHealth,
+  sanitizeDecimalInput,
 } from "./fogata";
 
 describe("computePoolApy", () => {
@@ -112,5 +113,34 @@ describe("findMatchingOrder", () => {
     ];
     // selling 400 VHP asking 380 KOIN → wanted price 0.95; both orders are eligible, the better price wins
     assert.equal(findMatchingOrder("sell", "400", "380", twoEligible, null)?.id, "4");
+  });
+});
+
+describe("sanitizeDecimalInput", () => {
+  it("keeps digits and a single dot", () => {
+    assert.equal(sanitizeDecimalInput("123.45"), "123.45");
+  });
+  it("drops letters, signs and exponent notation", () => {
+    assert.equal(sanitizeDecimalInput("1e-8"), "18");
+    assert.equal(sanitizeDecimalInput("-12"), "12");
+    assert.equal(sanitizeDecimalInput("abc"), "");
+  });
+  it("accepts a comma as the decimal separator", () => {
+    assert.equal(sanitizeDecimalInput("1,5"), "1.5");
+  });
+  it("keeps only the first dot", () => {
+    assert.equal(sanitizeDecimalInput("1.2.3"), "1.23");
+  });
+  it("allows a trailing dot while typing", () => {
+    assert.equal(sanitizeDecimalInput("12."), "12.");
+  });
+  it("prefixes a bare dot with zero", () => {
+    assert.equal(sanitizeDecimalInput("."), "0.");
+  });
+  it("limits to eight decimals", () => {
+    assert.equal(sanitizeDecimalInput("1.1234567890"), "1.12345678");
+  });
+  it("passes empty through", () => {
+    assert.equal(sanitizeDecimalInput(""), "");
   });
 });

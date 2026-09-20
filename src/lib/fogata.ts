@@ -93,3 +93,18 @@ export function findMatchingOrder<
     .sort((a, b) => (side === "sell" ? b.price - a.price : a.price - b.price));
   return candidates[0]?.order ?? null;
 }
+
+/**
+ * Filters free text into a decimal amount: digits, one dot, at most eight
+ * decimals. Amount fields are plain text inputs (no spinner, no exponent
+ * notation), so this is the only thing standing between the keyboard and the
+ * amount state.
+ */
+export function sanitizeDecimalInput(raw: string): string {
+  const cleaned = raw.replace(/,/g, ".").replace(/[^0-9.]/g, "");
+  const dot = cleaned.indexOf(".");
+  if (dot === -1) return cleaned;
+  const whole = cleaned.slice(0, dot) || "0";
+  const fraction = cleaned.slice(dot + 1).replace(/\./g, "").slice(0, 8);
+  return `${whole}.${fraction}`;
+}

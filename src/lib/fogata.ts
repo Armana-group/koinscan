@@ -149,3 +149,47 @@ export function multicallValue(result: unknown): string | undefined {
   const value = (result as { value?: unknown }).value;
   return typeof value === "string" ? value : undefined;
 }
+
+export interface PriceSuggestion {
+  /** KOIN per VHP. */
+  price: number;
+  /** Which side of the book it came from: a bid (open buy) or an ask (open sell). */
+  source: "bid" | "ask";
+}
+
+/**
+ * A starting price for the order form, taken from the open book: a seller is
+ * offered the best bid, a buyer the best ask, and either falls back to the
+ * other side when its own is empty. The user's own orders never count.
+ */
+export function suggestPrice<
+  T extends { buy: boolean; owner: string; koin_amount: string; vhp_amount: string }
+>(
+  side: "buy" | "sell",
+  buyOrders: T[],
+  sellOrders: T[],
+  account: string | null
+): PriceSuggestion | null {
+  const prices = (orders: T[]) =>
+    orders
+      .filter((order) => order.owner !== account && Number(order.vhp_amount) > 0)
+      .map((order) => Number(order.koin_amount) / Number(order.vhp_amount));
+  const bids = prices(buyOrders);
+  const asks = prices(sellOrders);
+  const bestBid = bids.length ? { price: Math.max(...bids), source: "bid" as const } : null;
+  const bestAsk = asks.length ? { price: Math.min(...asks), source: "ask" as const } : null;
+  return side === "sell" ? bestBid ?? bestAsk : bestAsk ?? bestBid;
+}
+
+/**
+ * The other amount of an order at a given price: KOIN for a sale of VHP,
+ * VHP for a purchase with KOIN. Plain decimal, at most eight places.
+ */
+export function amountAtPrice(side: "buy" | "sell", payAmount: string, price: number): string {
+  const pay = Number(payAmount);
+  if (!payAmount || !Number.isFinite(pay) || pay <= 0 || !Number.isFinite(price) || price <= 0) {
+    return "";
+  }
+  const amount = side === "sell" ? pay * price : pay / price;
+  return amount.toFixed(8).replace(/\.?0+$/, "");
+}

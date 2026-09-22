@@ -9,6 +9,8 @@ import {
   summarizeFogata,
   formatCompactVhp,
   multicallValue,
+  suggestPrice,
+  amountAtPrice,
 } from "./fogata";
 
 describe("computePoolApy", () => {
@@ -182,5 +184,51 @@ describe("multicallValue", () => {
     assert.equal(multicallValue(new Error("user code cannot access system space")), undefined);
     assert.equal(multicallValue(undefined), undefined);
     assert.equal(multicallValue({}), undefined);
+  });
+});
+
+describe("suggestPrice", () => {
+  const order = (buy: boolean, koin: number, vhp: number, owner = "someone") => ({
+    id: `${buy}-${koin}-${vhp}`,
+    buy,
+    owner,
+    koin_amount: String(koin * 1e8),
+    vhp_amount: String(vhp * 1e8),
+  });
+  const buys = [order(true, 90, 100), order(true, 95, 100)];
+  const sells = [order(false, 105, 100), order(false, 100, 100)];
+
+  it("offers a seller the best open bid", () => {
+    assert.deepEqual(suggestPrice("sell", buys, sells, null), { price: 0.95, source: "bid" });
+  });
+  it("offers a buyer the best open ask", () => {
+    assert.deepEqual(suggestPrice("buy", buys, sells, null), { price: 1, source: "ask" });
+  });
+  it("falls back to the other side of the book when its own side is empty", () => {
+    assert.deepEqual(suggestPrice("sell", [], sells, null), { price: 1, source: "ask" });
+    assert.deepEqual(suggestPrice("buy", buys, [], null), { price: 0.95, source: "bid" });
+  });
+  it("ignores the user's own orders", () => {
+    const mine = [order(true, 200, 100, "me")];
+    assert.deepEqual(suggestPrice("sell", [...buys, ...mine], sells, "me"), { price: 0.95, source: "bid" });
+  });
+  it("has nothing to suggest on an empty book", () => {
+    assert.equal(suggestPrice("sell", [], [], null), null);
+  });
+});
+
+describe("amountAtPrice", () => {
+  it("multiplies a sale by the price and divides a purchase by it", () => {
+    assert.equal(amountAtPrice("sell", "420", 0.96), "403.2");
+    assert.equal(amountAtPrice("buy", "96", 0.96), "100");
+  });
+  it("keeps at most eight decimals and never uses exponent notation", () => {
+    assert.equal(amountAtPrice("sell", "1", 0.333333333333), "0.33333333");
+    assert.equal(amountAtPrice("sell", "0.0000001", 0.5), "0.00000005");
+  });
+  it("is empty for an empty or invalid amount or price", () => {
+    assert.equal(amountAtPrice("sell", "", 1), "");
+    assert.equal(amountAtPrice("sell", "abc", 1), "");
+    assert.equal(amountAtPrice("buy", "1", 0), "");
   });
 });

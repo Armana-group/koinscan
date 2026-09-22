@@ -20,6 +20,8 @@ interface AmountFieldProps {
   /** `lg` on pages, `md` inside sheets. */
   size?: "lg" | "md";
   autoFocus?: boolean;
+  /** The value was filled in for the user; shown muted until they edit it. */
+  suggested?: boolean;
 }
 
 /**
@@ -39,6 +41,7 @@ export function AmountField({
   hint,
   size = "lg",
   autoFocus,
+  suggested,
 }: AmountFieldProps) {
   return (
     <div className="border-b border-border pb-3 transition-colors focus-within:border-foreground">
@@ -68,7 +71,8 @@ export function AmountField({
           aria-label={`${label} (${unit})`}
           className={cn(
             "w-full min-w-0 bg-transparent font-semibold leading-none tracking-[-0.045em] tabular-nums outline-none placeholder:text-muted-foreground/50 disabled:opacity-60",
-            size === "lg" ? "text-[44px]" : "text-[40px]"
+            size === "lg" ? "text-[44px]" : "text-[40px]",
+            suggested && "text-muted-foreground"
           )}
           value={value}
           onChange={(event) => onChange(sanitizeDecimalInput(event.target.value))}

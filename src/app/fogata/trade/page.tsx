@@ -30,7 +30,7 @@ import {
   KOIN_VHP_DEX_CONTRACT_ID,
   VHP_CONTRACT_ID,
 } from "@/koinos/constants";
-import { findMatchingOrder, multicallValue } from "@/lib/fogata";
+import { amountAtPrice, findMatchingOrder, multicallValue, suggestPrice } from "@/lib/fogata";
 import { AmountField } from "@/components/fogata/AmountField";
 import { HowItWorks } from "@/components/fogata/HowItWorks";
 import { LineList, LineRow } from "@/components/fogata/LineRow";
@@ -305,9 +305,25 @@ export default function DexPage() {
   const [error, setError] = useState<string | null>(null);
 
   const [side, setSide] = useState<"buy" | "sell">("sell");
-  const [koinAmount, setKoinAmount] = useState("");
-  const [vhpAmount, setVhpAmount] = useState("");
+  // What the user typed. The "You get" side may be empty, in which case the
+  // effective amount below is filled from the best open order.
+  const [koinInput, setKoinInput] = useState("");
+  const [vhpInput, setVhpInput] = useState("");
   const [pool, setPool] = useState("");
+
+  const priceSuggestion = useMemo(
+    () => suggestPrice(side, buyOrders, sellOrders, account),
+    [side, buyOrders, sellOrders, account]
+  );
+  const getInput = side === "sell" ? koinInput : vhpInput;
+  const suggestedGet =
+    getInput === "" && priceSuggestion
+      ? amountAtPrice(side, side === "sell" ? vhpInput : koinInput, priceSuggestion.price)
+      : "";
+  const usingSuggestion = suggestedGet !== "";
+  // The amounts every handler reads: the suggestion stands in for an empty "You get".
+  const koinAmount = side === "sell" && usingSuggestion ? suggestedGet : koinInput;
+  const vhpAmount = side === "buy" && usingSuggestion ? suggestedGet : vhpInput;
 
   const [selectedOrder, setSelectedOrder] = useState<DexOrder | null>(null);
   const [fillAmount, setFillAmount] = useState("");
@@ -509,8 +525,8 @@ export default function DexPage() {
 
       toast.dismiss(toastId);
       toast.success("Order created");
-      setKoinAmount("");
-      setVhpAmount("");
+      setKoinInput("");
+      setVhpInput("");
       setPool("");
       await Promise.all([loadOrders(), loadBalances()]);
     } catch (err) {
@@ -729,15 +745,15 @@ export default function DexPage() {
           label={side === "sell" ? "You sell" : "You pay"}
           unit={paySymbol}
           value={payAmount}
-          onChange={(value) => (side === "sell" ? setVhpAmount(value) : setKoinAmount(value))}
+          onChange={(value) => (side === "sell" ? setVhpInput(value) : setKoinInput(value))}
           disabled={submitting}
           onMax={
             account
               ? () => {
                   if (!availablePayBalance) return;
                   const maxValue = formatAmountForInput(availablePayBalance);
-                  if (side === "sell") setVhpAmount(maxValue);
-                  else setKoinAmount(maxValue);
+                  if (side === "sell") setVhpInput(maxValue);
+                  else setKoinInput(maxValue);
                 }
               : undefined
           }
@@ -750,12 +766,17 @@ export default function DexPage() {
           label="You get"
           unit={getSymbol}
           value={getAmount}
-          onChange={(value) => (side === "sell" ? setKoinAmount(value) : setVhpAmount(value))}
+          suggested={usingSuggestion}
+          onChange={(value) => (side === "sell" ? setKoinInput(value) : setVhpInput(value))}
           disabled={submitting}
         />
       </div>
       <div className="mt-3 flex justify-between text-xs text-muted-foreground">
-        <span className="tabular-nums">{impliedPrice ? `${impliedPrice} KOIN per VHP` : " "}</span>
+        <span className="tabular-nums">
+          {impliedPrice
+            ? `${impliedPrice} KOIN per VHP${usingSuggestion ? ` · from the best open ${priceSuggestion?.source === "bid" ? "bid" : "ask"}` : ""}`
+            : " "}
+        </span>
         <span className="tabular-nums">
           {!account
             ? ""

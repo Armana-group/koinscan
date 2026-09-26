@@ -330,9 +330,15 @@ export default function FogataPage() {
             the node produces blocks and the pool pays you a share of the rewards every payout period.
           </p>
           <p>
-            KOIN you stake is converted into VHP so it can produce. Rewards arrive as KOIN — take
-            them, or let the pool convert them too. To turn VHP itself back into KOIN, use{" "}
-            <Link href="/fogata/trade" className={quietLink}>Trade</Link>.
+            KOIN you stake becomes VHP so it can produce. Producing slowly turns that VHP back into
+            KOIN, and each payout period the pool either pays it to you or burns it back into VHP to
+            keep earning. Your reward setting on the pool decides which, so set it to take KOIN and
+            your stake comes back to you over time.
+          </p>
+          <p>
+            For a quicker way out, sell VHP on{" "}
+            <Link href="/fogata/trade" className={quietLink}>Trade</Link>. Pools fill orders there
+            before they burn any KOIN.
           </p>
           <p>
             Fogata v2 pools live here on Koinscan; v1 pools remain at{" "}

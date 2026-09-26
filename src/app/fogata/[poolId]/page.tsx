@@ -1163,7 +1163,9 @@ export default function FogataPoolPage() {
               </div>
               {depositToken === "koin" && formatPayoutPeriod(poolParams.payment_period) !== "—" && (
                 <p className="mt-2 text-[13px] leading-relaxed text-muted-foreground">
-                  KOIN becomes VHP over the next {formatPayoutPeriod(poolParams.payment_period).replace(/^Every /, "")}. Rewards are paid in KOIN; to sell VHP itself, use{" "}
+                  Your KOIN is staked as VHP to produce blocks. {formatPayoutPeriod(poolParams.payment_period)} the
+                  pool pays your share in small KOIN payments, or stakes it again, depending on your reward
+                  setting. To get out faster, sell VHP on{" "}
                   <Link href="/fogata/trade" className={quietLink}>Trade</Link>.
                 </p>
               )}

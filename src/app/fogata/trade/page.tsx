@@ -703,8 +703,10 @@ export default function DexPage() {
       <h1 className={pageTitle}>Trade</h1>
       <HowItWorks>
         <p>
-          Staked VHP doesn&apos;t turn back into KOIN by itself. Post an order to sell VHP for KOIN, or
-          buy VHP with KOIN; it fills when another trader accepts it.
+          Staked VHP already turns back into KOIN over time, through your pool&apos;s payouts when your
+          reward setting takes KOIN. Trade is the quicker route: post an order to sell VHP for KOIN, or
+          buy VHP with KOIN. It fills when another trader accepts it, and pools fill orders here
+          before they burn any KOIN.
         </p>
         <p>
           If your pool allows it, you can sell straight from the pool and keep earning until the

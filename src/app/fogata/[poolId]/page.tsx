@@ -1094,7 +1094,7 @@ export default function FogataPoolPage() {
           <section className="mt-14">
             <h2 className="text-xs font-normal text-muted-foreground">About this pool</h2>
             {poolParams.description && (
-              <p className="mt-2 mb-4 line-clamp-2 text-[13px] text-muted-foreground">{poolParams.description}</p>
+              <p className="mt-2 mb-4 max-w-[60ch] whitespace-pre-line break-words text-[13px] leading-relaxed text-muted-foreground">{poolParams.description}</p>
             )}
             <LineList className={poolParams.description ? "" : "mt-2"}>
               <LineRow label="Effectiveness">

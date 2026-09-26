@@ -42,6 +42,7 @@ import {
   pageTitle,
   primaryButton,
   quietLink,
+  rowButton,
 } from "@/components/fogata/styles";
 import { cn } from "@/lib/utils";
 import * as toast from "@/lib/toast";
@@ -661,25 +662,27 @@ export default function DexPage() {
               {rows.map((order) => {
                 const isMine = order.owner === account;
                 return (
-                  <div key={order.id} className="flex items-center justify-between gap-6 border-b border-border py-3.5 text-sm">
-                    <span className={cn("min-w-0 truncate", isMine ? "text-foreground" : "text-muted-foreground")}>
-                      {isMine ? "Your " : ""}
-                      {order.buy ? "buy" : "sell"} {formatAmount(order.vhp_amount)} VHP
-                      {isMine && order.pool && <span className="text-muted-foreground"> from {getPoolLabel(order.pool)}</span>}
-                    </span>
-                    <span className="shrink-0 tabular-nums text-muted-foreground">
-                      {formatPrice(order)}
-                      <span className="mx-2 text-muted-foreground/50">·</span>
-                      {isMine ? (
-                        <button type="button" className={quietLink} onClick={() => handleCancelOrder(order)} disabled={submitting}>
-                          cancel
-                        </button>
-                      ) : (
-                        <button type="button" className={cn(quietLink, "disabled:opacity-50")} onClick={() => openFillDialog(order)} disabled={!account || submitting}>
-                          fill
-                        </button>
-                      )}
-                    </span>
+                  <div key={order.id} className="flex items-center justify-between gap-4 border-b border-border py-3 text-sm">
+                    <div className="min-w-0">
+                      <p className="truncate tabular-nums text-foreground">
+                        {isMine ? "You're " : ""}
+                        {isMine ? (order.buy ? "buying" : "selling") : order.buy ? "Buying" : "Selling"}{" "}
+                        {formatAmount(order.vhp_amount)} VHP
+                      </p>
+                      <p className="mt-0.5 truncate text-xs tabular-nums text-muted-foreground">
+                        at {formatPrice(order)} KOIN per VHP
+                        {isMine && order.pool && <> · from your stake in {getPoolLabel(order.pool)}</>}
+                      </p>
+                    </div>
+                    {isMine ? (
+                      <button type="button" className={rowButton} onClick={() => handleCancelOrder(order)} disabled={submitting}>
+                        Cancel
+                      </button>
+                    ) : (
+                      <button type="button" className={rowButton} onClick={() => openFillDialog(order)} disabled={!account || submitting}>
+                        Fill
+                      </button>
+                    )}
                   </div>
                 );
               })}
@@ -709,8 +712,8 @@ export default function DexPage() {
           before they burn any KOIN.
         </p>
         <p>
-          If your pool allows it, you can sell straight from the pool and keep earning until the
-          order fills.
+          You can sell from your wallet or straight from your stake in a pool. VHP sold from a pool
+          keeps earning until the order fills.
         </p>
       </HowItWorks>
 
@@ -774,7 +777,7 @@ export default function DexPage() {
             : balancesLoading
               ? "Loading balance…"
               : availablePayBalance !== null
-                ? `Wallet ${formatAmount(availablePayBalance)} ${availablePaySymbol}${side === "sell" && pool ? " in pool" : ""}`
+                ? `${side === "sell" && pool ? "In pool" : "Wallet"} ${formatAmount(availablePayBalance)} ${availablePaySymbol}`
                 : balancesError
                   ? (
                     <>
@@ -789,7 +792,7 @@ export default function DexPage() {
       {((side === "sell" && account && pools.length > 0) || matchingOrder) && (
         <LineList className="mt-7">
           {side === "sell" && account && pools.length > 0 && (
-            <LineRow label="From">
+            <LineRow label="Sell VHP from">
               <Select value={pool || NO_POOL_VALUE} onValueChange={(value) => setPool(value === NO_POOL_VALUE ? "" : value)} disabled={submitting || poolsLoading}>
                 <SelectTrigger id="dex-pool" className="h-auto w-auto gap-2 border-0 p-0 text-sm text-foreground shadow-none focus:ring-0">
                   <SelectValue placeholder="Your wallet" />
@@ -798,7 +801,7 @@ export default function DexPage() {
                   <SelectItem value={NO_POOL_VALUE}>Your wallet</SelectItem>
                   {pools.map((miningPool) => (
                     <SelectItem key={miningPool.account} value={miningPool.account}>
-                      {miningPool.name}
+                      Your stake in {miningPool.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -812,11 +815,18 @@ export default function DexPage() {
               onClick={() => { openFillDialog(matchingOrder); setFillAmount(side === "sell" ? vhpAmount : koinAmount); }}
             >
               <span className="tabular-nums">
-                {matchingOrder.buy ? "Sell" : "Buy"} {formatAmount(matchingOrder.vhp_amount)} VHP at {formatPrice(matchingOrder)}
+                {matchingOrder.buy ? "Sell" : "Buy"} {formatAmount(matchingOrder.vhp_amount)} VHP at {formatPrice(matchingOrder)} KOIN per VHP
               </span>
             </LineRow>
           )}
         </LineList>
+      )}
+      {side === "sell" && account && pools.length > 0 && (
+        <p className={cn(footnote, "mt-2.5")}>
+          {pool
+            ? "Sold straight from your stake. It keeps earning in the pool until the order fills."
+            : "VHP in your wallet. You can also sell from your stake in a pool and keep earning until the order fills."}
+        </p>
       )}
 
       <div className="mt-8">

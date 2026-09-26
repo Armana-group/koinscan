@@ -20,7 +20,11 @@ export const primaryButton =
 export const ghostButton =
   "inline-flex h-12 w-full items-center justify-center rounded-full border border-border px-7 text-[15px] font-semibold text-foreground transition-colors hover:bg-muted/60 disabled:opacity-40 disabled:hover:bg-transparent";
 
-/** Quiet inline action: foreground text with a faint underline, never the accent. */
+/** Row action in a list (fill, cancel): a small outlined pill, so it reads as a button. */
+export const rowButton =
+  "inline-flex h-8 shrink-0 items-center justify-center rounded-full border border-border px-3.5 text-[13px] font-medium text-foreground transition-colors hover:bg-muted/60 disabled:opacity-40 disabled:hover:bg-transparent";
+
+/** Quiet inline action:foreground text with a faint underline, never the accent. */
 export const quietLink =
   "text-foreground underline decoration-border underline-offset-[3px] transition-colors hover:decoration-foreground";
 

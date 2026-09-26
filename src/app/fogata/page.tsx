@@ -326,22 +326,47 @@ export default function FogataPage() {
         <h1 className={pageTitle}>Fogata</h1>
         <HowItWorks>
           <p>
-            Fogata pools run Koinos nodes on behalf of their stakers. Stake KOIN or VHP with a pool;
-            the node produces blocks and the pool pays you a share of the rewards every payout period.
+            Fogata pools run Koinos nodes for you. Stake KOIN with a pool and earn a share of the
+            block rewards without running a node yourself.
           </p>
+          <ol className="list-decimal space-y-1.5 pl-5 marker:text-muted-foreground">
+            <li>
+              <span className="text-foreground">Connect a Kondor wallet</span> that holds KOIN.
+            </li>
+            <li>
+              <span className="text-foreground">Pick a pool.</span> The list is sorted by estimated
+              yearly yield, after each pool&apos;s fee.
+            </li>
+            <li>
+              <span className="text-foreground">Deposit.</span> Your KOIN is staked as VHP and starts
+              producing blocks.
+            </li>
+            <li>
+              <span className="text-foreground">Get paid.</span> Every payout period the pool pays your
+              share in KOIN, or stakes it again. Your reward setting on the pool decides which.
+            </li>
+            <li>
+              <span className="text-foreground">Get your KOIN back.</span> Producing slowly turns VHP
+              back into KOIN, so with rewards set to KOIN your stake returns over time. For a quicker
+              way out, sell VHP on{" "}
+              <Link href="/fogata/trade" className={quietLink}>Trade</Link>; pools fill orders there
+              before they burn any KOIN.
+            </li>
+          </ol>
+        </HowItWorks>
+        <HowItWorks label="What's new in v2">
+          <ul className="list-disc space-y-1.5 pl-5 marker:text-muted-foreground">
+            <li>
+              A built-in order book, <Link href="/fogata/trade" className={quietLink}>Trade</Link>.
+              Pools buy VHP there when the price is good and only burn the KOIN they can&apos;t trade.
+            </li>
+            <li>You can sell VHP straight from your stake, and it keeps earning until the order fills.</li>
+            <li>No more Vapor token. The Koinos Fund System now covers what it was for.</li>
+            <li>Pools are listed automatically once their contract fingerprint is verified, with no manual approval.</li>
+            <li>One shared bot triggers payouts for every pool, so owners no longer run their own.</li>
+          </ul>
           <p>
-            KOIN you stake becomes VHP so it can produce. Producing slowly turns that VHP back into
-            KOIN, and each payout period the pool either pays it to you or burns it back into VHP to
-            keep earning. Your reward setting on the pool decides which, so set it to take KOIN and
-            your stake comes back to you over time.
-          </p>
-          <p>
-            For a quicker way out, sell VHP on{" "}
-            <Link href="/fogata/trade" className={quietLink}>Trade</Link>. Pools fill orders there
-            before they burn any KOIN.
-          </p>
-          <p>
-            Fogata v2 pools live here on Koinscan; v1 pools remain at{" "}
+            v1 pools remain at{" "}
             <a href="https://fogata.io" target="_blank" rel="noopener noreferrer" className={quietLink}>fogata.io</a>.
           </p>
         </HowItWorks>

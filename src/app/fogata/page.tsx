@@ -24,6 +24,7 @@ import { abiFogata2Pool } from "@/koinos/abis/fogata2Pool";
 import { abiPob } from "@/koinos/abis";
 import { computePoolApy, formatCompactVhp, getNetworkStaking, summarizeFogata, type NetworkStaking } from "@/lib/fogata";
 import { HowItWorks } from "@/components/fogata/HowItWorks";
+import { PoolLogo } from "@/components/fogata/PoolLogo";
 import { ShareBar } from "@/components/fogata/ShareBar";
 import { pageColumn, pageTitle, quietLink } from "@/components/fogata/styles";
 import * as toast from "@/lib/toast";
@@ -451,21 +452,7 @@ export default function FogataPage() {
               .map(({ pool, apy }) => (
                 <li key={pool.account} className="border-b border-border">
                   <Link href={`/fogata/${pool.account}`} className={listRow}>
-                    <span className="relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-muted text-sm font-semibold text-muted-foreground">
-                      {(pool.name || "P").charAt(0).toUpperCase()}
-                      {pool.image && (
-                        /* Pool logo hosts are arbitrary on-chain URLs */
-                        /* eslint-disable-next-line @next/next/no-img-element */
-                        <img
-                          src={pool.image}
-                          alt=""
-                          className="absolute inset-0 h-full w-full bg-background object-contain"
-                          onError={(event) => {
-                            event.currentTarget.style.display = "none";
-                          }}
-                        />
-                      )}
-                    </span>
+                    <PoolLogo name={pool.name} image={pool.image} size={40} className="h-10 w-10 rounded-xl text-sm" />
                     <span className="min-w-0 flex-1 truncate text-[15px] font-medium">
                       {pool.name || "Unnamed pool"}
                     </span>
@@ -536,6 +523,7 @@ export default function FogataPage() {
                 onChange={(event) => setPoolImage(event.target.value)}
                 disabled={creating}
               />
+              <p className="text-xs text-muted-foreground">Any https image: PNG, JPEG, WebP or GIF. SVG isn&apos;t supported.</p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="new-pool-description">Description</Label>

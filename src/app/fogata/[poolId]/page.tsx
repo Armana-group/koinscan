@@ -41,6 +41,7 @@ import { cn } from "@/lib/utils";
 import { computePoolApy, estimateEarnings, formatAmountForInput, formatKoinEstimate, formatPayoutPeriod, getNetworkApy, poolHealth, sanitizeDecimalInput } from "@/lib/fogata";
 import { AmountField } from "@/components/fogata/AmountField";
 import { LineList, LineRow } from "@/components/fogata/LineRow";
+import { PoolLogo } from "@/components/fogata/PoolLogo";
 import { WordTabs } from "@/components/fogata/WordTabs";
 import {
   backLink,
@@ -991,21 +992,7 @@ export default function FogataPoolPage() {
       {!loading && !error && poolParams && (
         <>
           <header className="flex items-center gap-4">
-            <span className="relative flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-[13px] bg-muted text-base font-semibold text-muted-foreground">
-              {(poolParams.name || "P").charAt(0).toUpperCase()}
-              {poolParams.image && (
-                /* Pool logo hosts are arbitrary on-chain URLs */
-                /* eslint-disable-next-line @next/next/no-img-element */
-                <img
-                  src={poolParams.image}
-                  alt=""
-                  className="absolute inset-0 h-full w-full bg-background object-contain"
-                  onError={(event) => {
-                    event.currentTarget.style.display = "none";
-                  }}
-                />
-              )}
-            </span>
+            <PoolLogo name={poolParams.name} image={poolParams.image} size={44} className="h-11 w-11 rounded-[13px] text-base" />
             <div className="min-w-0">
               <h1 className="flex items-center gap-2.5 text-[22px] font-semibold leading-tight tracking-[-0.02em]">
                 <span className="truncate">{poolParams.name || "Unnamed pool"}</span>
@@ -1431,6 +1418,7 @@ export default function FogataPoolPage() {
                           onChange={(event) => setPoolImage(event.target.value)}
                           disabled={submitting}
                         />
+                        <p className={footnote}>Any https image: PNG, JPEG, WebP or GIF. SVG isn&apos;t supported.</p>
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="pool-description">Description</Label>

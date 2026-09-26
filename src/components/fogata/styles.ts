@@ -5,8 +5,15 @@
  * the title and the two button shapes.
  */
 
-/** One column for every Fogata page; wide enough for a 56px number. */
-export const pageColumn = "mx-auto w-full max-w-[520px] px-5 py-10";
+/**
+ * The page frame for every Fogata page: one column wide enough for a 56px
+ * number on phones; from 1024px it widens so a page can split into two
+ * columns (splitColumns) or show a table.
+ */
+export const pageWide = "mx-auto w-full max-w-[520px] px-5 py-10 lg:max-w-[1080px]";
+
+/** Two top-aligned columns from 1024px; a single stack below. */
+export const splitColumns = "lg:grid lg:grid-cols-2 lg:items-start lg:gap-x-16";
 
 export const pageTitle = "text-[34px] font-semibold leading-none tracking-[-0.03em]";
 

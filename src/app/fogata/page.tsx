@@ -22,12 +22,28 @@ import { abiFogata2ListPools } from "@/koinos/abis/fogata2ListPools";
 import { useEffect, useState } from "react";
 import { abiFogata2Pool } from "@/koinos/abis/fogata2Pool";
 import { abiPob } from "@/koinos/abis";
-import { computePoolApy, formatCompactVhp, getNetworkStaking, summarizeFogata, type NetworkStaking } from "@/lib/fogata";
+import { cn } from "@/lib/utils";
+import { computePoolApy, formatCompactVhp, formatPayoutPeriod, getNetworkStaking, summarizeFogata, type NetworkStaking } from "@/lib/fogata";
 import { HowItWorks } from "@/components/fogata/HowItWorks";
 import { PoolLogo } from "@/components/fogata/PoolLogo";
 import { ShareBar } from "@/components/fogata/ShareBar";
-import { pageColumn, pageTitle, quietLink } from "@/components/fogata/styles";
+import { pageTitle, pageWide, quietLink } from "@/components/fogata/styles";
 import * as toast from "@/lib/toast";
+
+/** A desktop-only table column on the pool list. */
+const poolColumn = "w-28 shrink-0 text-right text-sm tabular-nums text-muted-foreground";
+
+function formatFee(beneficiaries: { percentage: number }[]): string {
+  const percent = beneficiaries.reduce((sum, b) => sum + b.percentage, 0) / 1000;
+  return `${percent}%`;
+}
+
+/** "4 days", "1 day", or "—": the payout period without its "Every". */
+function formatPayoutEvery(paymentPeriodMs: string): string {
+  const period = formatPayoutPeriod(paymentPeriodMs);
+  if (period === "Every day") return "1 day";
+  return period.replace(/^Every /, "");
+}
 
 const listRow =
   "-mx-3 flex items-center gap-4 rounded-xl px-3 py-[18px] transition-colors hover:bg-muted/50";
@@ -322,7 +338,7 @@ export default function FogataPage() {
   const summary = summarizeFogata(pools.map((pool) => pool.vhp), network?.vhpProducing);
 
   return (
-    <div className={pageColumn}>
+    <div className={pageWide}>
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <h1 className={pageTitle}>Fogata</h1>
         <HowItWorks>
@@ -440,6 +456,15 @@ export default function FogataPage() {
 
         {!loading && !error && pools.length > 0 && (
           <ul>
+            <li aria-hidden className="hidden items-center gap-4 border-b border-border py-2.5 text-xs text-muted-foreground lg:flex">
+              <span className="w-10 shrink-0" />
+              <span className="flex-1">Pool</span>
+              <span className={poolColumn}>Fee</span>
+              <span className={poolColumn}>Payout every</span>
+              <span className={poolColumn}>Staked</span>
+              <span className="w-24 text-right">Yield</span>
+              <span className="w-4" />
+            </li>
             {[...pools]
               .map((pool) => ({
                 pool,
@@ -456,7 +481,12 @@ export default function FogataPage() {
                     <span className="min-w-0 flex-1 truncate text-[15px] font-medium">
                       {pool.name || "Unnamed pool"}
                     </span>
-                    <span className="text-xl font-semibold tracking-[-0.02em] tabular-nums">
+                    <span className={cn(poolColumn, "hidden lg:block")}>{formatFee(pool.beneficiaries)}</span>
+                    <span className={cn(poolColumn, "hidden lg:block")}>{formatPayoutEvery(pool.payment_period)}</span>
+                    <span className={cn(poolColumn, "hidden lg:block")}>
+                      {pool.vhp !== undefined ? `${formatCompactVhp(pool.vhp)} VHP` : "—"}
+                    </span>
+                    <span className="text-xl font-semibold tracking-[-0.02em] tabular-nums lg:w-24 lg:text-right">
                       {apy !== null ? (
                         <>
                           {apy.toFixed(1)}

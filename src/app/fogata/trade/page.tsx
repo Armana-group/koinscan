@@ -38,13 +38,15 @@ import { WordTabs } from "@/components/fogata/WordTabs";
 import {
   backLink,
   footnote,
-  pageColumn,
+  pageWide,
   pageTitle,
   primaryButton,
   quietLink,
   rowButton,
+  splitColumns,
 } from "@/components/fogata/styles";
 import { cn } from "@/lib/utils";
+import { useMediaQuery } from "@/hooks/useMediaQuery";
 import * as toast from "@/lib/toast";
 
 const DECIMALS = 8;
@@ -630,6 +632,9 @@ export default function DexPage() {
     }
   };
 
+  // On desktop the order book sits in its own column, always open.
+  const wide = useMediaQuery("(min-width: 1024px)");
+
   const getPoolLabel = (poolAddress: string) => {
     if (!poolAddress) return "—";
     const match = pools.find((miningPool) => miningPool.account === poolAddress);
@@ -644,15 +649,20 @@ export default function DexPage() {
     return (
       <>
         {error && (
-          <p className="mt-10 text-sm text-muted-foreground">
+          <p className="mt-10 text-sm text-muted-foreground lg:mt-0">
             Couldn&apos;t load orders.{" "}
             <button type="button" className={quietLink} onClick={loadOrders}>Retry</button>
           </p>
         )}
-        <details className={cn("border-t border-border", error ? "mt-3" : "mt-10")}>
-          <summary className="flex cursor-pointer list-none items-center justify-between border-b border-border py-3.5 text-sm text-muted-foreground hover:text-foreground [&::-webkit-details-marker]:hidden">
+        <details open={wide || undefined} className={cn("border-t border-border", error ? "mt-3" : "mt-10 lg:mt-0")}>
+          <summary
+            className="flex cursor-pointer list-none items-center justify-between border-b border-border py-3.5 text-sm text-muted-foreground hover:text-foreground lg:cursor-default lg:hover:text-muted-foreground [&::-webkit-details-marker]:hidden"
+            onClick={(event) => {
+              if (wide) event.preventDefault();
+            }}
+          >
             <span>Open orders</span>
-            <span className="tabular-nums">{loading ? "…" : rows.length} ›</span>
+            <span className="tabular-nums">{loading ? "…" : rows.length}<span className="lg:hidden"> ›</span></span>
           </summary>
           {!error && rows.length === 0 && !loading && (
             <p className="py-3.5 text-sm text-muted-foreground">No open orders.</p>
@@ -699,148 +709,152 @@ export default function DexPage() {
   const getSymbol = side === "sell" ? "KOIN" : "VHP";
 
   return (
-    <div className={pageColumn}>
-      <Link href="/fogata" className={backLink}>
-        ‹ Fogata
-      </Link>
-      <h1 className={pageTitle}>Trade</h1>
-      <HowItWorks>
-        <p>
-          Staked VHP already turns back into KOIN over time, through your pool&apos;s payouts when your
-          reward setting takes KOIN. Trade is the quicker route: post an order to sell VHP for KOIN, or
-          buy VHP with KOIN. It fills when another trader accepts it, and pools fill orders here
-          before they burn any KOIN.
-        </p>
-        <p>
-          You can sell from your wallet or straight from your stake in a pool. VHP sold from a pool
-          keeps earning until the order fills.
-        </p>
-      </HowItWorks>
+    <div className={pageWide}>
+      <div className={splitColumns}>
+        <div>
+          <Link href="/fogata" className={backLink}>
+            ‹ Fogata
+          </Link>
+          <h1 className={pageTitle}>Trade</h1>
+          <HowItWorks>
+            <p>
+              Staked VHP already turns back into KOIN over time, through your pool&apos;s payouts when your
+              reward setting takes KOIN. Trade is the quicker route: post an order to sell VHP for KOIN, or
+              buy VHP with KOIN. It fills when another trader accepts it, and pools fill orders here
+              before they burn any KOIN.
+            </p>
+            <p>
+              You can sell from your wallet or straight from your stake in a pool. VHP sold from a pool
+              keeps earning until the order fills.
+            </p>
+          </HowItWorks>
 
-      <div className="mt-7">
-        <WordTabs
-          ariaLabel="Order side"
-          value={side}
-          disabled={submitting}
-          options={[
-            { value: "sell", label: "Sell VHP" },
-            { value: "buy", label: "Buy VHP" },
-          ]}
-          onChange={(next) => {
-            setSide(next);
-            if (next === "buy") setPool("");
-          }}
-        />
-      </div>
+          <div className="mt-7">
+            <WordTabs
+              ariaLabel="Order side"
+              value={side}
+              disabled={submitting}
+              options={[
+                { value: "sell", label: "Sell VHP" },
+                { value: "buy", label: "Buy VHP" },
+              ]}
+              onChange={(next) => {
+                setSide(next);
+                if (next === "buy") setPool("");
+              }}
+            />
+          </div>
 
-      <div className="mt-8">
-        <AmountField
-          id="dex-pay-amount"
-          label={side === "sell" ? "You sell" : "You pay"}
-          unit={paySymbol}
-          value={payAmount}
-          onChange={(value) => (side === "sell" ? setVhpInput(value) : setKoinInput(value))}
-          disabled={submitting}
-          onMax={
-            account
-              ? () => {
-                  if (!availablePayBalance) return;
-                  const maxValue = formatAmountForInput(availablePayBalance);
-                  if (side === "sell") setVhpInput(maxValue);
-                  else setKoinInput(maxValue);
-                }
-              : undefined
-          }
-          maxDisabled={!availablePayBalance || balancesLoading || BigInt(availablePayBalance || "0") <= BigInt(0)}
-        />
-      </div>
-      <div className="mt-5">
-        <AmountField
-          id="dex-get-amount"
-          label="You get"
-          unit={getSymbol}
-          value={getAmount}
-          suggested={usingSuggestion}
-          onChange={(value) => (side === "sell" ? setKoinInput(value) : setVhpInput(value))}
-          disabled={submitting}
-        />
-      </div>
-      <div className="mt-3 flex justify-between text-xs text-muted-foreground">
-        <span className="tabular-nums">
-          {impliedPrice
-            ? `${impliedPrice} KOIN per VHP${usingSuggestion ? ` · from the best open ${priceSuggestion?.source === "bid" ? "bid" : "ask"}` : ""}`
-            : " "}
-        </span>
-        <span className="tabular-nums">
-          {!account
-            ? ""
-            : balancesLoading
-              ? "Loading balance…"
-              : availablePayBalance !== null
-                ? `${side === "sell" && pool ? "In pool" : "Wallet"} ${formatAmount(availablePayBalance)} ${availablePaySymbol}`
-                : balancesError
-                  ? (
-                    <>
-                      Couldn&apos;t read your balance.{" "}
-                      <button type="button" className={quietLink} onClick={loadBalances}>Retry</button>
-                    </>
-                  )
-                  : ""}
-        </span>
-      </div>
+          <div className="mt-8">
+            <AmountField
+              id="dex-pay-amount"
+              label={side === "sell" ? "You sell" : "You pay"}
+              unit={paySymbol}
+              value={payAmount}
+              onChange={(value) => (side === "sell" ? setVhpInput(value) : setKoinInput(value))}
+              disabled={submitting}
+              onMax={
+                account
+                  ? () => {
+                      if (!availablePayBalance) return;
+                      const maxValue = formatAmountForInput(availablePayBalance);
+                      if (side === "sell") setVhpInput(maxValue);
+                      else setKoinInput(maxValue);
+                    }
+                  : undefined
+              }
+              maxDisabled={!availablePayBalance || balancesLoading || BigInt(availablePayBalance || "0") <= BigInt(0)}
+            />
+          </div>
+          <div className="mt-5">
+            <AmountField
+              id="dex-get-amount"
+              label="You get"
+              unit={getSymbol}
+              value={getAmount}
+              suggested={usingSuggestion}
+              onChange={(value) => (side === "sell" ? setKoinInput(value) : setVhpInput(value))}
+              disabled={submitting}
+            />
+          </div>
+          <div className="mt-3 flex justify-between text-xs text-muted-foreground">
+            <span className="tabular-nums">
+              {impliedPrice
+                ? `${impliedPrice} KOIN per VHP${usingSuggestion ? ` · from the best open ${priceSuggestion?.source === "bid" ? "bid" : "ask"}` : ""}`
+                : " "}
+            </span>
+            <span className="tabular-nums">
+              {!account
+                ? ""
+                : balancesLoading
+                  ? "Loading balance…"
+                  : availablePayBalance !== null
+                    ? `${side === "sell" && pool ? "In pool" : "Wallet"} ${formatAmount(availablePayBalance)} ${availablePaySymbol}`
+                    : balancesError
+                      ? (
+                        <>
+                          Couldn&apos;t read your balance.{" "}
+                          <button type="button" className={quietLink} onClick={loadBalances}>Retry</button>
+                        </>
+                      )
+                      : ""}
+            </span>
+          </div>
 
-      {((side === "sell" && account && pools.length > 0) || matchingOrder) && (
-        <LineList className="mt-7">
+          {((side === "sell" && account && pools.length > 0) || matchingOrder) && (
+            <LineList className="mt-7">
+              {side === "sell" && account && pools.length > 0 && (
+                <LineRow label="Sell VHP from">
+                  <Select value={pool || NO_POOL_VALUE} onValueChange={(value) => setPool(value === NO_POOL_VALUE ? "" : value)} disabled={submitting || poolsLoading}>
+                    <SelectTrigger id="dex-pool" className="h-auto w-auto gap-2 border-0 p-0 text-sm text-foreground shadow-none focus:ring-0">
+                      <SelectValue placeholder="Your wallet" />
+                    </SelectTrigger>
+                    <SelectContent align="end">
+                      <SelectItem value={NO_POOL_VALUE}>Your wallet</SelectItem>
+                      {pools.map((miningPool) => (
+                        <SelectItem key={miningPool.account} value={miningPool.account}>
+                          Your stake in {miningPool.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </LineRow>
+              )}
+              {matchingOrder && (
+                <LineRow
+                  label="Matching order"
+                  disabled={!account || submitting}
+                  onClick={() => { openFillDialog(matchingOrder); setFillAmount(side === "sell" ? vhpAmount : koinAmount); }}
+                >
+                  <span className="tabular-nums">
+                    {matchingOrder.buy ? "Sell" : "Buy"} {formatAmount(matchingOrder.vhp_amount)} VHP at {formatPrice(matchingOrder)} KOIN per VHP
+                  </span>
+                </LineRow>
+              )}
+            </LineList>
+          )}
           {side === "sell" && account && pools.length > 0 && (
-            <LineRow label="Sell VHP from">
-              <Select value={pool || NO_POOL_VALUE} onValueChange={(value) => setPool(value === NO_POOL_VALUE ? "" : value)} disabled={submitting || poolsLoading}>
-                <SelectTrigger id="dex-pool" className="h-auto w-auto gap-2 border-0 p-0 text-sm text-foreground shadow-none focus:ring-0">
-                  <SelectValue placeholder="Your wallet" />
-                </SelectTrigger>
-                <SelectContent align="end">
-                  <SelectItem value={NO_POOL_VALUE}>Your wallet</SelectItem>
-                  {pools.map((miningPool) => (
-                    <SelectItem key={miningPool.account} value={miningPool.account}>
-                      Your stake in {miningPool.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </LineRow>
+            <p className={cn(footnote, "mt-2.5")}>
+              {pool
+                ? "Sold straight from your stake. It keeps earning in the pool until the order fills."
+                : "VHP in your wallet. You can also sell from your stake in a pool and keep earning until the order fills."}
+            </p>
           )}
-          {matchingOrder && (
-            <LineRow
-              label="Matching order"
-              disabled={!account || submitting}
-              onClick={() => { openFillDialog(matchingOrder); setFillAmount(side === "sell" ? vhpAmount : koinAmount); }}
-            >
-              <span className="tabular-nums">
-                {matchingOrder.buy ? "Sell" : "Buy"} {formatAmount(matchingOrder.vhp_amount)} VHP at {formatPrice(matchingOrder)} KOIN per VHP
-              </span>
-            </LineRow>
-          )}
-        </LineList>
-      )}
-      {side === "sell" && account && pools.length > 0 && (
-        <p className={cn(footnote, "mt-2.5")}>
-          {pool
-            ? "Sold straight from your stake. It keeps earning in the pool until the order fills."
-            : "VHP in your wallet. You can also sell from your stake in a pool and keep earning until the order fills."}
-        </p>
-      )}
 
-      <div className="mt-8">
-        {account ? (
-          <button type="button" className={primaryButton} onClick={handleCreateOrder} disabled={submitting}>
-            {submitting ? "Submitting…" : "Place order"}
-          </button>
-        ) : (
-          <WalletButton connectLabel="Connect wallet" connectClassName={primaryButton} />
-        )}
+          <div className="mt-8">
+            {account ? (
+              <button type="button" className={primaryButton} onClick={handleCreateOrder} disabled={submitting}>
+                {submitting ? "Submitting…" : "Place order"}
+              </button>
+            ) : (
+              <WalletButton connectLabel="Connect wallet" connectClassName={primaryButton} />
+            )}
+          </div>
+          <p className={cn(footnote, "mt-3 text-center")}>Waits for a taker. Cancel any time.</p>
+        </div>
+
+        <div>{renderBook()}</div>
       </div>
-      <p className={cn(footnote, "mt-3 text-center")}>Waits for a taker. Cancel any time.</p>
-
-      {renderBook()}
 
 
       <Dialog

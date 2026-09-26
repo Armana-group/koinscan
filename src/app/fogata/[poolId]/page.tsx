@@ -192,7 +192,7 @@ export default function FogataPoolPage() {
   const [poolBalance, setPoolBalance] = useState<PoolBalance | null>(null);
   const [preferences, setPreferences] = useState<CollectKoinPreferences | null>(null);
   const [poolOwner, setPoolOwner] = useState<string | null>(null);
-  const [reservedKoin, setReservedKoin] = useState("0");
+  const [reservedKoin, setReservedKoin] = useState<string | null>(null);
   const [registeredPublicKey, setRegisteredPublicKey] = useState("");
   const [performance, setPerformance] = useState<PoolPerformance>({});
   const [nextPayment, setNextPayment] = useState<Date | null>(null);
@@ -375,7 +375,7 @@ export default function FogataPoolPage() {
       setPoolParams(paramsResult);
       setPoolOwner(ownerResult.value ?? null);
       setReservedKoin(
-        isMulticallError(reservedResult) ? "0" : (reservedResult.value ?? "0")
+        isMulticallError(reservedResult) ? null : (reservedResult.value ?? "0")
       );
       setRegisteredPublicKey(publicKeyResponse?.result?.value ?? "");
       setPoolName(paramsResult.name ?? "");
@@ -815,7 +815,11 @@ export default function FogataPoolPage() {
       toast.error("Enter a KOIN amount");
       return;
     }
-    if (action === "remove" && BigInt(amount) > BigInt(reservedKoin)) {
+    if (action === "remove" && reservedKoin === null) {
+      toast.error("Couldn't read the pool's reserved KOIN. Reload and try again.");
+      return;
+    }
+    if (action === "remove" && reservedKoin !== null && BigInt(amount) > BigInt(reservedKoin)) {
       toast.error("Amount exceeds the pool's reserved KOIN");
       return;
     }
@@ -1011,7 +1015,7 @@ export default function FogataPoolPage() {
                     <button
                       type="button"
                       className={quietLink}
-                      onClick={() => setManageOpen((open) => !open)}
+                      onClick={() => setManageOpen(true)}
                     >
                       Manage
                     </button>
@@ -1106,15 +1110,43 @@ export default function FogataPoolPage() {
                   {performance.expectedTimeToProduce !== undefined && <span className="ml-2 text-muted-foreground">expected {formatDuration(performance.expectedTimeToProduce)}</span>}
                 </span>
               </LineRow>
+              {performance.lastBlockHeight !== undefined ? (
+                <LineRow label="Last block" href={`/blocks/${performance.lastBlockHeight}`}>
+                  <span className="tabular-nums">
+                    #{performance.lastBlockHeight}
+                    {performance.lastBlockTime && <span className="text-muted-foreground"> · {formatTimeAgo(performance.lastBlockTime)}</span>}
+                  </span>
+                </LineRow>
+              ) : (
+                <LineRow label="Last block">—</LineRow>
+              )}
               <LineRow label="Staked in pool"><span className="tabular-nums">{formatTokenAmount(performance.vhpAmount, "VHP")}</span></LineRow>
               <LineRow label="Fee"><span className="tabular-nums">{feePercent}%</span></LineRow>
               <LineRow label="Payout">{formatPayoutPeriod(poolParams.payment_period)}</LineRow>
+              <LineRow label="Next payout">{nextPayment ? formatTimeAgo(nextPayment) : "—"}</LineRow>
               <LineRow label="Address" href={`/address/${poolId}`}>
                 <span className="font-mono text-xs">{poolId.slice(0, 8)}…{poolId.slice(-6)}</span>
               </LineRow>
               <LineRow label="Contract" href={`/contracts/${poolId}`}>Fogata Pool v2</LineRow>
               <LineRow label="Trade" href="/fogata/trade">Sell VHP for KOIN</LineRow>
             </LineList>
+          </section>
+
+          <section className="mt-10">
+            <h2 className="text-xs font-normal text-muted-foreground">Pool account</h2>
+            <LineList className="mt-2">
+              <LineRow label="KOIN balance"><span className="tabular-nums">{formatTokenAmount(performance.koinAmount, "KOIN")}</span></LineRow>
+              <LineRow label="Mana">
+                <span className="tabular-nums">{performance.manaPercentage !== undefined ? `${performance.manaPercentage.toFixed(1)}%` : "—"}</span>
+              </LineRow>
+              <LineRow label="Reserved KOIN">
+                <span className="tabular-nums">{reservedKoin !== null ? formatTokenAmount(Number(reservedKoin) / SCALE, "KOIN") : "—"}</span>
+              </LineRow>
+            </LineList>
+            <p className={cn(footnote, "mt-2.5")}>
+              Withdrawals use the pool&apos;s mana. If mana is low a withdrawal can fail; mana recovers
+              over time, so try again later.
+            </p>
           </section>
 
           <Dialog open={sheet === "deposit"} onOpenChange={(open) => { if (!open && !submitting) setSheet(null); }}>
@@ -1343,303 +1375,289 @@ export default function FogataPoolPage() {
             </DialogContent>
           </Dialog>
 
-          {isOwner && manageOpen && (
-            <section id="manage" className="mt-14 space-y-10">
-              <div>
-                <h2 className="text-xs font-normal text-muted-foreground">Manage pool</h2>
-                <LineList className="mt-2">
-                  <LineRow label="Liquid KOIN"><span className="tabular-nums">{formatTokenAmount(performance.koinAmount, "KOIN")}</span></LineRow>
-                  <LineRow label="Mana">
-                    <span className="tabular-nums">{performance.manaPercentage !== undefined ? `${performance.manaPercentage.toFixed(1)}%` : "—"}</span>
-                  </LineRow>
-                  {performance.lastBlockHeight !== undefined ? (
-                    <LineRow label="Last block" href={`/blocks/${performance.lastBlockHeight}`}>
-                      <span className="tabular-nums">
-                        #{performance.lastBlockHeight}
-                        {performance.lastBlockTime && <span className="text-muted-foreground"> · {formatTimeAgo(performance.lastBlockTime)}</span>}
-                      </span>
-                    </LineRow>
-                  ) : (
-                    <LineRow label="Last block">—</LineRow>
-                  )}
-                  <LineRow label="Next snapshot">{nextPayment ? formatTimeAgo(nextPayment) : "—"}</LineRow>
-                  <LineRow label="Reserved KOIN"><span className="tabular-nums">{formatAmount(reservedKoin)} KOIN</span></LineRow>
-                </LineList>
-              </div>
-
-              <section className="border-t border-border pt-5">
-                <h3 className="text-base font-semibold tracking-[-0.01em]">Pool parameters</h3>
-                <p className={cn(footnote, "mt-1")}>
-                  Update the public details, beneficiaries, and reburn
-                  period using the pool&apos;s set_pool_params function.
-                </p>
-                <div className="mt-5 space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="pool-name">Name</Label>
-                    <Input
-                      id="pool-name"
-                      value={poolName}
-                      onChange={(event) => setPoolName(event.target.value)}
-                      disabled={submitting}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="pool-image">Image URL</Label>
-                    <Input
-                      id="pool-image"
-                      type="url"
-                      value={poolImage}
-                      onChange={(event) => setPoolImage(event.target.value)}
-                      disabled={submitting}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="pool-description">Description</Label>
-                    <textarea
-                      id="pool-description"
-                      value={poolDescription}
-                      onChange={(event) =>
-                        setPoolDescription(event.target.value)
-                      }
-                      disabled={submitting}
-                      rows={4}
-                      className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="reburn-period">Reburn period (days)</Label>
-                    <Input
-                      id="reburn-period"
-                      type="text"
-                      inputMode="decimal"
-                      value={reburnPeriodDays}
-                      onChange={(event) =>
-                        setReburnPeriodDays(event.target.value)
-                      }
-                      disabled={submitting}
-                    />
-                  </div>
-
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between gap-3">
-                      <Label>Beneficiaries</Label>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() =>
-                          setBeneficiaries((current) => [
-                            ...current,
-                            { address: "", percentage: 0 },
-                          ])
-                        }
-                        disabled={submitting}
-                      >
-                        <Plus className="mr-2 h-4 w-4" />
-                        Add
-                      </Button>
-                    </div>
-                    {beneficiaries.length === 0 && (
-                      <p className="text-sm text-muted-foreground">
-                        No beneficiaries configured.
-                      </p>
-                    )}
-                    {beneficiaries.map((beneficiary, index) => (
-                      <div
-                        key={index}
-                        className="grid gap-2 rounded-md border p-3 sm:grid-cols-[1fr_8rem_auto]"
-                      >
+          {isOwner && (
+            <Dialog open={manageOpen} onOpenChange={(open) => { if (!open && !submitting) setManageOpen(false); }}>
+              <DialogContent className="max-h-[85vh] overflow-y-auto rounded-[22px] p-7 sm:max-w-[520px]">
+                <DialogHeader>
+                  <DialogTitle className="text-xl tracking-[-0.02em]">Manage {poolParams.name || "this pool"}</DialogTitle>
+                  <DialogDescription>Only the pool owner sees these settings.</DialogDescription>
+                </DialogHeader>
+                <div className="space-y-10">
+                  <section className="border-t border-border pt-5">
+                    <h3 className="text-base font-semibold tracking-[-0.01em]">Pool parameters</h3>
+                    <p className={cn(footnote, "mt-1")}>
+                      Update the public details, beneficiaries, and reburn
+                      period using the pool&apos;s set_pool_params function.
+                    </p>
+                    <div className="mt-5 space-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="pool-name">Name</Label>
                         <Input
-                          aria-label={`Beneficiary ${index + 1} address`}
-                          placeholder="Beneficiary address"
-                          value={beneficiary.address}
-                          onChange={(event) =>
-                            setBeneficiaries((current) =>
-                              current.map((item, itemIndex) =>
-                                itemIndex === index
-                                  ? { ...item, address: event.target.value }
-                                  : item
-                              )
-                            )
-                          }
+                          id="pool-name"
+                          value={poolName}
+                          onChange={(event) => setPoolName(event.target.value)}
                           disabled={submitting}
                         />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="pool-image">Image URL</Label>
                         <Input
-                          aria-label={`Beneficiary ${index + 1} percentage`}
+                          id="pool-image"
+                          type="url"
+                          value={poolImage}
+                          onChange={(event) => setPoolImage(event.target.value)}
+                          disabled={submitting}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="pool-description">Description</Label>
+                        <textarea
+                          id="pool-description"
+                          value={poolDescription}
+                          onChange={(event) =>
+                            setPoolDescription(event.target.value)
+                          }
+                          disabled={submitting}
+                          rows={4}
+                          className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="reburn-period">Reburn period (days)</Label>
+                        <Input
+                          id="reburn-period"
                           type="text"
                           inputMode="decimal"
-                          placeholder="%"
-                          value={beneficiary.percentage / 1000}
+                          value={reburnPeriodDays}
                           onChange={(event) =>
-                            setBeneficiaries((current) =>
-                              current.map((item, itemIndex) =>
-                                itemIndex === index
-                                  ? {
-                                      ...item,
-                                      percentage: Math.round(
-                                        Number(event.target.value) * 1000
-                                      ),
-                                    }
-                                  : item
-                              )
-                            )
+                            setReburnPeriodDays(event.target.value)
                           }
                           disabled={submitting}
                         />
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          aria-label={`Remove beneficiary ${index + 1}`}
-                          onClick={() =>
-                            setBeneficiaries((current) =>
-                              current.filter(
-                                (_, itemIndex) => itemIndex !== index
-                              )
-                            )
+                      </div>
+
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between gap-3">
+                          <Label>Beneficiaries</Label>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() =>
+                              setBeneficiaries((current) => [
+                                ...current,
+                                { address: "", percentage: 0 },
+                              ])
+                            }
+                            disabled={submitting}
+                          >
+                            <Plus className="mr-2 h-4 w-4" />
+                            Add
+                          </Button>
+                        </div>
+                        {beneficiaries.length === 0 && (
+                          <p className="text-sm text-muted-foreground">
+                            No beneficiaries configured.
+                          </p>
+                        )}
+                        {beneficiaries.map((beneficiary, index) => (
+                          <div
+                            key={index}
+                            className="grid gap-2 rounded-md border p-3 sm:grid-cols-[1fr_8rem_auto]"
+                          >
+                            <Input
+                              aria-label={`Beneficiary ${index + 1} address`}
+                              placeholder="Beneficiary address"
+                              value={beneficiary.address}
+                              onChange={(event) =>
+                                setBeneficiaries((current) =>
+                                  current.map((item, itemIndex) =>
+                                    itemIndex === index
+                                      ? { ...item, address: event.target.value }
+                                      : item
+                                  )
+                                )
+                              }
+                              disabled={submitting}
+                            />
+                            <Input
+                              aria-label={`Beneficiary ${index + 1} percentage`}
+                              type="text"
+                              inputMode="decimal"
+                              placeholder="%"
+                              value={beneficiary.percentage / 1000}
+                              onChange={(event) =>
+                                setBeneficiaries((current) =>
+                                  current.map((item, itemIndex) =>
+                                    itemIndex === index
+                                      ? {
+                                          ...item,
+                                          percentage: Math.round(
+                                            Number(event.target.value) * 1000
+                                          ),
+                                        }
+                                      : item
+                                  )
+                                )
+                              }
+                              disabled={submitting}
+                            />
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              aria-label={`Remove beneficiary ${index + 1}`}
+                              onClick={() =>
+                                setBeneficiaries((current) =>
+                                  current.filter(
+                                    (_, itemIndex) => itemIndex !== index
+                                  )
+                                )
+                              }
+                              disabled={submitting}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ))}
+                        <p className="text-xs text-muted-foreground">
+                          Total beneficiary share:{" "}
+                          {beneficiaries.reduce(
+                            (sum, beneficiary) =>
+                              sum + beneficiary.percentage,
+                            0
+                          ) / 1000}
+                          %
+                        </p>
+                      </div>
+
+                      <button
+                        type="button"
+                        className={primaryButton}
+                        onClick={handleSavePoolParams}
+                        disabled={submitting}
+                      >
+                        {submitting ? "Saving…" : "Save pool parameters"}
+                      </button>
+                    </div>
+                  </section>
+
+                  <section className="border-t border-border pt-5">
+                    <h3 className="text-base font-semibold tracking-[-0.01em]">Reserved KOIN</h3>
+                    <p className={cn(footnote, "mt-1")}>
+                      Reserved KOIN provides mana for operating the pool and is
+                      not burned. Lower reburn periods require more frequent
+                      operations, so more reserved KOIN is recommended. As a
+                      base reference, use about 2,000 KOIN for a 4-day reburn
+                      period.
+                    </p>
+                    <div className="mt-5 space-y-4">
+                      <p className="text-sm">
+                        <span className="text-muted-foreground">
+                          Currently reserved:{" "}
+                        </span>
+                        {reservedKoin !== null ? `${formatAmount(reservedKoin)} KOIN` : "—"}
+                      </p>
+                      <div className="space-y-2">
+                        <Label htmlFor="reserved-koin-amount">KOIN amount</Label>
+                        <Input
+                          id="reserved-koin-amount"
+                          type="text"
+                          inputMode="decimal"
+                          placeholder="0"
+                          value={reservedKoinAmount}
+                          onChange={(event) =>
+                            setReservedKoinAmount(event.target.value)
                           }
                           disabled={submitting}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                        />
                       </div>
-                    ))}
-                    <p className="text-xs text-muted-foreground">
-                      Total beneficiary share:{" "}
-                      {beneficiaries.reduce(
-                        (sum, beneficiary) =>
-                          sum + beneficiary.percentage,
-                        0
-                      ) / 1000}
-                      %
-                    </p>
-                  </div>
-
-                  <button
-                    type="button"
-                    className={primaryButton}
-                    onClick={handleSavePoolParams}
-                    disabled={submitting}
-                  >
-                    {submitting ? "Saving…" : "Save pool parameters"}
-                  </button>
-                </div>
-              </section>
-
-              <section className="border-t border-border pt-5">
-                <h3 className="text-base font-semibold tracking-[-0.01em]">Reserved KOIN</h3>
-                <p className={cn(footnote, "mt-1")}>
-                  Reserved KOIN provides mana for operating the pool and is
-                  not burned. Lower reburn periods require more frequent
-                  operations, so more reserved KOIN is recommended. As a
-                  base reference, use about 2,000 KOIN for a 4-day reburn
-                  period.
-                </p>
-                <div className="mt-5 space-y-4">
-                  <p className="text-sm">
-                    <span className="text-muted-foreground">
-                      Currently reserved:{" "}
-                    </span>
-                    {formatAmount(reservedKoin)} KOIN
-                  </p>
-                  <div className="space-y-2">
-                    <Label htmlFor="reserved-koin-amount">KOIN amount</Label>
-                    <Input
-                      id="reserved-koin-amount"
-                      type="text"
-                      inputMode="decimal"
-                      placeholder="0"
-                      value={reservedKoinAmount}
-                      onChange={(event) =>
-                        setReservedKoinAmount(event.target.value)
-                      }
-                      disabled={submitting}
-                    />
-                  </div>
-                  <div className="grid gap-2.5 sm:grid-cols-2">
-                    <button
-                      type="button"
-                      className={primaryButton}
-                      onClick={() => handleReservedKoin("add")}
-                      disabled={submitting}
-                    >
-                      Add reserved KOIN
-                    </button>
-                    <button
-                      type="button"
-                      className={ghostButton}
-                      onClick={() => handleReservedKoin("remove")}
-                      disabled={submitting}
-                    >
-                      Remove reserved KOIN
-                    </button>
-                  </div>
-                </div>
-              </section>
-
-              <section className="border-t border-border pt-5">
-                <h3 className="text-base font-semibold tracking-[-0.01em]">Node operator public key</h3>
-                <p className={cn(footnote, "mt-1")}>
-                  Register the public key from{" "}
-                  <code>.koinos/block_producer/public.key</code>. Also set
-                  the <code>producer</code> field in the{" "}
-                  <code>block_producer</code> section of your node&apos;s{" "}
-                  <code>config.yml</code> to this pool address.
-                </p>
-                <div className="mt-5 space-y-4">
-                  {registeredPublicKey && (
-                    <div className="space-y-1">
-                      <p className="text-xs text-muted-foreground">
-                        Currently registered public key
-                      </p>
-                      <p className="break-all font-mono text-xs">
-                        {registeredPublicKey}
-                      </p>
+                      <div className="grid gap-2.5 sm:grid-cols-2">
+                        <button
+                          type="button"
+                          className={primaryButton}
+                          onClick={() => handleReservedKoin("add")}
+                          disabled={submitting}
+                        >
+                          Add reserved KOIN
+                        </button>
+                        <button
+                          type="button"
+                          className={ghostButton}
+                          onClick={() => handleReservedKoin("remove")}
+                          disabled={submitting}
+                        >
+                          Remove reserved KOIN
+                        </button>
+                      </div>
                     </div>
-                  )}
-                  <div className="space-y-2">
-                    <Label htmlFor="public-key">Public key</Label>
-                    <Input
-                      id="public-key"
-                      value={publicKey}
-                      onChange={(event) => setPublicKey(event.target.value)}
-                      placeholder="Paste the contents of public.key"
-                      disabled={submitting}
-                    />
-                  </div>
-                  <button
-                    type="button"
-                    className={primaryButton}
-                    onClick={handleRegisterPublicKey}
-                    disabled={submitting}
-                  >
-                    Register public key
-                  </button>
-                </div>
-              </section>
+                  </section>
 
-              <details className="border-t border-border pt-4">
-                <summary className="cursor-pointer list-none text-sm text-muted-foreground hover:text-foreground [&::-webkit-details-marker]:hidden">Danger zone ›</summary>
-                <div className="mt-3 space-y-3 text-sm text-muted-foreground">
-                  <p>Removing the pool delists it from Fogata. Stakers keep their funds and can still withdraw. Enter the pool address to confirm.</p>
-                  <Input
-                    aria-label="Pool address confirmation"
-                    value={deleteConfirmation}
-                    onChange={(event) => setDeleteConfirmation(event.target.value)}
-                    placeholder={poolId}
-                    disabled={submitting}
-                  />
-                  <button
-                    type="button"
-                    className={cn(ghostButton, "w-auto border-destructive/60 text-destructive hover:bg-destructive/10")}
-                    onClick={handleDeletePool}
-                    disabled={submitting || deleteConfirmation !== poolId}
-                  >
-                    Remove from Fogata list
-                  </button>
+                  <section className="border-t border-border pt-5">
+                    <h3 className="text-base font-semibold tracking-[-0.01em]">Node operator public key</h3>
+                    <p className={cn(footnote, "mt-1")}>
+                      Register the public key from{" "}
+                      <code>.koinos/block_producer/public.key</code>. Also set
+                      the <code>producer</code> field in the{" "}
+                      <code>block_producer</code> section of your node&apos;s{" "}
+                      <code>config.yml</code> to this pool address.
+                    </p>
+                    <div className="mt-5 space-y-4">
+                      {registeredPublicKey && (
+                        <div className="space-y-1">
+                          <p className="text-xs text-muted-foreground">
+                            Currently registered public key
+                          </p>
+                          <p className="break-all font-mono text-xs">
+                            {registeredPublicKey}
+                          </p>
+                        </div>
+                      )}
+                      <div className="space-y-2">
+                        <Label htmlFor="public-key">Public key</Label>
+                        <Input
+                          id="public-key"
+                          value={publicKey}
+                          onChange={(event) => setPublicKey(event.target.value)}
+                          placeholder="Paste the contents of public.key"
+                          disabled={submitting}
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        className={primaryButton}
+                        onClick={handleRegisterPublicKey}
+                        disabled={submitting}
+                      >
+                        Register public key
+                      </button>
+                    </div>
+                  </section>
+
+                  <details className="border-t border-border pt-4">
+                    <summary className="cursor-pointer list-none text-sm text-muted-foreground hover:text-foreground [&::-webkit-details-marker]:hidden">Danger zone ›</summary>
+                    <div className="mt-3 space-y-3 text-sm text-muted-foreground">
+                      <p>Removing the pool delists it from Fogata. Stakers keep their funds and can still withdraw. Enter the pool address to confirm.</p>
+                      <Input
+                        aria-label="Pool address confirmation"
+                        value={deleteConfirmation}
+                        onChange={(event) => setDeleteConfirmation(event.target.value)}
+                        placeholder={poolId}
+                        disabled={submitting}
+                      />
+                      <button
+                        type="button"
+                        className={cn(ghostButton, "w-auto border-destructive/60 text-destructive hover:bg-destructive/10")}
+                        onClick={handleDeletePool}
+                        disabled={submitting || deleteConfirmation !== poolId}
+                      >
+                        Remove from Fogata list
+                      </button>
+                    </div>
+                  </details>
                 </div>
-              </details>
-            </section>
+              </DialogContent>
+            </Dialog>
           )}
         </>
       )}

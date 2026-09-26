@@ -995,7 +995,7 @@ export default function FogataPoolPage() {
           <div className={splitColumns}>
             <div>
               <header className="flex items-center gap-4">
-                <PoolLogo name={poolParams.name} image={poolParams.image} size={44} className="h-11 w-11 rounded-[13px] text-base" />
+                <PoolLogo poolId={poolId} name={poolParams.name} image={poolParams.image} className="h-11 w-11 rounded-[13px] text-base" />
                 <div className="min-w-0">
                   <h1 className="flex items-center gap-2.5 text-[22px] font-semibold leading-tight tracking-[-0.02em]">
                     <span className="truncate">{poolParams.name || "Unnamed pool"}</span>
@@ -1424,7 +1424,7 @@ export default function FogataPoolPage() {
                           onChange={(event) => setPoolImage(event.target.value)}
                           disabled={submitting}
                         />
-                        <p className={footnote}>Any https image: PNG, JPEG, WebP or GIF. SVG isn&apos;t supported.</p>
+                        <p className={footnote}>Any https image up to 1 MB: PNG, JPEG, WebP or GIF. SVG isn&apos;t supported.</p>
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="pool-description">Description</Label>

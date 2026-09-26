@@ -30,14 +30,7 @@ const nextConfig = {
     NEXT_PUBLIC_BUILD_COMMIT: resolveBuildCommit(),
   },
   images: {
-    // Any https host: Fogata pool logos are arbitrary on-chain URLs, served
-    // through the optimizer so owners never see visitor IPs. SVG stays
-    // refused (dangerouslyAllowSVG is off by default).
     remotePatterns: [
-      {
-        protocol: 'https',
-        hostname: '**',
-      },
       {
         protocol: 'https',
         hostname: 'raw.githubusercontent.com',

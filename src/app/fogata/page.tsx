@@ -477,7 +477,7 @@ export default function FogataPage() {
               .map(({ pool, apy }) => (
                 <li key={pool.account} className="border-b border-border">
                   <Link href={`/fogata/${pool.account}`} className={listRow}>
-                    <PoolLogo name={pool.name} image={pool.image} size={40} className="h-10 w-10 rounded-xl text-sm" />
+                    <PoolLogo poolId={pool.account} name={pool.name} image={pool.image} className="h-10 w-10 rounded-xl text-sm" />
                     <span className="min-w-0 flex-1 truncate text-[15px] font-medium">
                       {pool.name || "Unnamed pool"}
                     </span>
@@ -553,7 +553,7 @@ export default function FogataPage() {
                 onChange={(event) => setPoolImage(event.target.value)}
                 disabled={creating}
               />
-              <p className="text-xs text-muted-foreground">Any https image: PNG, JPEG, WebP or GIF. SVG isn&apos;t supported.</p>
+              <p className="text-xs text-muted-foreground">Any https image up to 1 MB: PNG, JPEG, WebP or GIF. SVG isn&apos;t supported.</p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="new-pool-description">Description</Label>

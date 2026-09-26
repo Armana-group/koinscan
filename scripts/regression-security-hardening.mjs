@@ -19,6 +19,7 @@ const tsconfig = JSON.parse(read('tsconfig.json'));
 const yarnrc = existsSync('.yarnrc') ? read('.yarnrc') : '';
 const packageJson = JSON.parse(read('package.json'));
 const constants = read('src/koinos/constants.ts');
+const poolLogoRoute = read('src/app/api/pool-logo/[poolId]/route.ts');
 
 assert(
   'admin whitelist route does not authorize with public wallet bearer addresses',
@@ -64,6 +65,16 @@ assert(
     !nextConfig.includes('hostname: "**"') &&
     !nextConfig.includes("protocol: 'http'") &&
     !nextConfig.includes('protocol: "http"'),
+);
+
+assert(
+  'pool logo route only fetches on-chain logos of listed pools, without redirects, private hosts or non-image bytes',
+  poolLogoRoute.includes('loadListedPools') &&
+    poolLogoRoute.includes('get_pool_params') &&
+    poolLogoRoute.includes('redirect: "manual"') &&
+    poolLogoRoute.includes('isPrivateAddress') &&
+    poolLogoRoute.includes('sniffImageType') &&
+    poolLogoRoute.includes('readCapped'),
 );
 
 assert(

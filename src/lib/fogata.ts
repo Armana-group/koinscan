@@ -140,6 +140,23 @@ export function sanitizeDecimalInput(raw: string): string {
 }
 
 /**
+ * A raw 8-decimal amount as a plain decimal string for an amount field:
+ * exact (BigInt, no float), no grouping, always "." as the separator. Never
+ * use toLocaleString for this — "1,234.5" or "1.234,5" is not a number the
+ * field can submit.
+ */
+export function formatAmountForInput(raw: string): string {
+  const amount = BigInt(raw || "0");
+  const scale = BigInt(100_000_000);
+  const whole = amount / scale;
+  const fraction = (amount % scale)
+    .toString()
+    .padStart(8, "0")
+    .replace(/0+$/, "");
+  return fraction ? `${whole}.${fraction}` : whole.toString();
+}
+
+/**
  * The decoded value of one call in a koilib Multicall result, or undefined
  * when that call failed (koilib puts an Error in the slot). Callers must
  * not turn undefined into "0": a read that failed is not a zero balance.

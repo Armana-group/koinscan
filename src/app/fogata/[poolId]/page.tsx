@@ -38,7 +38,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { WalletButton } from "@/components/WalletButton";
 import { cn } from "@/lib/utils";
-import { computePoolApy, formatPayoutPeriod, getNetworkApy, poolHealth, sanitizeDecimalInput } from "@/lib/fogata";
+import { computePoolApy, formatAmountForInput, formatPayoutPeriod, getNetworkApy, poolHealth, sanitizeDecimalInput } from "@/lib/fogata";
 import { AmountField } from "@/components/fogata/AmountField";
 import { LineList, LineRow } from "@/components/fogata/LineRow";
 import { WordTabs } from "@/components/fogata/WordTabs";
@@ -1148,8 +1148,8 @@ export default function FogataPoolPage() {
                   disabled={submitting}
                   onMax={() =>
                     depositToken === "koin"
-                      ? setKoinDeposit(formatAmount(walletBalances!.koin))
-                      : setVhpDeposit(formatAmount(walletBalances!.vhp))
+                      ? setKoinDeposit(formatAmountForInput(walletBalances!.koin))
+                      : setVhpDeposit(formatAmountForInput(walletBalances!.vhp))
                   }
                   maxDisabled={!walletBalances}
                   autoFocus
@@ -1211,8 +1211,8 @@ export default function FogataPoolPage() {
                   disabled={submitting}
                   onMax={() =>
                     withdrawToken === "koin"
-                      ? setKoinWithdraw(formatAmount(poolBalance!.koin_amount))
-                      : setVhpWithdraw(formatAmount(poolBalance!.vhp_amount))
+                      ? setKoinWithdraw(formatAmountForInput(poolBalance!.koin_amount))
+                      : setVhpWithdraw(formatAmountForInput(poolBalance!.vhp_amount))
                   }
                   maxDisabled={!poolBalance}
                   autoFocus

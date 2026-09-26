@@ -30,7 +30,7 @@ import {
   KOIN_VHP_DEX_CONTRACT_ID,
   VHP_CONTRACT_ID,
 } from "@/koinos/constants";
-import { amountAtPrice, findMatchingOrder, multicallValue, suggestPrice } from "@/lib/fogata";
+import { amountAtPrice, findMatchingOrder, formatAmountForInput, multicallValue, suggestPrice } from "@/lib/fogata";
 import { AmountField } from "@/components/fogata/AmountField";
 import { HowItWorks } from "@/components/fogata/HowItWorks";
 import { LineList, LineRow } from "@/components/fogata/LineRow";
@@ -102,17 +102,6 @@ function formatAmount(raw: string, maximumFractionDigits = 8): string {
     .slice(0, maximumFractionDigits)
     .replace(/0+$/, "");
   return `${whole.toLocaleString()}${fraction ? `.${fraction}` : ""}`;
-}
-
-function formatAmountForInput(raw: string): string {
-  const amount = BigInt(raw || "0");
-  const scale = BigInt(100_000_000);
-  const whole = amount / scale;
-  const fraction = (amount % scale)
-    .toString()
-    .padStart(DECIMALS, "0")
-    .replace(/0+$/, "");
-  return fraction ? `${whole}.${fraction}` : whole.toString();
 }
 
 function formatPrice(order: DexOrder): string {

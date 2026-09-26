@@ -38,7 +38,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { WalletButton } from "@/components/WalletButton";
 import { cn } from "@/lib/utils";
-import { computePoolApy, formatAmountForInput, formatPayoutPeriod, getNetworkApy, poolHealth, sanitizeDecimalInput } from "@/lib/fogata";
+import { computePoolApy, estimateEarnings, formatAmountForInput, formatKoinEstimate, formatPayoutPeriod, getNetworkApy, poolHealth, sanitizeDecimalInput } from "@/lib/fogata";
 import { AmountField } from "@/components/fogata/AmountField";
 import { LineList, LineRow } from "@/components/fogata/LineRow";
 import { WordTabs } from "@/components/fogata/WordTabs";
@@ -260,6 +260,14 @@ export default function FogataPoolPage() {
     ? (BigInt(poolBalance.vhp_amount) + BigInt(poolBalance.koin_amount)).toString()
     : null;
   const hasStake = stakedVhp !== null && BigInt(stakedVhp) > BigInt(0);
+  const payoutPeriod = formatPayoutPeriod(poolParams?.payment_period);
+  const stakeEarnings =
+    hasStake && poolApy !== null
+      ? estimateEarnings(Number(stakedVhp) / SCALE, poolApy, poolParams?.payment_period)
+      : null;
+  const depositAmount = Number(depositToken === "koin" ? koinDeposit : vhpDeposit);
+  const depositEarnings =
+    poolApy !== null && depositAmount > 0 ? estimateEarnings(depositAmount, poolApy) : null;
 
   const loadData = useCallback(async () => {
     if (!provider || !poolId) return;
@@ -1062,6 +1070,17 @@ export default function FogataPoolPage() {
                   {formatAmount(stakedVhp!)}
                   <span className="ml-2 text-lg font-medium tracking-normal text-muted-foreground">VHP</span>
                 </p>
+                {stakeEarnings && (
+                  <p className="mt-3 text-[15px] tabular-nums">
+                    ≈ {formatKoinEstimate(stakeEarnings.yearly)} KOIN a year
+                    <span className="text-muted-foreground">
+                      {stakeEarnings.perPayout !== null && payoutPeriod !== "—" && (
+                        <> · about {formatKoinEstimate(stakeEarnings.perPayout)} KOIN {payoutPeriod.toLowerCase()}</>
+                      )}
+                      {" "}at {poolApy!.toFixed(1)}%
+                    </span>
+                  </p>
+                )}
                 <p className="mt-2.5 text-[13px] text-muted-foreground">
                   {poolBalance && BigInt(poolBalance.koin_amount) > BigInt(0) && (
                     <>includes {formatAmount(poolBalance.koin_amount)} KOIN being converted · </>
@@ -1191,7 +1210,11 @@ export default function FogataPoolPage() {
                 <span>
                   Wallet {walletBalances ? formatAmount(depositToken === "koin" ? walletBalances.koin : walletBalances.vhp) : "—"} {depositToken.toUpperCase()}
                 </span>
-                {poolApy !== null && <span>≈ {poolApy.toFixed(1)}% yearly</span>}
+                {depositEarnings ? (
+                  <span>≈ {formatKoinEstimate(depositEarnings.yearly)} KOIN a year</span>
+                ) : (
+                  poolApy !== null && <span>≈ {poolApy.toFixed(1)}% yearly</span>
+                )}
               </div>
               {depositToken === "koin" && formatPayoutPeriod(poolParams.payment_period) !== "—" && (
                 <p className="mt-2 text-[13px] leading-relaxed text-muted-foreground">

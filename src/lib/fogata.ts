@@ -71,6 +71,27 @@ export function computePoolApy(
   return networkApy * (1 - beneficiaryShare / 100);
 }
 
+/**
+ * KOIN a stake would earn at a yearly yield (percent), for a year and for one
+ * payout period. An estimate only: the yield moves with network staking.
+ */
+export function estimateEarnings(
+  stake: number,
+  apyPercent: number,
+  paymentPeriodMs?: string
+): { yearly: number; perPayout: number | null } {
+  const yearly = (stake * apyPercent) / 100;
+  const periodDays = paymentPeriodMs ? Number(paymentPeriodMs) / DAY_MS : NaN;
+  const perPayout =
+    Number.isFinite(periodDays) && periodDays > 0 ? (yearly * periodDays) / 365 : null;
+  return { yearly, perPayout };
+}
+
+/** An estimated KOIN amount: whole numbers once it's big enough not to need decimals. */
+export function formatKoinEstimate(amount: number): string {
+  return amount.toLocaleString(undefined, { maximumFractionDigits: amount < 10 ? 2 : 0 });
+}
+
 export type PoolHealth = "producing" | "late" | "paused";
 
 const DAY_MS = 24 * 60 * 60 * 1000;

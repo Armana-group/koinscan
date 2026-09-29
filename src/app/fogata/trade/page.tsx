@@ -54,6 +54,45 @@ const TIERS = Array.from({ length: 17 }, (_, index) => index + 1);
 // A single 17-tier call exceeds the chain's compute-bandwidth limit.
 const TIERS_PER_MULTICALL = 4;
 const NO_POOL_VALUE = "__wallet__";
+const RPC_READ_INTERVAL_MS = 250;
+const RPC_READ_RETRIES = 3;
+const RPC_RETRY_DELAY_MS = 750;
+
+let rpcReadQueue: Promise<void> = Promise.resolve();
+let nextRpcReadAt = 0;
+
+function delay(milliseconds: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
+/**
+ * Keep this page's read-only RPC requests from bursting through provider rate
+ * limits. A failed request retains its place in the queue and is retried, so
+ * completed order-tier batches do not need to be fetched again.
+ */
+function queueRpcRead<T>(read: () => Promise<T>): Promise<T> {
+  const run = async () => {
+    for (let attempt = 0; ; attempt += 1) {
+      const wait = Math.max(0, nextRpcReadAt - Date.now());
+      if (wait > 0) await delay(wait);
+      nextRpcReadAt = Date.now() + RPC_READ_INTERVAL_MS;
+
+      try {
+        return await read();
+      } catch (error) {
+        if (attempt >= RPC_READ_RETRIES) throw error;
+        await delay(RPC_RETRY_DELAY_MS * 2 ** attempt);
+      }
+    }
+  };
+
+  const result = rpcReadQueue.then(run, run);
+  rpcReadQueue = result.then(
+    () => undefined,
+    () => undefined
+  );
+  return result;
+}
 
 interface DexOrder {
   id: string;
@@ -140,7 +179,7 @@ async function fetchOrders(
       });
     }
 
-    const results = (await multicall.call()) as OrdersResult[];
+    const results = (await queueRpcRead(() => multicall.call())) as OrdersResult[];
     results.forEach((result, index) => {
       const tier = tierBatch[index];
       for (const order of result?.orders ?? []) {
@@ -166,12 +205,14 @@ async function fetchOrdersByOwner(
     provider,
     abi: abiDexKoinVhp,
   });
-  const { result } = await dex.functions.get_orders_by_owner({
-    owner,
-    start: "",
-    limit: 100,
-    descending: false,
-  });
+  const { result } = await queueRpcRead(() =>
+    dex.functions.get_orders_by_owner({
+      owner,
+      start: "",
+      limit: 100,
+      descending: false,
+    })
+  );
   const orders = ((result as OrdersResult | undefined)?.orders ?? []).map(
     (order) => ({
       ...order,
@@ -197,11 +238,13 @@ async function fetchMiningPools(
     provider,
     abi: abiFogata2ListPools,
   });
-  const { result: listPoolsResult } = await listPoolsContract.functions.get_pools({
-    start: "",
-    limit: 100,
-    direction: 0,
-  });
+  const { result: listPoolsResult } = await queueRpcRead(() =>
+    listPoolsContract.functions.get_pools({
+      start: "",
+      limit: 100,
+      direction: 0,
+    })
+  );
   const listedPools = (listPoolsResult?.value ?? []) as { account: string }[];
   if (listedPools.length === 0) return [];
 
@@ -219,7 +262,7 @@ async function fetchMiningPools(
   for (const contract of multicall.contracts) {
     await multicall.add(contract.functions.get_pool_params, {});
   }
-  const poolParams = await multicall.call();
+  const poolParams = await queueRpcRead(() => multicall.call());
   return listedPools.map((listedPool, index) => ({
     account: listedPool.account,
     name:
@@ -249,7 +292,7 @@ async function fetchWalletBalances(
   });
   await multicall.add(koinContract.functions.balanceOf, { owner });
   await multicall.add(vhpContract.functions.balanceOf, { owner });
-  const results = await multicall.call();
+  const results = await queueRpcRead(() => multicall.call());
   const koin = multicallValue(results[0]);
   const vhp = multicallValue(results[1]);
   // A failed read is a failure, never a zero balance.
@@ -269,7 +312,9 @@ async function fetchPoolBalance(
     provider,
     abi: abiFogata2Pool,
   });
-  const { result } = await poolContract.functions.balance_of({ value: owner });
+  const { result } = await queueRpcRead(() =>
+    poolContract.functions.balance_of({ value: owner })
+  );
   return {
     koin_amount: result?.koin_amount ?? "0",
     vhp_amount: result?.vhp_amount ?? "0",

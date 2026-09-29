@@ -48,51 +48,19 @@ import {
 import { cn } from "@/lib/utils";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import * as toast from "@/lib/toast";
+import { createRpcReadQueue } from "@/lib/rpcReadQueue";
 
 const DECIMALS = 8;
 const TIERS = Array.from({ length: 17 }, (_, index) => index + 1);
 // A single 17-tier call exceeds the chain's compute-bandwidth limit.
 const TIERS_PER_MULTICALL = 4;
 const NO_POOL_VALUE = "__wallet__";
-const RPC_READ_INTERVAL_MS = 250;
-const RPC_READ_RETRIES = 3;
-const RPC_RETRY_DELAY_MS = 750;
-
-let rpcReadQueue: Promise<void> = Promise.resolve();
-let nextRpcReadAt = 0;
-
-function delay(milliseconds: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, milliseconds));
-}
-
-/**
- * Keep this page's read-only RPC requests from bursting through provider rate
- * limits. A failed request retains its place in the queue and is retried, so
- * completed order-tier batches do not need to be fetched again.
- */
-function queueRpcRead<T>(read: () => Promise<T>): Promise<T> {
-  const run = async () => {
-    for (let attempt = 0; ; attempt += 1) {
-      const wait = Math.max(0, nextRpcReadAt - Date.now());
-      if (wait > 0) await delay(wait);
-      nextRpcReadAt = Date.now() + RPC_READ_INTERVAL_MS;
-
-      try {
-        return await read();
-      } catch (error) {
-        if (attempt >= RPC_READ_RETRIES) throw error;
-        await delay(RPC_RETRY_DELAY_MS * 2 ** attempt);
-      }
-    }
-  };
-
-  const result = rpcReadQueue.then(run, run);
-  rpcReadQueue = result.then(
-    () => undefined,
-    () => undefined
-  );
-  return result;
-}
+const queueRpcRead = createRpcReadQueue({
+  intervalMs: 250,
+  retries: 3,
+  retryDelayMs: 750,
+  timeoutMs: 10_000,
+});
 
 interface DexOrder {
   id: string;

@@ -5,6 +5,13 @@ interface RpcReadQueueOptions {
   timeoutMs: number;
 }
 
+class RpcReadTimeoutError extends Error {
+  constructor() {
+    super("RPC read timed out");
+    this.name = "RpcReadTimeoutError";
+  }
+}
+
 export function createRpcReadQueue(options: RpcReadQueueOptions) {
   let queue: Promise<void> = Promise.resolve();
   let nextReadAt = 0;
@@ -19,8 +26,8 @@ export function createRpcReadQueue(options: RpcReadQueueOptions) {
         read(),
         new Promise<never>((_, reject) => {
           timer = setTimeout(
-            () => reject(new Error("RPC read timed out")),
-            options.timeoutMs
+            () => reject(new RpcReadTimeoutError()),
+            options.timeoutMs,
           );
         }),
       ]);
@@ -40,7 +47,7 @@ export function createRpcReadQueue(options: RpcReadQueueOptions) {
     const result = queue.then(run, run);
     queue = result.then(
       () => undefined,
-      () => undefined
+      () => undefined,
     );
     return result;
   };
@@ -50,6 +57,9 @@ export function createRpcReadQueue(options: RpcReadQueueOptions) {
       try {
         return await enqueueAttempt(read);
       } catch (error) {
+        // Koilib cannot cancel the underlying fetch. Retrying a timeout would
+        // start another request while the first may still be running.
+        if (error instanceof RpcReadTimeoutError) throw error;
         if (attempt >= options.retries) throw error;
         await delay(options.retryDelayMs * 2 ** attempt);
       }

@@ -47,3 +47,28 @@ test("a failed read yields the queue while waiting to retry", async () => {
   assert.deepEqual(await Promise.all([retried, next]), ["recovered", "ready"]);
   assert.deepEqual(events, ["attempt 1", "next read", "attempt 2"]);
 });
+
+test("a timed-out read is not retried while its transport is still running", async () => {
+  const queue = createRpcReadQueue({
+    intervalMs: 0,
+    retries: 3,
+    retryDelayMs: 1,
+    timeoutMs: 10,
+  });
+  let attempts = 0;
+  let finishTransport!: (value: string) => void;
+  const pendingTransport = new Promise<string>((resolve) => {
+    finishTransport = resolve;
+  });
+  const stalled = queue(() => {
+    attempts += 1;
+    return pendingTransport;
+  });
+  const rejection = assert.rejects(stalled, /timed out/i);
+  const next = queue(async () => "ready");
+
+  assert.equal(await next, "ready");
+  await rejection;
+  assert.equal(attempts, 1);
+  finishTransport("late result");
+});

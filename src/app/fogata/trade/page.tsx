@@ -47,6 +47,7 @@ import {
 } from "@/components/fogata/styles";
 import { cn } from "@/lib/utils";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
+import { useLatestLoader } from "@/hooks/useLatestLoader";
 import * as toast from "@/lib/toast";
 import { createRpcReadQueue } from "@/lib/rpcReadQueue";
 
@@ -362,74 +363,106 @@ export default function DexPage() {
 
   const availablePaySymbol = side === "buy" ? "KOIN" : "VHP";
 
-  const loadOrders = useCallback(async () => {
-    if (!provider) return;
-    setLoading(true);
-    setError(null);
-    try {
-      const [sells, buys, owned] = await Promise.all([
-        fetchOrders(provider, false),
-        fetchOrders(provider, true),
-        account ? fetchOrdersByOwner(provider, account) : Promise.resolve([]),
-      ]);
-      setSellOrders(sells);
-      setBuyOrders(buys);
-      setMyOrders(owned);
-    } catch (err) {
-      console.error("Failed to load DEX orders:", err);
-      setError(err instanceof Error ? err.message : "Failed to load orders");
-    } finally {
-      setLoading(false);
-    }
-  }, [provider, account]);
+  const ordersScope = useMemo(() => ({ provider, account }), [provider, account]);
+  const balancesScope = useMemo(
+    () => ({ provider, account, pool }),
+    [provider, account, pool]
+  );
+  const poolsScope = useMemo(() => ({ provider }), [provider]);
+  const runOrdersLoad = useLatestLoader(ordersScope);
+  const runBalancesLoad = useLatestLoader(balancesScope);
+  const runPoolsLoad = useLatestLoader(poolsScope);
 
-  const loadBalances = useCallback(async () => {
-    if (!provider || !account) {
-      setWalletBalances(null);
-      setPoolBalance(null);
-      return;
-    }
+  const loadOrders = useCallback(
+    () => runOrdersLoad(
+      async () => {
+        if (!provider) return { sells: [], buys: [], owned: [] };
+        const [sells, buys, owned] = await Promise.all([
+          fetchOrders(provider, false),
+          fetchOrders(provider, true),
+          account ? fetchOrdersByOwner(provider, account) : Promise.resolve([]),
+        ]);
+        return { sells, buys, owned };
+      },
+      {
+        onStart: () => {
+          setLoading(Boolean(provider));
+          setError(null);
+          setSellOrders([]);
+          setBuyOrders([]);
+          setMyOrders([]);
+        },
+        onSuccess: ({ sells, buys, owned }) => {
+          setSellOrders(sells);
+          setBuyOrders(buys);
+          setMyOrders(owned);
+        },
+        onError: (err) => {
+          console.error("Failed to load DEX orders:", err);
+          setError(err instanceof Error ? err.message : "Failed to load orders");
+        },
+        onFinally: () => setLoading(false),
+      }
+    ),
+    [provider, account, runOrdersLoad]
+  );
 
-    setBalancesLoading(true);
-    setBalancesError(false);
-    try {
-      const [wallet, staked] = await Promise.all([
-        fetchWalletBalances(provider, account),
-        pool
-          ? fetchPoolBalance(provider, pool, account)
-          : Promise.resolve(null),
-      ]);
-      setWalletBalances(wallet);
-      setPoolBalance(staked);
-    } catch (err) {
-      console.error("Failed to load balances:", err);
-      setWalletBalances(null);
-      setPoolBalance(null);
-      setBalancesError(true);
-    } finally {
-      setBalancesLoading(false);
-    }
-  }, [provider, account, pool]);
+  const loadBalances = useCallback(
+    () => runBalancesLoad(
+      async () => {
+        if (!provider || !account) return { wallet: null, staked: null };
+        const [wallet, staked] = await Promise.all([
+          fetchWalletBalances(provider, account),
+          pool
+            ? fetchPoolBalance(provider, pool, account)
+            : Promise.resolve(null),
+        ]);
+        return { wallet, staked };
+      },
+      {
+        onStart: () => {
+          setBalancesLoading(Boolean(provider && account));
+          setBalancesError(false);
+          setWalletBalances(null);
+          setPoolBalance(null);
+        },
+        onSuccess: ({ wallet, staked }) => {
+          setWalletBalances(wallet);
+          setPoolBalance(staked);
+        },
+        onError: (err) => {
+          console.error("Failed to load balances:", err);
+          setWalletBalances(null);
+          setPoolBalance(null);
+          setBalancesError(true);
+        },
+        onFinally: () => setBalancesLoading(false),
+      }
+    ),
+    [provider, account, pool, runBalancesLoad]
+  );
 
   useEffect(() => {
     loadOrders();
   }, [loadOrders]);
 
   useEffect(() => {
-    const loadPools = async () => {
-      if (!provider) return;
-      setPoolsLoading(true);
-      try {
-        setPools(await fetchMiningPools(provider));
-      } catch (err) {
-        console.error("Failed to load mining pools:", err);
-        setPools([]);
-      } finally {
-        setPoolsLoading(false);
+    runPoolsLoad(
+      () => provider ? fetchMiningPools(provider) : Promise.resolve([]),
+      {
+        onStart: () => {
+          setPoolsLoading(Boolean(provider));
+          setPools([]);
+        },
+        onSuccess: setPools,
+        onError: (err) => {
+          console.error("Failed to load mining pools:", err);
+          setPools([]);
+        },
+        onFinally: () => setPoolsLoading(false),
       }
-    };
-    loadPools();
-  }, [provider]);
+    );
+  }, [provider, runPoolsLoad]);
 
   useEffect(() => {
     loadBalances();

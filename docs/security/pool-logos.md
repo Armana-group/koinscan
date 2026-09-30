@@ -35,6 +35,8 @@ The component shows the letter fallback on failure and retries at 30, 60, and
 Updated or removed logos may remain cached for up to 5 minutes.
 
 The deployment trace explicitly includes `src/lib/pool-logo-worker.mjs`.
+The direct Sharp version stays aligned with Next's Sharp dependency, avoiding
+two native libvips versions being loaded into the server process.
 The Node deployment must support child processes and include Sharp's native
 dependencies. These limits are per warm instance; they are not a distributed
 rate limit. V8's 64 MiB heap setting does not cap native decoder allocations,

@@ -12,6 +12,7 @@ This log records the packages that are most relevant to Koinscan's security post
 | `kondor-js` | `1.2.0` | Kondor wallet integration | None in package metadata checked locally | Keep wallet behavior manually verified after upgrades. |
 | `protobufjs` | `7.6.2` | Koinos transfer-event decoding and protobuf parsing | `postinstall` | Forced with Yarn `resolutions`; `scripts/regression-protobufjs-version.ts` verifies the lockfile stays patched. |
 | `sharp` | `0.33.5` | Next image optimization native dependency | `install` | Expected native install hook; CI installs with `--ignore-scripts` for security checks. |
+| `ipaddr.js` | `2.5.0` | Public IPv4/IPv6 classification for pool-logo requests | None | Direct, exact dependency; connections use the validated DNS answers. |
 
 ## Install-Script Policy
 

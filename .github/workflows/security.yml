@@ -22,6 +22,7 @@ jobs:
 
       - run: yarn install --frozen-lockfile --ignore-scripts
       - run: yarn security:regression
+      - run: yarn test
       - run: yarn build
       - run: yarn audit --groups dependencies --level high
         continue-on-error: true

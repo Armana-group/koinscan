@@ -25,19 +25,24 @@ const resolveBuildCommit = () => {
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  outputFileTracingIncludes: {
+    '/api/pool-logo/*': ['./src/lib/pool-logo-worker.mjs'],
+  },
   env: {
     NEXT_PUBLIC_APP_VERSION: packageJson.version,
     NEXT_PUBLIC_BUILD_COMMIT: resolveBuildCommit(),
   },
   images: {
-    // Any https host: Fogata pool logos are arbitrary on-chain URLs, served
-    // through the optimizer so owners never see visitor IPs. SVG stays
-    // refused (dangerouslyAllowSVG is off by default).
+    // Prevent callers from re-optimizing API responses at arbitrary sizes.
+    localPatterns: [
+      { pathname: '/*.png', search: '' },
+      { pathname: '/*.svg', search: '' },
+      { pathname: '/images/**', search: '' },
+      { pathname: '/_next/static/media/**', search: '' },
+    ],
+    // Pool logos use the bounded /api/pool-logo endpoint. Other remote images
+    // keep explicit host rules rather than exposing an unrestricted optimizer.
     remotePatterns: [
-      {
-        protocol: 'https',
-        hostname: '**',
-      },
       {
         protocol: 'https',
         hostname: 'raw.githubusercontent.com',
@@ -53,6 +58,8 @@ const nextConfig = {
       {
         protocol: 'https',
         hostname: 'koinscan.com',
+        pathname: '/koinscan-logo.png',
+        search: '',
       },
     ],
   },

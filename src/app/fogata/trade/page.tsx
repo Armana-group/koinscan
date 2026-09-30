@@ -762,18 +762,21 @@ export default function DexPage() {
             ‹ Fogata
           </Link>
           <h1 className={pageTitle}>Trade</h1>
-          <HowItWorks>
-            <p>
-              Staked VHP already turns back into KOIN over time, through your pool&apos;s payouts when your
-              reward setting takes KOIN. Trade is the quicker route: post an order to sell VHP for KOIN, or
-              buy VHP with KOIN. It fills when another trader accepts it, and pools fill orders here
-              before they burn any KOIN.
-            </p>
-            <p>
-              You can sell from your wallet or straight from your stake in a pool. VHP sold from a pool
-              keeps earning until the order fills.
-            </p>
-          </HowItWorks>
+          <div className="mt-3 flex items-center gap-4 text-sm">
+            <HowItWorks className="mt-0" guideHref="/fogata/help#trade-koin-and-vhp">
+              <p>
+                Staked VHP already turns back into KOIN over time, through your pool&apos;s payouts when your
+                reward setting takes KOIN. Trade is the quicker route: post an order to sell VHP for KOIN, or
+                buy VHP with KOIN. It fills when another trader accepts it, and pools fill orders here
+                before they burn any KOIN.
+              </p>
+              <p>
+                You can sell from your wallet or straight from your stake in a pool. VHP sold from a pool
+                keeps earning until the order fills.
+              </p>
+            </HowItWorks>
+            <Link href="/fogata/help#trade-koin-and-vhp" className={quietLink}>Trading guide</Link>
+          </div>
 
           <div className="mt-7">
             <WordTabs

@@ -20,6 +20,15 @@ import { useState } from "react";
 import { Input } from "./ui/input";
 import { Provider } from "koilib";
 
+const menuItems = [
+  { name: "Home", href: "/" },
+  { name: "Blocks", href: "/blocks" },
+  { name: "Tokens", href: "/tokens" },
+  { name: "Contracts", href: "/contracts" },
+  { name: "Network", href: "/network" },
+  { name: "Fogata", href: "/fogata" },
+];
+
 export function Navbar() {
   const pathname = usePathname();
   const { provider, setProvider } = useWallet();
@@ -46,8 +55,8 @@ export function Navbar() {
   };
 
   return (
-    <div className="bg-background/80 backdrop-blur-sm">
-      <div className="container mx-auto flex items-center justify-between px-4 md:px-4 py-6">
+    <header className="w-full bg-background/80 backdrop-blur-sm">
+      <div className="mx-auto flex w-full max-w-[1920px] items-center justify-between px-4 py-4 md:px-8">
         {/* Mobile Menu (Left) */}
         <div className="md:hidden">
           <DropdownMenu>
@@ -61,31 +70,18 @@ export function Navbar() {
                 <Logo showBetaBadge />
               </div>
               <DropdownMenuSeparator />
-              <Link href="/">
-                <DropdownMenuItem className={pathname === "/" ? "bg-accent" : ""}>
-                  Home
-                </DropdownMenuItem>
-              </Link>
-              <Link href="/blocks">
-                <DropdownMenuItem className={pathname === "/blocks" ? "bg-accent" : ""}>
-                  Blocks
-                </DropdownMenuItem>
-              </Link>
-              <Link href="/tokens">
-                <DropdownMenuItem className={pathname === "/tokens" ? "bg-accent" : ""}>
-                  Tokens
-                </DropdownMenuItem>
-              </Link>
-              <Link href="/contracts">
-                <DropdownMenuItem className={pathname === "/contracts" ? "bg-accent" : ""}>
-                  Contracts
-                </DropdownMenuItem>
-              </Link>
-              <Link href="/network">
-                <DropdownMenuItem className={pathname === "/network" ? "bg-accent" : ""}>
-                  Network
-                </DropdownMenuItem>
-              </Link>
+              {menuItems.map((item) => {
+                const isActive =
+                  item.href === "/" ? pathname === item.href : pathname.startsWith(item.href);
+
+                return (
+                  <Link key={item.name} href={item.href}>
+                    <DropdownMenuItem className={isActive ? "bg-accent" : ""}>
+                      {item.name}
+                    </DropdownMenuItem>
+                  </Link>
+                );
+              })}
               <DropdownMenuSeparator />
               <div className="px-2 py-2 space-y-2">
                 <div className="space-y-2">
@@ -172,6 +168,6 @@ export function Navbar() {
           </div>
         </div>
       </div>
-    </div>
+    </header>
   );
 }

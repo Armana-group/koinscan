@@ -15,6 +15,7 @@ import {
   BLOCK_EXPLORER,
   GOVERNANCE_CONTRACT_ID,
   KOIN_CONTRACT_ID,
+  KOINOS_FUND_CONTRACT_ID,
   NICKNAMES_CONTRACT_ID,
   RPC_NODE,
   VHP_CONTRACT_ID,
@@ -27,6 +28,8 @@ import { useWallet } from "@/contexts/WalletContext";
 import { cn } from "@/lib/utils";
 import { abiGovernance } from "@/koinos/abis";
 import { getTokenImageUrl } from "@/koinos/utils";
+import { abiKoinosFund } from "@/koinos/abis/koinosFund";
+import { abiKoin } from "@/koinos/abis/koin";
 
 export default function ContractPage() {
   const params = useParams();
@@ -203,8 +206,12 @@ export default function ContractPage() {
         if (contractId === GOVERNANCE_CONTRACT_ID) {
           // special case to fix the abi of governance
           abi = abiGovernance;
-        } else if (contractId === KOIN_CONTRACT_ID || contractId === VHP_CONTRACT_ID) {
+        } else if (contractId === KOIN_CONTRACT_ID) {
+          abi = abiKoin;
+        } else if (contractId === VHP_CONTRACT_ID) {
           abi = utils.tokenAbi;
+        } else if (contractId === KOINOS_FUND_CONTRACT_ID) {
+          abi = abiKoinosFund;
         } else {
           abi = await c.fetchAbi({
             updateFunctions: false,
@@ -237,7 +244,11 @@ export default function ContractPage() {
             "bitkoincontract.balance_of_result",
           ];
           const returnType = abi.methods[m].return;
-          if (returnType && !abi.methods[m].default_output && balanceOfReturnTypes.includes(returnType)) {
+          if (
+            returnType &&
+            !abi.methods[m].default_output &&
+            balanceOfReturnTypes.includes(returnType)
+          ) {
             abi.methods[m].default_output = { value: "0" };
           }
 

@@ -25,11 +25,23 @@ const resolveBuildCommit = () => {
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  outputFileTracingIncludes: {
+    '/api/pool-logo/*': ['./src/lib/pool-logo-worker.mjs'],
+  },
   env: {
     NEXT_PUBLIC_APP_VERSION: packageJson.version,
     NEXT_PUBLIC_BUILD_COMMIT: resolveBuildCommit(),
   },
   images: {
+    // Prevent callers from re-optimizing API responses at arbitrary sizes.
+    localPatterns: [
+      { pathname: '/*.png', search: '' },
+      { pathname: '/*.svg', search: '' },
+      { pathname: '/images/**', search: '' },
+      { pathname: '/_next/static/media/**', search: '' },
+    ],
+    // Pool logos use the bounded /api/pool-logo endpoint. Other remote images
+    // keep explicit host rules rather than exposing an unrestricted optimizer.
     remotePatterns: [
       {
         protocol: 'https',
@@ -46,6 +58,8 @@ const nextConfig = {
       {
         protocol: 'https',
         hostname: 'koinscan.com',
+        pathname: '/koinscan-logo.png',
+        search: '',
       },
     ],
   },
@@ -65,7 +79,7 @@ const nextConfig = {
               "base-uri 'self'",
               "frame-ancestors 'none'",
               "object-src 'none'",
-              "img-src 'self' data: blob: https://raw.githubusercontent.com https://githubusercontent.com https://walletconnect.com https://koinscan.com",
+              "img-src 'self' data: blob: https://raw.githubusercontent.com https://githubusercontent.com https://walletconnect.com https://koinscan.com https://iili.io",
               "connect-src 'self' https://api.koinos.io https://api.koinosblocks.com https://rest.koinos.io https://raw.githubusercontent.com wss://relay.walletconnect.com https://relay.walletconnect.com",
               "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
               "style-src 'self' 'unsafe-inline'",

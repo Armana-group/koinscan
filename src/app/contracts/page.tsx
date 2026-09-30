@@ -137,6 +137,27 @@ const systemContracts = [
     address: "1KD9Es7LBBjA1FY3ViCgQJ7e6WH1ipKbhz",
     categories: ["utility"],
   },
+  {
+    id: "koinvhpdex",
+    name: "Koin/VHP DEX",
+    description: "Koin/VHP decentralized exchange",
+    address: "1KZVMtRxdfsHp4yXU7CZh9s7CodGvRPGhx",
+    categories: ["utility"],
+  },
+  {
+    id: "fogatapoolsv1",
+    name: "Fogata Pools V1",
+    description: "Fogata pools v1 - fogata.io",
+    address: "1MmV5nzSBVGnBrjTr3B8XtA4yPs8wcSpr",
+    categories: ["utility"],
+  },
+  {
+    id: "fogatapoolsv2",
+    name: "Fogata Pools V2",
+    description: "Fogata pools v2",
+    address: "1FiBcmCus5N2bWv2RHwyiA1YRVVSE8uPqF",
+    categories: ["utility"],
+  },
 ];
 
 export default function ContractsPage() {

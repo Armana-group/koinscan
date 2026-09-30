@@ -1,0 +1,233 @@
+import { Contract, ProviderInterface, utils } from "koilib";
+
+import tokenAbi from "@/koinos/abi";
+import { abiPob } from "@/koinos/abis";
+import {
+  KOIN_CONTRACT_ID,
+  POB_CONTRACT_ID,
+  VHP_CONTRACT_ID,
+} from "@/koinos/constants";
+
+export interface NetworkStaking {
+  /** Base yearly yield for producing VHP, before any pool fee. */
+  apy: number;
+  /** VHP currently producing blocks across the whole network. */
+  vhpProducing: number;
+}
+
+/**
+ * APY = 2% * virtual supply / VHP producing
+ * Same formula as src/app/network/page.tsx
+ */
+export async function getNetworkStaking(provider: ProviderInterface): Promise<NetworkStaking> {
+  const vhpContract = new Contract({ id: VHP_CONTRACT_ID, provider, abi: tokenAbi });
+  const { result: resultVhp } = await vhpContract.functions.totalSupply();
+  const totalVhp = Number(resultVhp!.value) / 1e8;
+
+  const koinContract = new Contract({ id: KOIN_CONTRACT_ID, provider, abi: tokenAbi });
+  const { result: resultKoin } = await koinContract.functions.totalSupply();
+  const totalKoin = Number(resultKoin!.value) / 1e8;
+
+  const pobContract = new Contract({ id: POB_CONTRACT_ID, provider, abi: abiPob });
+  const { result: resultPob } = await pobContract.functions.get_metadata();
+  const difficulty = Number(
+    "0x" + utils.toHexString(utils.decodeBase64url(resultPob!.value.difficulty))
+  );
+  const vhpProducing = 10 * difficulty / 3000 / 1e8;
+  return { apy: 2 * (totalVhp + totalKoin) / vhpProducing, vhpProducing };
+}
+
+export async function getNetworkApy(provider: ProviderInterface): Promise<number> {
+  return (await getNetworkStaking(provider)).apy;
+}
+
+/**
+ * The one line under the Fogata title: how much VHP the listed pools hold
+ * and what share of the network's producing VHP that is.
+ */
+export function summarizeFogata(
+  poolVhp: (number | undefined)[],
+  vhpProducing: number | undefined
+): { totalStaked: number; share: number | null } {
+  const totalStaked = poolVhp.reduce<number>((sum, vhp) => sum + (vhp ?? 0), 0);
+  const share = vhpProducing && vhpProducing > 0 ? (totalStaked * 100) / vhpProducing : null;
+  return { totalStaked, share };
+}
+
+export function formatCompactVhp(amount: number): string {
+  if (amount >= 1e6) return `${(amount / 1e6).toFixed(1)}M`;
+  if (amount >= 1e3) return `${(amount / 1e3).toFixed(1)}K`;
+  return Math.round(amount).toString();
+}
+
+export function computePoolApy(
+  networkApy: number,
+  beneficiaries: { percentage: number }[]
+): number {
+  const beneficiaryShare = beneficiaries.reduce(
+    (sum, beneficiary) => sum + beneficiary.percentage,
+    0
+  ) / 1000;
+  return networkApy * (1 - beneficiaryShare / 100);
+}
+
+/**
+ * KOIN a stake would earn at a yearly yield (percent), for a year and for one
+ * payout period. An estimate only: the yield moves with network staking.
+ */
+export function estimateEarnings(
+  stake: number,
+  apyPercent: number,
+  paymentPeriodMs?: string
+): { yearly: number; perPayout: number | null } {
+  const yearly = (stake * apyPercent) / 100;
+  const periodDays = paymentPeriodMs ? Number(paymentPeriodMs) / DAY_MS : NaN;
+  const perPayout =
+    Number.isFinite(periodDays) && periodDays > 0 ? (yearly * periodDays) / 365 : null;
+  return { yearly, perPayout };
+}
+
+/** An estimated KOIN amount: whole numbers once it's big enough not to need decimals. */
+export function formatKoinEstimate(amount: number): string {
+  return amount.toLocaleString(undefined, { maximumFractionDigits: amount < 10 ? 2 : 0 });
+}
+
+export type PoolHealth = "producing" | "late" | "paused";
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+export function poolHealth(
+  input: { lastBlockTime?: Date; expectedTimeToProduce?: number; effectiveness?: number },
+  now: Date = new Date()
+): PoolHealth {
+  if (!input.lastBlockTime) return "paused";
+  const age = now.getTime() - input.lastBlockTime.getTime();
+  if (age > DAY_MS) return "paused";
+  if (input.expectedTimeToProduce && age > 4 * input.expectedTimeToProduce) return "late";
+  if (input.effectiveness !== undefined && input.effectiveness < 50) return "late";
+  return "producing";
+}
+
+export function formatPayoutPeriod(paymentPeriodMs?: string): string {
+  if (!paymentPeriodMs) return "—";
+  const days = Number(paymentPeriodMs) / DAY_MS;
+  if (!Number.isFinite(days) || days <= 0) return "—";
+  if (days === 1) return "Every day";
+  return `Every ${Number.isInteger(days) ? days : days.toFixed(1)} days`;
+}
+
+const SCALE = 1e8;
+
+/**
+ * Best open order on the *other* side that would satisfy the amounts the user
+ * typed, at an equal or better price. Used only to offer the existing fill
+ * dialog as a shortcut; it never places or fills anything itself.
+ */
+export function findMatchingOrder<
+  T extends { vhp_amount: string; koin_amount: string; buy: boolean; owner: string; id: string }
+>(
+  side: "buy" | "sell",
+  vhpAmount: string,
+  koinAmount: string,
+  orders: T[],
+  account: string | null
+): T | null {
+  const vhp = Number(vhpAmount);
+  const koin = Number(koinAmount);
+  if (!Number.isFinite(vhp) || !Number.isFinite(koin) || vhp <= 0 || koin <= 0) return null;
+  const wantedPrice = koin / vhp; // KOIN per VHP
+  const candidates = orders
+    .filter((order) => order.buy === (side === "sell") && order.owner !== account)
+    .filter((order) => Number(order.vhp_amount) / SCALE >= vhp)
+    .map((order) => ({ order, price: Number(order.koin_amount) / Number(order.vhp_amount) }))
+    .filter(({ price }) => (side === "sell" ? price >= wantedPrice : price <= wantedPrice))
+    .sort((a, b) => (side === "sell" ? b.price - a.price : a.price - b.price));
+  return candidates[0]?.order ?? null;
+}
+
+/**
+ * Filters free text into a decimal amount: digits, one dot, at most eight
+ * decimals. Amount fields are plain text inputs (no spinner, no exponent
+ * notation), so this is the only thing standing between the keyboard and the
+ * amount state.
+ */
+export function sanitizeDecimalInput(raw: string): string {
+  const cleaned = raw.replace(/,/g, ".").replace(/[^0-9.]/g, "");
+  const dot = cleaned.indexOf(".");
+  if (dot === -1) return cleaned;
+  const whole = cleaned.slice(0, dot) || "0";
+  const fraction = cleaned.slice(dot + 1).replace(/\./g, "").slice(0, 8);
+  return `${whole}.${fraction}`;
+}
+
+/**
+ * A raw 8-decimal amount as a plain decimal string for an amount field:
+ * exact (BigInt, no float), no grouping, always "." as the separator. Never
+ * use toLocaleString for this — "1,234.5" or "1.234,5" is not a number the
+ * field can submit.
+ */
+export function formatAmountForInput(raw: string): string {
+  const amount = BigInt(raw || "0");
+  const scale = BigInt(100_000_000);
+  const whole = amount / scale;
+  const fraction = (amount % scale)
+    .toString()
+    .padStart(8, "0")
+    .replace(/0+$/, "");
+  return fraction ? `${whole}.${fraction}` : whole.toString();
+}
+
+/**
+ * The decoded value of one call in a koilib Multicall result, or undefined
+ * when that call failed (koilib puts an Error in the slot). Callers must
+ * not turn undefined into "0": a read that failed is not a zero balance.
+ */
+export function multicallValue(result: unknown): string | undefined {
+  if (result instanceof Error || result === null || typeof result !== "object") return undefined;
+  const value = (result as { value?: unknown }).value;
+  return typeof value === "string" ? value : undefined;
+}
+
+export interface PriceSuggestion {
+  /** KOIN per VHP. */
+  price: number;
+  /** Which side of the book it came from: a bid (open buy) or an ask (open sell). */
+  source: "bid" | "ask";
+}
+
+/**
+ * A starting price for the order form, taken from the open book: a seller is
+ * offered the best bid, a buyer the best ask, and either falls back to the
+ * other side when its own is empty. The user's own orders never count.
+ */
+export function suggestPrice<
+  T extends { buy: boolean; owner: string; koin_amount: string; vhp_amount: string }
+>(
+  side: "buy" | "sell",
+  buyOrders: T[],
+  sellOrders: T[],
+  account: string | null
+): PriceSuggestion | null {
+  const prices = (orders: T[]) =>
+    orders
+      .filter((order) => order.owner !== account && Number(order.vhp_amount) > 0)
+      .map((order) => Number(order.koin_amount) / Number(order.vhp_amount));
+  const bids = prices(buyOrders);
+  const asks = prices(sellOrders);
+  const bestBid = bids.length ? { price: Math.max(...bids), source: "bid" as const } : null;
+  const bestAsk = asks.length ? { price: Math.min(...asks), source: "ask" as const } : null;
+  return side === "sell" ? bestBid ?? bestAsk : bestAsk ?? bestBid;
+}
+
+/**
+ * The other amount of an order at a given price: KOIN for a sale of VHP,
+ * VHP for a purchase with KOIN. Plain decimal, at most eight places.
+ */
+export function amountAtPrice(side: "buy" | "sell", payAmount: string, price: number): string {
+  const pay = Number(payAmount);
+  if (!payAmount || !Number.isFinite(pay) || pay <= 0 || !Number.isFinite(price) || price <= 0) {
+    return "";
+  }
+  const amount = side === "sell" ? pay * price : pay / price;
+  return amount.toFixed(8).replace(/\.?0+$/, "");
+}

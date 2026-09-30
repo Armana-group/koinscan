@@ -5,7 +5,9 @@ import {
   connectWallet,
   disconnectWallet,
   getWalletSigner,
-  KONDOR_ACCOUNTS_KEY,
+  pickKondorAccount,
+  requestKondorAccountPicker,
+  type KondorAccount,
 } from "../koinos/wallets";
 import kondorLogo from "./images/kondor-logo.png";
 import walletConnectLogo from "./images/wallet-connect-logo.png";
@@ -28,38 +30,48 @@ interface ExtendedSigner extends SignerInterface {
   name?: "kondor" | "walletConnect";
 }
 
-interface KondorAccount {
-  address: string;
-  name?: string;
-}
-
 function shortAddress(address: string): string {
   return `${address.slice(0, 4)}...${address.slice(address.length - 4)}`;
 }
 
-export function WalletButton() {
-  const { signer, setSigner, savedAddress, savedWalletType, forgetAddress, isReconnecting, kondorAccounts } = useWallet();
+export function WalletButton({
+  connectLabel,
+  connectClassName,
+}: {
+  connectLabel?: string;
+  /** Overrides the connect button's classes so a page can match its own button shape. */
+  connectClassName?: string;
+} = {}) {
+  const { signer, setSigner, savedAddress, savedWalletType, forgetAddress, chooseKondorAccount, setKondorAccounts, isReconnecting, kondorAccounts } = useWallet();
   const addr = (signer as ExtendedSigner)?.getAddress();
   const walletName = (signer as ExtendedSigner)?.name;
   const router = useRouter();
 
-  // Add function to fetch Kondor accounts manually when needed
-  const fetchKondorAccounts = async () => {
-    if (walletName === "kondor") {
-      try {
-        const accounts = await kondor.getAccounts();
-        if (accounts && accounts.length > 0) {
-          // Store accounts in localStorage
-          localStorage.setItem(KONDOR_ACCOUNTS_KEY, JSON.stringify(accounts));
-          // Refresh the page to update the UI with the new accounts
-          window.location.reload();
-        } else {
-          toast.error("No accounts found in Kondor");
-        }
-      } catch (error) {
-        console.error("Failed to fetch Kondor accounts:", error);
-        toast.error("Failed to fetch accounts");
+  // Ask Kondor for its account picker. Kondor 2 shows it; older Kondor just
+  // returns the accounts it already shares, so say where to change that.
+  const useDifferentAccount = async () => {
+    try {
+      const accounts = await requestKondorAccountPicker();
+      if (!accounts.length) {
+        toast.error("No accounts shared from Kondor");
+        return;
       }
+      const known = new Set(kondorAccounts.map((account) => account.address));
+      const added = accounts.find((account) => !known.has(account.address));
+      setKondorAccounts(accounts);
+      if (added) {
+        chooseKondorAccount(added);
+        toast.success(`Switched to ${added.name || shortAddress(added.address)}`);
+      } else if (accounts.length === 1 && accounts[0].address === addr) {
+        toast.custom(
+          "Kondor only shares this account with Koinscan. In Kondor, open Settings › Connected sites and change what Koinscan can see, then try again."
+        );
+      } else {
+        toast.success("Accounts refreshed. Pick one under Switch Account.");
+      }
+    } catch (error) {
+      console.error("Failed to fetch Kondor accounts:", error);
+      toast.error("Failed to fetch accounts");
     }
   };
 
@@ -82,12 +94,21 @@ export function WalletButton() {
         setSigner(undefined);
         forgetAddress();
         // clearBetaAccess is already called in forgetAddress()
-        toast.success("Address forgotten");
+        toast.success(
+          walletName === "kondor"
+            ? "Forgotten on this site. Kondor still shares this account with Koinscan; to connect a different one, change it under Kondor › Settings › Connected sites."
+            : "Address forgotten"
+        );
         return;
       }
 
       const wName = action;
       const address = await connectWallet(wName);
+      if (wName === "kondor") {
+        const shared = pickKondorAccount<KondorAccount>(kondorAccounts, address) ?? { address };
+        chooseKondorAccount(shared);
+        return;
+      }
       const signer = getWalletSigner(wName, address);
       (signer as ExtendedSigner).name = wName;
       setSigner(signer as ExtendedSigner);
@@ -102,9 +123,7 @@ export function WalletButton() {
 
   const switchKondorAccount = async (account: KondorAccount) => {
     try {
-      const newSigner = getWalletSigner("kondor", account.address);
-      (newSigner as ExtendedSigner).name = "kondor";
-      setSigner(newSigner as ExtendedSigner);
+      chooseKondorAccount(account);
     } catch (error) {
       toast.error((error as Error).message);
       console.error(error);
@@ -118,52 +137,58 @@ export function WalletButton() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button
-          variant="ghost"
-          className="relative flex items-center justify-center gap-2 transition-all w-auto px-3 h-10 rounded-lg focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 hover:bg-background/60 hover:shadow-sm bg-background/40 backdrop-blur-sm border border-border/40"
-        >
-          {displayAddress ? (
-            <>
-              <div className="flex items-center gap-2 max-w-[160px]">
-                <div className="flex-shrink-0 w-5 h-5 rounded-full p-0.5 bg-background">
-                  <Image
-                    src={
-                      walletName === "kondor"
-                        ? kondorLogo
-                        : walletName === "walletConnect"
-                        ? walletConnectLogo
-                        : savedWalletType === "kondor"
-                        ? kondorLogo
-                        : savedWalletType === "walletConnect"
-                        ? walletConnectLogo
-                        : kondorLogo
-                    }
-                    alt="wallet"
-                    width={16}
-                    height={16}
-                    className="w-full h-full object-contain rounded-full"
-                  />
+        {connectLabel && !displayAddress ? (
+          <Button className={connectClassName ?? "h-[42px] rounded-[11px] bg-brand px-6 text-brand-foreground hover:bg-brand/90"}>
+            {connectLabel}
+          </Button>
+        ) : (
+          <Button
+            variant="ghost"
+            className="relative flex items-center justify-center gap-2 transition-all w-auto px-3 h-10 rounded-lg focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 hover:bg-background/60 hover:shadow-sm bg-background/40 backdrop-blur-sm border border-border/40"
+          >
+            {displayAddress ? (
+              <>
+                <div className="flex items-center gap-2 max-w-[160px]">
+                  <div className="flex-shrink-0 w-5 h-5 rounded-full p-0.5 bg-background">
+                    <Image
+                      src={
+                        walletName === "kondor"
+                          ? kondorLogo
+                          : walletName === "walletConnect"
+                          ? walletConnectLogo
+                          : savedWalletType === "kondor"
+                          ? kondorLogo
+                          : savedWalletType === "walletConnect"
+                          ? walletConnectLogo
+                          : kondorLogo
+                      }
+                      alt="wallet"
+                      width={16}
+                      height={16}
+                      className="w-full h-full object-contain rounded-full"
+                    />
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <div className={`w-2 h-2 rounded-full flex-shrink-0 ${isConnected ? 'bg-[hsl(var(--logo-color-2))]' : 'bg-amber-500'}`}></div>
+                    <span className="text-sm font-medium truncate">{shortAddress(displayAddress)}</span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-1.5">
-                  <div className={`w-2 h-2 rounded-full flex-shrink-0 ${isConnected ? 'bg-[hsl(var(--logo-color-2))]' : 'bg-amber-500'}`}></div>
-                  <span className="text-sm font-medium truncate">{shortAddress(displayAddress)}</span>
-                </div>
-              </div>
-              <ChevronDown className="w-4 h-4 ml-1 text-muted-foreground flex-shrink-0" />
-            </>
-          ) : (
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 512 512"
-              className="h-5 w-5"
-            >
-              <path
-                fill="currentColor"
-                d="M24 32L0 32 0 56 0 456l0 24 24 0 464 0 24 0 0-24 0-304 0-24-24 0-368 0-24 0 0 48 24 0 344 0 0 256L48 432 48 80l408 0 24 0 0-48-24 0L24 32zM384 336a32 32 0 1 0 0-64 32 32 0 1 0 0 64z"
-              />
-            </svg>
-          )}
-        </Button>
+                <ChevronDown className="w-4 h-4 ml-1 text-muted-foreground flex-shrink-0" />
+              </>
+            ) : (
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 512 512"
+                className="h-5 w-5"
+              >
+                <path
+                  fill="currentColor"
+                  d="M24 32L0 32 0 56 0 456l0 24 24 0 464 0 24 0 0-24 0-304 0-24-24 0-368 0-24 0 0 48 24 0 344 0 0 256L48 432 48 80l408 0 24 0 0-48-24 0L24 32zM384 336a32 32 0 1 0 0-64 32 32 0 1 0 0 64z"
+                />
+              </svg>
+            )}
+          </Button>
+        )}
       </DropdownMenuTrigger>
       <DropdownMenuContent 
         align="end" 
@@ -313,7 +338,7 @@ export function WalletButton() {
               {/* Add Accounts button */}
               {isConnected && walletName === "kondor" && (
                 <DropdownMenuItem 
-                  onClick={fetchKondorAccounts}
+                  onClick={useDifferentAccount}
                   className="flex items-center px-4 py-3 my-1 rounded-lg cursor-pointer focus:bg-muted/80 hover:bg-muted/80"
                 >
                   <div className="flex items-center gap-3 text-sm font-medium">
@@ -332,7 +357,7 @@ export function WalletButton() {
                       <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
                       <path d="M16 3.13a4 4 0 0 1 0 7.75" />
                     </svg>
-                    Add Accounts
+                    Use a different account…
                   </div>
                 </DropdownMenuItem>
               )}

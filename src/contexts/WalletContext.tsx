@@ -9,8 +9,12 @@ import {
   disconnectWallet, 
   getWalletSigner, 
   getStoredKondorAccounts,
+  getChosenAddress,
+  pickKondorAccount,
+  rememberChosenAddress,
   KONDOR_ACCOUNTS_KEY,
-  WALLET_CONNECT_SESSION_KEY
+  WALLET_CONNECT_SESSION_KEY,
+  type KondorAccount,
 } from "@/koinos/wallets";
 import { saveBetaAccess, clearBetaAccess } from "@/lib/beta-access";
 
@@ -42,8 +46,12 @@ interface WalletContextType {
   savedAddress: string | null;
   savedWalletType: WalletName | null;
   forgetAddress: () => void;
+  /** Use one of the accounts Kondor shares, and keep using it after a reload. */
+  chooseKondorAccount: (account: KondorAccount) => void;
+  /** Replace the list of accounts Kondor shares, keeping the chosen one if it is still there. */
+  setKondorAccounts: (accounts: KondorAccount[]) => void;
   isReconnecting: boolean;
-  kondorAccounts: any[];
+  kondorAccounts: KondorAccount[];
   provider: ProviderInterface | undefined;
   setProvider: (provider: ProviderInterface) => void;
   rpcNode: string; // REST API endpoint for account history, balances
@@ -59,7 +67,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   const [savedAddress, setSavedAddress] = useState<string | null>(null);
   const [savedWalletType, setSavedWalletType] = useState<WalletName | null>(null);
   const [isReconnecting, setIsReconnecting] = useState(false);
-  const [kondorAccounts, setKondorAccounts] = useState<any[]>([]);
+  const [kondorAccounts, setKondorAccountsState] = useState<KondorAccount[]>([]);
   const [provider, setProvider] = useState<ProviderInterface>();
   const [rpcNode, setRpcNode] = useState<string>(""); // REST API endpoint
   const [jsonRpcNode, setJsonRpcNode] = useState<string>(""); // JSON-RPC endpoint for koilib
@@ -70,10 +78,10 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       // Check for stored Kondor accounts
       const storedKondorAccounts = getStoredKondorAccounts();
       if (storedKondorAccounts && storedKondorAccounts.length > 0) {
-        setKondorAccounts(storedKondorAccounts);
+        setKondorAccountsState(storedKondorAccounts);
         
-        // Create a signer for the first account
-        const account = storedKondorAccounts[0];
+        // Reconnect to the account chosen here before, if Kondor still shares it
+        const account = pickKondorAccount<KondorAccount>(storedKondorAccounts, getChosenAddress())!;
         const newSigner = getWalletSigner("kondor", account.address);
         (newSigner as ExtendedSigner).name = "kondor";
         setSigner(newSigner as ExtendedSigner);
@@ -176,7 +184,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
           // Disconnect if no accounts available
           setSigner(undefined);
           localStorage.removeItem(KONDOR_ACCOUNTS_KEY);
-          setKondorAccounts([]);
+          setKondorAccountsState([]);
           
           // Clear beta access when disconnecting
           clearBetaAccess();
@@ -185,15 +193,17 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         
         // Update stored accounts
         localStorage.setItem(KONDOR_ACCOUNTS_KEY, JSON.stringify(accounts));
-        setKondorAccounts(accounts);
+        setKondorAccountsState(accounts);
         
-        // Update signer with new account
-        const newSigner = getWalletSigner("kondor", accounts[0].address);
+        // Keep the account chosen here if Kondor still shares it
+        const account = pickKondorAccount<KondorAccount>(accounts, getChosenAddress())!;
+        const newSigner = getWalletSigner("kondor", account.address);
         (newSigner as ExtendedSigner).name = "kondor";
+        newSigner.provider = provider;
         setSigner(newSigner as ExtendedSigner);
         
         // Update beta access with the new wallet
-        saveBetaAccess(accounts[0].address);
+        saveBetaAccess(account.address);
       } catch (error) {
         console.error("Error handling account change", error);
       }
@@ -219,11 +229,27 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       localStorage.removeItem(WALLET_CONNECT_SESSION_KEY);
       setSavedAddress(null);
       setSavedWalletType(null);
-      setKondorAccounts([]);
+      setKondorAccountsState([]);
       
       // Also clear beta access
       clearBetaAccess();
     }
+  };
+
+  const chooseKondorAccount = (account: KondorAccount) => {
+    const newSigner = getWalletSigner("kondor", account.address);
+    (newSigner as ExtendedSigner).name = "kondor";
+    newSigner.provider = provider;
+    setSigner(newSigner as ExtendedSigner);
+    setSavedAddress(account.address);
+    setSavedWalletType("kondor");
+    rememberChosenAddress(account.address);
+    saveBetaAccess(account.address);
+  };
+
+  const setKondorAccounts = (accounts: KondorAccount[]) => {
+    localStorage.setItem(KONDOR_ACCOUNTS_KEY, JSON.stringify(accounts));
+    setKondorAccountsState(accounts);
   };
 
   return (
@@ -233,6 +259,8 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       savedAddress,
       savedWalletType,
       forgetAddress,
+      chooseKondorAccount,
+      setKondorAccounts,
       isReconnecting,
       kondorAccounts,
       provider,

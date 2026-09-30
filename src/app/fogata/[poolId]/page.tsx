@@ -44,7 +44,6 @@ import { LineList, LineRow } from "@/components/fogata/LineRow";
 import { PoolLogo } from "@/components/fogata/PoolLogo";
 import { WordTabs } from "@/components/fogata/WordTabs";
 import {
-  backLink,
   footnote,
   ghostButton,
   pageWide,
@@ -966,9 +965,10 @@ export default function FogataPoolPage() {
 
   return (
     <div className={pageWide}>
-      <Link href="/fogata" className={backLink}>
-        ‹ Fogata
-      </Link>
+      <div className="mb-7 flex items-center justify-between text-[13px] text-muted-foreground">
+        <Link href="/fogata" className="hover:text-foreground">‹ Fogata</Link>
+        <Link href="/fogata/help#choose-a-pool-and-read-its-page" className="hover:text-foreground">Pool guide ›</Link>
+      </div>
 
       {loading && (
         <div className="space-y-4" aria-busy="true">
@@ -1165,6 +1165,9 @@ export default function FogataPoolPage() {
             <DialogContent className="rounded-[22px] p-7 sm:max-w-[400px]">
               <DialogHeader>
                 <DialogTitle className="text-xl tracking-[-0.02em]">Deposit to {poolParams.name || "this pool"}</DialogTitle>
+                <DialogDescription>
+                  <Link href="/fogata/help#deposit-koin-or-vhp" className={quietLink}>Read the deposit guide</Link>
+                </DialogDescription>
               </DialogHeader>
               <WordTabs
                 size="md"
@@ -1234,6 +1237,9 @@ export default function FogataPoolPage() {
             <DialogContent className="rounded-[22px] p-7 sm:max-w-[400px]">
               <DialogHeader>
                 <DialogTitle className="text-xl tracking-[-0.02em]">Withdraw from {poolParams.name || "this pool"}</DialogTitle>
+                <DialogDescription>
+                  <Link href="/fogata/help#withdraw-or-leave-a-pool" className={quietLink}>Read the withdrawal guide</Link>
+                </DialogDescription>
               </DialogHeader>
               <WordTabs
                 size="md"
@@ -1288,7 +1294,10 @@ export default function FogataPoolPage() {
             <DialogContent className="rounded-[22px] p-7 sm:max-w-[400px]">
               <DialogHeader>
                 <DialogTitle className="text-xl tracking-[-0.02em]">Reward settings</DialogTitle>
-                <DialogDescription>Rewards are paid in KOIN. Choose what the pool does with them.</DialogDescription>
+                <DialogDescription>
+                  Rewards are paid in KOIN. Choose what the pool does with them.{" "}
+                  <Link href="/fogata/help#choose-your-reward-settings" className={quietLink}>Reward settings guide</Link>
+                </DialogDescription>
               </DialogHeader>
               <RadioGroup
                 value={rewardMode}
@@ -1325,8 +1334,8 @@ export default function FogataPoolPage() {
                       <span className="text-sm font-medium text-muted-foreground">%</span>
                     </div>
                     <p className={cn(footnote, "mt-2")}>
-                      Keep this percentage of earned KOIN and burn the rest
-                      into VHP.
+                      Take this percentage of your KOIN allocation and
+                      reinvest the rest into VHP.
                       {preferences &&
                         BigInt(preferences.all_after_virtual || "0") ===
                           BigInt(0) && (
@@ -1365,7 +1374,8 @@ export default function FogataPoolPage() {
                       <span className="text-sm font-medium text-muted-foreground">VHP</span>
                     </div>
                     <p className={cn(footnote, "mt-2")}>
-                      Keep this amount of VHP and burn anything above it.
+                      Retain this participation amount and take eligible
+                      excess as KOIN, subject to the pool&apos;s available KOIN.
                       {preferences &&
                         BigInt(preferences.all_after_virtual || "0") >
                           BigInt(0) && (

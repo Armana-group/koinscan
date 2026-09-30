@@ -1,7 +1,5 @@
 import { SignerInterface } from "koilib";
 import * as kondor from "kondor-js";
-import { Messenger } from "kondor-js";
-import { version as kondorJsVersion } from "kondor-js/package.json";
 import {
   ChainIds,
   Methods,
@@ -13,6 +11,15 @@ export type WalletName = "kondor" | "walletConnect";
 
 // Lazy-initialize WalletConnect to avoid SSR issues
 let walletConnectKoinos: WebWalletConnectKoinos | null = null;
+let walletConnectOperation: Promise<void> = Promise.resolve();
+
+// The SDK mutates one shared session. Finish a disconnect before a later
+// connection can replace it, even when the UI already shows disconnected.
+function runWalletConnectOperation<T>(operation: () => Promise<T>): Promise<T> {
+  const result = walletConnectOperation.then(operation);
+  walletConnectOperation = result.then(() => undefined, () => undefined);
+  return result;
+}
 
 function getWalletConnectKoinos(): WebWalletConnectKoinos {
   if (!walletConnectKoinos && typeof window !== 'undefined') {
@@ -64,19 +71,9 @@ export function pickKondorAccount<T extends { address: string }>(
   return accounts.find((account) => account.address === chosen) ?? accounts[0];
 }
 
-/**
- * Ask Kondor to show its account picker even though this site is already
- * connected. Sends the same DOM message kondor.getAccounts() does plus a
- * `prompt` flag; Kondor 2 honours it, older Kondor ignores it and simply
- * returns the accounts it already shares.
- */
-export async function requestKondorAccountPicker(): Promise<KondorAccount[]> {
-  const messenger = new Messenger();
-  const accounts = await messenger.sendDomMessage<KondorAccount[]>("popup", "getAccounts", {
-    kondorVersion: kondorJsVersion,
-    prompt: true,
-  });
-  return accounts ?? [];
+/** Refresh the accounts Kondor currently shares with this site. */
+export async function refreshKondorAccounts(): Promise<KondorAccount[]> {
+  return (await kondor.getAccounts()) ?? [];
 }
 
 async function ensureKondorConnection() {
@@ -153,8 +150,12 @@ export function getStoredKondorAccounts() {
   return null;
 }
 
-// Update connectWallet function to store accounts
-export async function connectWallet(walletName: WalletName): Promise<string> {
+// Request a connection without persisting it. The wallet context decides whether
+// this reply still belongs to the current user action before storing anything.
+export async function connectWallet(walletName: WalletName): Promise<{
+  address: string;
+  accounts?: KondorAccount[];
+}> {
   switch (walletName) {
     case "kondor": {
       isKondorConnecting = true;
@@ -164,12 +165,9 @@ export async function connectWallet(walletName: WalletName): Promise<string> {
           throw new Error("Please connect at least one account in Kondor");
         }
         
-        // Store accounts in localStorage
-        localStorage.setItem(KONDOR_ACCOUNTS_KEY, JSON.stringify(accounts));
-        
         isKondorConnecting = false;
         kondorConnectionPromise = null;
-        return pickKondorAccount(accounts, getChosenAddress())!.address;
+        return { address: pickKondorAccount(accounts, getChosenAddress())!.address, accounts };
       } catch (e) {
         isKondorConnecting = false;
         kondorConnectionPromise = null;
@@ -177,7 +175,7 @@ export async function connectWallet(walletName: WalletName): Promise<string> {
       }
     }
     case "walletConnect": {
-      const [address] = await getWalletConnectKoinos().connect(
+      const [address] = await runWalletConnectOperation(() => getWalletConnectKoinos().connect(
         [
           (NETWORK_NAME as string) === "mainnet"
             ? ChainIds.Mainnet
@@ -188,15 +186,10 @@ export async function connectWallet(walletName: WalletName): Promise<string> {
           Methods.SignAndSendTransaction,
           Methods.WaitForTransaction,
         ],
-      );
+      ));
+      if (!address) throw new Error("No account shared from WalletConnect");
 
-      // Store wallet connect info
-      localStorage.setItem(WALLET_CONNECT_SESSION_KEY, JSON.stringify({
-        connected: true,
-        address: address
-      }));
-
-      return address;
+      return { address };
     }
     default: {
       throw new Error(`"${walletName}" not implemented`);
@@ -204,18 +197,26 @@ export async function connectWallet(walletName: WalletName): Promise<string> {
   }
 }
 
-// Update disconnect function to clear stored accounts
+// Session storage is cleared synchronously by WalletProvider before this call.
 export async function disconnectWallet(walletName: WalletName): Promise<void> {
   switch (walletName) {
     case "kondor": {
       isKondorConnecting = false;
       kondorConnectionPromise = null;
-      localStorage.removeItem(KONDOR_ACCOUNTS_KEY);
       return;
     }
     case "walletConnect": {
-      await getWalletConnectKoinos().disconnect();
-      localStorage.removeItem(WALLET_CONNECT_SESSION_KEY);
+      await runWalletConnectOperation(async () => {
+        const client = getWalletConnectKoinos();
+        // SDK 0.1.4 does not await its modal's session deletions. Await the
+        // public modal API here before resetting SDK state or reconnecting.
+        const sessions = await client.web3Modal.getSessions();
+        await Promise.all(sessions.map((session) => client.web3Modal.disconnect({
+          topic: session.topic,
+          reason: { code: 6000, message: "User disconnected." },
+        })));
+        await client.disconnect();
+      });
       return;
     }
     default: {

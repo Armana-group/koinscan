@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import { JSDOM } from "jsdom";
 
 const baseUrl = process.env.FOGATA_UI_BASE_URL || "http://localhost:3002";
 
@@ -37,6 +39,27 @@ assert.doesNotMatch(visible(trade), /\btiers?\b/i, "the word tier is not in trad
 assert.match(trade, /Waits for a taker/, "the order-placement sentence is present");
 assert.match(trade, /How it works/, "trade page has the how-it-works disclosure");
 assert.match(trade, /href="\/fogata"[^>]*>[^<]*Fogata/, "trade page has a back link to Fogata");
+
+const guideHtml = await page("/fogata/help");
+const guideDocument = new JSDOM(guideHtml).window.document;
+assert.equal(guideDocument.querySelectorAll("h1").length, 1, "guide has one page title");
+const article = guideDocument.querySelector("article");
+assert.ok(article, "guide is rendered as an article");
+const headings = [...article.querySelectorAll("h2, h3")];
+const headingIds = headings.map((heading) => heading.id);
+assert.ok(headingIds.every(Boolean), "each guide section has an anchor");
+assert.equal(new Set(headingIds).size, headingIds.length, "guide section anchors are distinct");
+for (const link of article.querySelectorAll('a[href^="#"]')) {
+  assert.ok(guideDocument.getElementById(link.getAttribute("href").slice(1)), "contents link resolves to a section");
+}
+const downloadLink = guideDocument.querySelector('a[download="fogata-guide.md"]');
+assert.equal(downloadLink?.getAttribute("href"), "/fogata-guide.md", "download points to the canonical file");
+const download = await fetch(`${baseUrl}/fogata-guide.md`);
+assert.equal(download.status, 200, "Markdown download is reachable");
+assert.equal(await download.text(), await readFile(new URL("../public/fogata-guide.md", import.meta.url), "utf8"), "download preserves the entire canonical source");
+for (const html of [pools, trade]) {
+  assert.match(html, /href="\/fogata\/help/, "Fogata and Trade expose the full guide");
+}
 
 await redirectsTo("/dapps", "/fogata");
 await redirectsTo("/dapps/fogata", "/fogata");

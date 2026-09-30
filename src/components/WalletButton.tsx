@@ -1,12 +1,9 @@
 import Image from "next/image";
+import { useState } from "react";
 import { SignerInterface } from "koilib";
 import {
   WalletName,
-  connectWallet,
   disconnectWallet,
-  getWalletSigner,
-  pickKondorAccount,
-  requestKondorAccountPicker,
   type KondorAccount,
 } from "../koinos/wallets";
 import kondorLogo from "./images/kondor-logo.png";
@@ -21,10 +18,9 @@ import {
 } from "./ui/dropdown-menu";
 import * as toast from "@/lib/toast";
 import { useWallet } from "@/contexts/WalletContext";
-import * as kondor from "kondor-js";
 import { Check, ChevronDown } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { saveBetaAccess, clearBetaAccess } from "@/lib/beta-access";
+import { WalletAccountBalance } from "./WalletAccountBalance";
 
 interface ExtendedSigner extends SignerInterface {
   name?: "kondor" | "walletConnect";
@@ -32,6 +28,47 @@ interface ExtendedSigner extends SignerInterface {
 
 function shortAddress(address: string): string {
   return `${address.slice(0, 4)}...${address.slice(address.length - 4)}`;
+}
+
+function KondorAccountChoices({ accounts, activeAddress, onChoose }: {
+  accounts: KondorAccount[];
+  activeAddress?: string;
+  onChoose: (account: KondorAccount) => void;
+}) {
+  return (
+    <div className="mb-3">
+      <div className="px-3 py-2 text-sm font-medium text-muted-foreground">
+        {activeAddress ? "Switch Account" : "Choose an account"}
+      </div>
+      {accounts.map((account, i) => (
+        <DropdownMenuItem
+          key={account.address}
+          onClick={() => onChoose(account)}
+          className="flex items-center justify-between gap-3 px-4 py-2 my-1 rounded-lg cursor-pointer focus:bg-muted/80 hover:bg-muted/80"
+        >
+          <div className="flex min-w-0 items-center gap-2 text-sm">
+            <div className="w-5 h-5 shrink-0 p-1 rounded-full bg-violet-100 dark:bg-violet-950/50">
+              <Image src={kondorLogo} alt="kondor" width={20} height={20} className="w-full h-full object-contain" />
+            </div>
+            <div className="flex min-w-0 flex-col">
+              <span className="truncate font-medium">{account.name || `Account ${i + 1}`}</span>
+              <span className="text-xs text-muted-foreground">{shortAddress(account.address)}</span>
+            </div>
+          </div>
+          <div className="flex shrink-0 items-center gap-1.5">
+            <WalletAccountBalance address={account.address} />
+            {account.address === activeAddress && <Check className="w-4 h-4 text-primary" />}
+          </div>
+        </DropdownMenuItem>
+      ))}
+      {!activeAddress && accounts.length === 1 && (
+        <p className="px-3 py-2 text-xs text-muted-foreground">
+          Kondor shares only this account. To share another, update Koinscan in Kondor’s Settings › Connected sites, then connect again.
+        </p>
+      )}
+      <DropdownMenuSeparator className="my-2" />
+    </div>
+  );
 }
 
 export function WalletButton({
@@ -42,26 +79,24 @@ export function WalletButton({
   /** Overrides the connect button's classes so a page can match its own button shape. */
   connectClassName?: string;
 } = {}) {
-  const { signer, setSigner, savedAddress, savedWalletType, forgetAddress, chooseKondorAccount, setKondorAccounts, isReconnecting, kondorAccounts } = useWallet();
+  const { signer, setSigner, connect, pickDifferentKondorAccount, savedAddress, savedWalletType, forgetAddress, chooseKondorAccount, kondorAccounts } = useWallet();
   const addr = (signer as ExtendedSigner)?.getAddress();
   const walletName = (signer as ExtendedSigner)?.name;
   const router = useRouter();
+  const [menuOpen, setMenuOpen] = useState(false);
 
-  // Ask Kondor for its account picker. Kondor 2 shows it; older Kondor just
-  // returns the accounts it already shares, so say where to change that.
+  // Refresh Kondor's shared accounts; site permission changes happen in Kondor.
   const useDifferentAccount = async () => {
     try {
-      const accounts = await requestKondorAccountPicker();
+      const result = await pickDifferentKondorAccount();
+      if (!result) return;
+      const { accounts, selected } = result;
       if (!accounts.length) {
         toast.error("No accounts shared from Kondor");
         return;
       }
-      const known = new Set(kondorAccounts.map((account) => account.address));
-      const added = accounts.find((account) => !known.has(account.address));
-      setKondorAccounts(accounts);
-      if (added) {
-        chooseKondorAccount(added);
-        toast.success(`Switched to ${added.name || shortAddress(added.address)}`);
+      if (selected) {
+        toast.success(`Switched to ${selected.name || shortAddress(selected.address)}`);
       } else if (accounts.length === 1 && accounts[0].address === addr) {
         toast.custom(
           "Kondor only shares this account with Koinscan. In Kondor, open Settings › Connected sites and change what Koinscan can see, then try again."
@@ -78,43 +113,29 @@ export function WalletButton({
   const handleWalletAction = async (action: WalletName | "disconnect" | "forget") => {
     try {
       if (action === "disconnect") {
+        setSigner(undefined);
         if (walletName) {
           await disconnectWallet(walletName);
         }
-        setSigner(undefined);
-        // Clear beta access when disconnecting
-        clearBetaAccess();
         return;
       }
 
       if (action === "forget") {
+        forgetAddress();
         if (walletName) {
           await disconnectWallet(walletName);
         }
-        setSigner(undefined);
-        forgetAddress();
         // clearBetaAccess is already called in forgetAddress()
         toast.success(
           walletName === "kondor"
-            ? "Forgotten on this site. Kondor still shares this account with Koinscan; to connect a different one, change it under Kondor › Settings › Connected sites."
+            ? "Address forgotten. Connect again to choose from the accounts Kondor shares."
             : "Address forgotten"
         );
         return;
       }
 
-      const wName = action;
-      const address = await connectWallet(wName);
-      if (wName === "kondor") {
-        const shared = pickKondorAccount<KondorAccount>(kondorAccounts, address) ?? { address };
-        chooseKondorAccount(shared);
-        return;
-      }
-      const signer = getWalletSigner(wName, address);
-      (signer as ExtendedSigner).name = wName;
-      setSigner(signer as ExtendedSigner);
+      if (await connect(action) === "choose-account") setMenuOpen(true);
       
-      // Update beta access with the new wallet
-      saveBetaAccess(address);
     } catch (error) {
       toast.error((error as Error).message);
       console.error(error);
@@ -135,7 +156,7 @@ export function WalletButton({
   const displayAddress = addr || savedAddress;
 
   return (
-    <DropdownMenu>
+    <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
       <DropdownMenuTrigger asChild>
         {connectLabel && !displayAddress ? (
           <Button className={connectClassName ?? "h-[42px] rounded-[11px] bg-brand px-6 text-brand-foreground hover:bg-brand/90"}>
@@ -192,11 +213,14 @@ export function WalletButton({
       </DropdownMenuTrigger>
       <DropdownMenuContent 
         align="end" 
-        className="w-72 p-3 bg-background/95 backdrop-blur-sm border border-border/80 shadow-lg rounded-xl"
+        className="w-80 max-w-[calc(100vw-2rem)] p-3 bg-background/95 backdrop-blur-sm border border-border/80 shadow-lg rounded-xl"
         sideOffset={8}
       >
         {!displayAddress ? (
           <>
+            {kondorAccounts.length > 0 && (
+              <KondorAccountChoices accounts={kondorAccounts} onChoose={switchKondorAccount} />
+            )}
             <div className="px-3 py-2 mb-1 text-sm font-medium text-muted-foreground">
               Connect Wallet
             </div>
@@ -364,41 +388,14 @@ export function WalletButton({
             </div>
             
             {/* Kondor Accounts */}
-            {kondorAccounts && kondorAccounts.length > 0 && walletName === "kondor" && (
-              <div className="mb-3">
-                <div className="px-3 py-2 text-sm font-medium text-muted-foreground">
-                  Switch Account
-                </div>
-                {kondorAccounts.map((account, i) => (
-                  <DropdownMenuItem
-                    key={account.address}
-                    onClick={() => switchKondorAccount(account)}
-                    className="flex items-center justify-between px-4 py-2 my-1 rounded-lg cursor-pointer focus:bg-muted/80 hover:bg-muted/80"
-                  >
-                    <div className="flex items-center gap-2 text-sm">
-                      <div className="w-5 h-5 p-1 rounded-full bg-violet-100 dark:bg-violet-950/50">
-                        <Image
-                          src={kondorLogo}
-                          alt="kondor"
-                          width={20}
-                          height={20}
-                          className="w-full h-full object-contain"
-                        />
-                      </div>
-                      <div className="flex flex-col">
-                        <span className="font-medium">{account.name || `Account ${i+1}`}</span>
-                        <span className="text-xs text-muted-foreground">{shortAddress(account.address)}</span>
-                      </div>
-                    </div>
-                    {account.address === addr && (
-                      <Check className="w-4 h-4 text-primary" />
-                    )}
-                  </DropdownMenuItem>
-                ))}
-                <DropdownMenuSeparator className="my-2" />
-              </div>
+            {kondorAccounts.length > 0 && (!isConnected || walletName === "kondor") && (
+              <KondorAccountChoices
+                accounts={kondorAccounts}
+                activeAddress={addr}
+                onChoose={switchKondorAccount}
+              />
             )}
-            
+
             {/* Connect/Disconnect Options */}
             <div className="space-y-1">
               {!isConnected && (
@@ -496,4 +493,4 @@ export function WalletButton({
       </DropdownMenuContent>
     </DropdownMenu>
   );
-} 
+}

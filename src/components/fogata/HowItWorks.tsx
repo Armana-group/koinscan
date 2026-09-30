@@ -1,6 +1,8 @@
 "use client";
 
 import type { ReactNode } from "react";
+import Link from "next/link";
+import { cn } from "@/lib/utils";
 import {
   Dialog,
   DialogContent,
@@ -15,12 +17,14 @@ interface HowItWorksProps {
   children: ReactNode;
   /** The trigger label and dialog title. */
   label?: string;
+  className?: string;
+  guideHref?: string;
 }
 
-export function HowItWorks({ children, label = "How it works" }: HowItWorksProps) {
+export function HowItWorks({ children, label = "How it works", className, guideHref = "/fogata/help" }: HowItWorksProps) {
   return (
     <Dialog>
-      <div className="mt-3 text-sm">
+      <div className={cn("mt-3 text-sm", className)}>
         <DialogTrigger asChild>
           <button
             type="button"
@@ -36,7 +40,14 @@ export function HowItWorks({ children, label = "How it works" }: HowItWorksProps
           <DialogTitle className="pr-6">{label}</DialogTitle>
         </DialogHeader>
         <DialogDescription asChild>
-          <div className="min-h-0 space-y-3 overflow-y-auto leading-relaxed">{children}</div>
+          <div className="min-h-0 space-y-3 overflow-y-auto leading-relaxed">
+            {children}
+            <p className="border-t border-border pt-3">
+              <Link href={guideHref} className="text-foreground underline decoration-border underline-offset-4 hover:decoration-foreground">
+                Read the full guide or download it for your LLM ›
+              </Link>
+            </p>
+          </div>
         </DialogDescription>
       </DialogContent>
     </Dialog>

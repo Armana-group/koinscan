@@ -3,11 +3,12 @@ import Link from "next/link";
 import { ArrowUpRight, Check, GitCommitHorizontal } from "lucide-react";
 import { Navbar } from "@/components/Navbar";
 import { changelogEntries } from "@/content/changelog";
+import { pageMetadata } from "@/lib/social-metadata";
 
-export const metadata: Metadata = {
-  title: "Changelog | KoinScan",
-  description: "A public record of improvements to the KoinScan block explorer.",
-};
+export const metadata: Metadata = pageMetadata(
+  "Changelog | KoinScan",
+  "A public record of improvements to the KoinScan block explorer.",
+);
 
 export default function ChangelogPage() {
   return (

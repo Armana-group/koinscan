@@ -6,6 +6,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { WalletProvider } from "@/contexts/WalletContext";
 import { SearchProvider } from "@/components/SearchProvider";
 import { Footer } from "@/components/Footer";
+import { pageMetadata, SITE_DESCRIPTION, SITE_TITLE } from "@/lib/social-metadata";
 
 const poppins = Poppins({
   subsets: ["latin"],
@@ -13,10 +14,11 @@ const poppins = Poppins({
   variable: "--font-poppins",
 });
 
+// The default card image comes from src/app/opengraph-image.tsx.
 export const metadata: Metadata = {
-  title: "KoinScan - Koinos Block Explorer",
-  description: "Explore the Koinos blockchain - transactions, blocks, accounts, and smart contracts",
-  manifest: "/manifest.json"
+  metadataBase: new URL("https://koinscan.com"),
+  ...pageMetadata(SITE_TITLE, SITE_DESCRIPTION),
+  manifest: "/manifest.json",
 };
 
 export default function RootLayout({

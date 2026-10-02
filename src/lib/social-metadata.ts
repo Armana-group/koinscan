@@ -13,15 +13,19 @@ export const SITE_DESCRIPTION = "Explore the Koinos blockchain - transactions, b
 // opengraph-image file override this.
 const SITE_IMAGE = { url: "/opengraph-image", width: 1200, height: 630, alt: "KoinScan, the Koinos block explorer" };
 
+// The card from src/app/fogata/opengraph-image.tsx, for pages under /fogata
+// that set their own title.
+export const FOGATA_IMAGE = { url: "/fogata/opengraph-image", width: 1200, height: 630, alt: "Fogata mining pools on KoinScan" };
+
 // A child segment's openGraph and twitter objects replace the root ones
 // entirely, including the inherited image, so every page that sets its own
 // title goes through this.
-export function pageMetadata(title: string, description: string): Metadata {
+export function pageMetadata(title: string, description: string, image = SITE_IMAGE): Metadata {
   return {
     title,
     description,
-    openGraph: { type: "website", siteName: "KoinScan", title, description, images: [SITE_IMAGE] },
-    twitter: { card: "summary_large_image", title, description, images: [SITE_IMAGE] },
+    openGraph: { type: "website", siteName: "KoinScan", title, description, images: [image] },
+    twitter: { card: "summary_large_image", title, description, images: [image] },
   };
 }
 

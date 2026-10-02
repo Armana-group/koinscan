@@ -21,15 +21,32 @@ interface CardProps {
   footer: string;
 }
 
-export async function renderCard({ eyebrow, headline, headlineSize = 112, detail, badge, footer }: CardProps) {
+async function loadFonts() {
   const [semiBold, regular] = await Promise.all([
     readFile(join(process.cwd(), "src/assets/fonts/Poppins-SemiBold.ttf")),
     readFile(join(process.cwd(), "src/assets/fonts/Poppins-Regular.ttf")),
   ]);
+  return [
+    { name: "Poppins", data: semiBold, weight: 600 as const, style: "normal" as const },
+    { name: "Poppins", data: regular, weight: 400 as const, style: "normal" as const },
+  ];
+}
+
+function LogoBars({ height }: { height: number }) {
+  const unit = height / 3.2;
+  return (
+    <div style={{ display: "flex" }}>
+      {LOGO_COLORS.map((color, i) => (
+        <div key={color} style={{ width: unit * [4, 2, 1][i], height, marginRight: unit * 0.4, background: color }} />
+      ))}
+    </div>
+  );
+}
+
+export async function renderCard({ eyebrow, headline, headlineSize = 112, detail, badge, footer }: CardProps) {
 
   // The site card shows a large logo; page cards shrink it to make room.
   const barHeight = eyebrow ? 40 : 128;
-  const barUnit = barHeight / 3.2;
 
   return new ImageResponse(
     (
@@ -47,12 +64,7 @@ export async function renderCard({ eyebrow, headline, headlineSize = 112, detail
         }}
       >
         <div style={{ display: "flex", alignItems: "center" }}>
-          {LOGO_COLORS.map((color, i) => (
-            <div
-              key={color}
-              style={{ width: barUnit * [4, 2, 1][i], height: barHeight, marginRight: barUnit * 0.4, background: color }}
-            />
-          ))}
+          <LogoBars height={barHeight} />
           {eyebrow && (
             <div style={{ display: "flex", marginLeft: 16, fontSize: 34, fontWeight: 600 }}>KoinScan</div>
           )}
@@ -93,12 +105,48 @@ export async function renderCard({ eyebrow, headline, headlineSize = 112, detail
         </div>
       </div>
     ),
-    {
-      ...cardSize,
-      fonts: [
-        { name: "Poppins", data: semiBold, weight: 600, style: "normal" },
-        { name: "Poppins", data: regular, weight: 400, style: "normal" },
-      ],
-    },
+    { ...cardSize, fonts: await loadFonts() },
+  );
+}
+
+// Fogata is its own product that lives inside KoinScan, so its card leads
+// with the Fogata mark and credits KoinScan small in the corner.
+export async function renderFogataCard({ headline, detail, footer }: { headline: string; detail: string; footer: string }) {
+  const mark = await readFile(join(process.cwd(), "public/fogata-mark.svg"));
+  const markSrc = `data:image/svg+xml;base64,${mark.toString("base64")}`;
+
+  return new ImageResponse(
+    (
+      <div
+        style={{
+          width: "100%",
+          height: "100%",
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "space-between",
+          padding: "88px 96px",
+          background: "#FFFFFF",
+          color: INK,
+          fontFamily: "Poppins",
+        }}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element -- ImageResponse renders plain <img> only */}
+        <img src={markSrc} width={136} height={136} alt="" />
+
+        <div style={{ display: "flex", flexDirection: "column" }}>
+          <div style={{ display: "flex", fontSize: 112, fontWeight: 600, letterSpacing: -4, lineHeight: 1 }}>{headline}</div>
+          <div style={{ display: "flex", marginTop: 24, fontSize: 40, color: MUTED }}>{detail}</div>
+        </div>
+
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 28, color: SUBTLE }}>
+          <div style={{ display: "flex" }}>{footer}</div>
+          <div style={{ display: "flex", alignItems: "center", color: INK, fontWeight: 600 }}>
+            <LogoBars height={22} />
+            <div style={{ display: "flex", marginLeft: 6 }}>KoinScan</div>
+          </div>
+        </div>
+      </div>
+    ),
+    { ...cardSize, fonts: await loadFonts() },
   );
 }

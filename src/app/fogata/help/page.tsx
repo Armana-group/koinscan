@@ -4,14 +4,16 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import Markdown from "react-markdown";
 import { backLink, pageTitle, quietLink } from "@/components/fogata/styles";
+import { FOGATA_IMAGE, pageMetadata } from "@/lib/social-metadata";
 import styles from "./guide.module.css";
 
 export const dynamic = "force-static";
 
-export const metadata: Metadata = {
-  title: "Fogata guide | KoinScan",
-  description: "Learn how Koinos mining works and how to deposit, manage rewards, withdraw, and trade with Fogata.",
-};
+export const metadata: Metadata = pageMetadata(
+  "Fogata guide | KoinScan",
+  "Learn how Koinos mining works and how to deposit, manage rewards, withdraw, and trade with Fogata.",
+  FOGATA_IMAGE,
+);
 
 // Headings in the guide are plain text. Use the same anchors as Markdown readers.
 function headingId(text: string) {

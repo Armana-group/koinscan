@@ -10,6 +10,23 @@ export interface ChangelogEntry {
 
 export const changelogEntries = [
   {
+    date: "2026-10-02",
+    displayDate: "October 2, 2026",
+    title: "Fogata v2 beta, guide, and link previews",
+    summary:
+      "Fogata v2 opens as a public beta with a plain-language guide, clearer wallet controls, and rich previews when you share KoinScan links.",
+    changes: [
+      "Open Fogata v2 as a public beta. Feedback on bugs, confusing steps, and ideas is welcome in the Armana Telegram.",
+      "Add the Fogata guide, covering how Koinos mining works, choosing a pool, deposits, reward settings, withdrawals, trading, and troubleshooting.",
+      "Link each Fogata screen to the matching section of the guide, and summarize what changed in v2 on the pools page.",
+      "Switch between shared Kondor accounts, disconnect, or forget a remembered address from the wallet menu, and see the connected account's KOIN balance.",
+      "Show a rich preview when a KoinScan link is shared, with the amount and parties for transfers and the method for contract calls.",
+      "Give Fogata links their own preview card.",
+    ],
+    contributors: ["Julian Gonzalez", "Ron Hamenahem"],
+    commits: ["2331d30", "8c31127", "f019678"],
+  },
+  {
     date: "2026-09-19",
     displayDate: "September 19, 2026",
     title: "Fogata staking pools and VHP trading",

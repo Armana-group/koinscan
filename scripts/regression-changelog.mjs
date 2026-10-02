@@ -19,6 +19,16 @@ assert.match(
 );
 assert.match(
   changelog.html,
+  /Fogata v2 beta, guide, and link previews/,
+  "the Fogata v2 beta release is documented",
+);
+assert.match(
+  changelog.html,
+  /2331d30/,
+  "the Fogata v2 beta release points to its deployed commit",
+);
+assert.match(
+  changelog.html,
   /Accurate balances and market pricing/,
   "the accepted accuracy release is documented",
 );

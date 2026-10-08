@@ -12,17 +12,19 @@ export const changelogEntries = [
   {
     date: "2026-10-08",
     displayDate: "October 8, 2026",
-    title: "Custom RPC nodes and a trusted node picker",
+    title: "Custom RPC nodes, block producer history, and faster failures",
     summary:
-      "Pointing KoinScan at your own Koinos node works again, and the settings menu now offers trusted nodes you can pick with one click.",
+      "Pointing KoinScan at your own Koinos node works again, block producers see their rewards in address history, and an unreachable node fails fast.",
     changes: [
       "Fix custom RPC nodes, which the browser had been refusing since the June security hardening.",
       "Pick a trusted node from the settings menu: Koinos Community Foundation, Armana, or KoinosBlocks.",
       "Keep the free-text field for any other node. Custom nodes are read directly from your browser, never relayed through KoinScan's servers.",
       "Allow a local node over http://localhost for development and testing.",
+      "Show blocks an address produced in its history as reward rows, with the KOIN earned and VHP burned, instead of an empty list.",
+      "Report an unreachable RPC node within seconds, naming the node, instead of leaving balances loading for over a minute.",
     ],
     contributors: ["Ron Hamenahem"],
-    commits: ["59fe8ae"],
+    commits: ["59fe8ae", "56ebfc0", "747f994"],
   },
   {
     date: "2026-10-02",

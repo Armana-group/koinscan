@@ -19,14 +19,16 @@ assert.match(
 );
 assert.match(
   changelog.html,
-  /Custom RPC nodes and a trusted node picker/,
+  /Custom RPC nodes, block producer history, and faster failures/,
   "the custom RPC node fix is documented",
 );
-assert.match(
-  changelog.html,
-  /59fe8ae/,
-  "the custom RPC node fix points to its deployed commit",
-);
+for (const commit of ["59fe8ae", "56ebfc0", "747f994"]) {
+  assert.match(
+    changelog.html,
+    new RegExp(commit),
+    `the October 8 release points to deployed commit ${commit}`,
+  );
+}
 assert.match(
   changelog.html,
   /Fogata v2 beta, guide, and link previews/,

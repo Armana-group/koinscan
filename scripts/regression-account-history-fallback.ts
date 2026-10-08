@@ -58,7 +58,7 @@ async function main() {
 
   assert.ok(history.length > 0, 'history fallback should return transactions when REST returns an error object');
   assert.ok(
-    history.some((transaction) => transaction.trx.transaction.id === EXPECTED_TX),
+    history.some((transaction) => transaction.trx?.transaction.id === EXPECTED_TX),
     `fallback history should include known transaction ${EXPECTED_TX}`
   );
 

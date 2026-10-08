@@ -229,16 +229,42 @@ export interface TransactionData {
   signatures: string[];
 }
 
-export interface DetailedTransaction {
-  seq_num?: string;
-  trx: {
-    transaction: TransactionData;
-    receipt: TransactionReceipt;
+// A block the account produced, as returned by the account history endpoints.
+// Its receipt carries the producer reward (mint) and VHP burn events.
+export interface ProducedBlock {
+  header: {
+    height: string;
+    timestamp: string;
+    signer: string;
+    previous?: string;
+    [key: string]: unknown;
+  };
+  receipt: {
+    id: string;
+    height?: string;
+    events?: TransactionEvent[];
+    logs?: string[];
+    [key: string]: unknown;
   };
 }
 
+// Account history entries are either a transaction (`trx`) or, for block
+// producers, a block they produced (`block`).
+export interface DetailedTransaction {
+  seq_num?: string;
+  trx?: {
+    transaction: TransactionData;
+    receipt: TransactionReceipt;
+  };
+  block?: ProducedBlock;
+}
+
+type TransactionHistoryEntry = DetailedTransaction & {
+  trx: NonNullable<DetailedTransaction['trx']>;
+};
+
 export interface TransactionAction {
-  type: 'token_transfer' | 'token_mint' | 'token_burn' | 'contract_interaction' | 'system_call' | 'contract_upload' | 'governance' | 'other';
+  type: 'token_transfer' | 'token_mint' | 'token_burn' | 'contract_interaction' | 'system_call' | 'contract_upload' | 'governance' | 'block_production' | 'other';
   description: string;
   dappName?: string;
   tokenTransfers?: Array<{
@@ -1026,92 +1052,235 @@ export function generateUserFriendlyInfo(tx: any): UserFriendlyTransactionInfo {
  * @param transactions Array of detailed transactions
  * @returns Formatted transactions with key information extracted
  */
+interface TokenEventSummary {
+  tokenSymbol: string;
+  totalValueTransferred: string;
+  tokenTransfers: Record<string, string>;
+}
+
+// Totals token movement from transfer and mint events for the legacy summary fields.
+function summarizeTokenEvents(events: TransactionEvent[]): TokenEventSummary {
+  let tokenSymbol = 'KOIN';
+  let totalValueTransferred = '0';
+  
+  // Track transfers for multiple tokens
+  const tokenTransfers: Record<string, string> = {};
+  
+  if (events.length > 0) {
+    const transferEvents = events.filter(event => event.name.includes('transfer_event'));
+    
+    // Process each transfer event
+    if (transferEvents.length > 0) {
+      transferEvents.forEach(event => {
+        const transferData = decodeTokenTransferEventData(event.data);
+        if (event.source && transferData?.value) {
+          try {
+            // Identify the token
+            let eventTokenSymbol = 'Unknown';
+            eventTokenSymbol = getTokenSymbolSync(event.source);
+            
+            // Add to the token's total
+            const value = BigInt(transferData.value);
+            if (tokenTransfers[eventTokenSymbol]) {
+              // Convert existing value to BigInt, add the new value, and store back as string
+              const currentTotal = BigInt(tokenTransfers[eventTokenSymbol]);
+              tokenTransfers[eventTokenSymbol] = (currentTotal + value).toString();
+            } else {
+              tokenTransfers[eventTokenSymbol] = value.toString();
+            }
+            
+            // For backward compatibility, keep track of the first token for single-token display
+            if (transferEvents.indexOf(event) === 0) {
+              tokenSymbol = eventTokenSymbol;
+              totalValueTransferred = value.toString();
+            }
+          } catch (err) {
+            console.error('Error processing transfer event:', err);
+          }
+        }
+      });
+    }
+    
+    // Also check for mint events
+    const mintEvents = events.filter(event => event.name.includes('mint_event'));
+    if (mintEvents.length > 0) {
+      mintEvents.forEach(event => {
+        const eventData = typeof event.data === 'string' ? null : event.data;
+        if (event.source && eventData?.value) {
+          try {
+            // Identify the token
+            let eventTokenSymbol = 'Unknown';
+            eventTokenSymbol = getTokenSymbolSync(event.source);
+            
+            // Add to the token's total
+            const value = BigInt(eventData.value);
+            if (tokenTransfers[eventTokenSymbol]) {
+              // Convert existing value to BigInt, add the new value, and store back as string
+              const currentTotal = BigInt(tokenTransfers[eventTokenSymbol]);
+              tokenTransfers[eventTokenSymbol] = (currentTotal + value).toString();
+            } else {
+              tokenTransfers[eventTokenSymbol] = value.toString();
+            }
+            
+            // If no transfer events, use the first mint event for display
+            if (transferEvents.length === 0 && mintEvents.indexOf(event) === 0) {
+              tokenSymbol = eventTokenSymbol;
+              totalValueTransferred = value.toString();
+            }
+          } catch (err) {
+            console.error('Error processing mint event:', err);
+          }
+        }
+      });
+    }
+  }
+
+  return { tokenSymbol, totalValueTransferred, tokenTransfers };
+}
+
+// Decodes a token mint_event ({ to, value }) or burn_event ({ from, value })
+// payload. Field 1 is the address, field 2 is the uint64 amount.
+export function decodeTokenAmountEventData(data: unknown): { address: string; value: string } | null {
+  if (typeof data !== 'string' || data.length === 0) return null;
+
+  try {
+    const bytes = utils.decodeBase64url(data);
+    let address: string | undefined;
+    let value: string | undefined;
+    let offset = 0;
+
+    while (offset < bytes.length) {
+      const key = readVarint(bytes, offset);
+      offset = key.next;
+      const fieldNumber = Number(key.value >> BigInt(3));
+      const wireType = Number(key.value & BigInt(0x07));
+
+      if (fieldNumber === 1 && wireType === 2) {
+        const length = readVarint(bytes, offset);
+        offset = length.next;
+        const end = offset + Number(length.value);
+        if (end > bytes.length) return null;
+        address = utils.encodeBase58(bytes.slice(offset, end));
+        offset = end;
+      } else if (fieldNumber === 2 && wireType === 0) {
+        const amount = readVarint(bytes, offset);
+        value = amount.value.toString();
+        offset = amount.next;
+      } else if (wireType === 0) {
+        offset = readVarint(bytes, offset).next;
+      } else if (wireType === 2) {
+        const length = readVarint(bytes, offset);
+        offset = length.next + Number(length.value);
+        if (offset > bytes.length) return null;
+      } else {
+        return null;
+      }
+    }
+
+    return address && value ? { address, value } : null;
+  } catch {
+    return null;
+  }
+}
+
+// Block receipts carry mint/burn events with encoded payloads; decode them so
+// the action extractor can show the producer reward.
+function normalizeBlockEvent(event: TransactionEvent): TransactionEvent {
+  const name = event.name?.toLowerCase() || '';
+  if (typeof event.data !== 'string') return event;
+
+  if (name.includes('mint_event')) {
+    const decoded = decodeTokenAmountEventData(event.data);
+    return decoded ? { ...event, data: { to: decoded.address, value: decoded.value } } : event;
+  }
+  if (name.includes('burn_event')) {
+    const decoded = decodeTokenAmountEventData(event.data);
+    return decoded ? { ...event, data: { from: decoded.address, value: decoded.value } } : event;
+  }
+  return normalizeTransactionEvent(event);
+}
+
+function formatBlockHeight(height: string): string {
+  const parsed = Number(height);
+  return Number.isFinite(parsed) ? parsed.toLocaleString('en-US') : height;
+}
+
+// Formats a block the account produced as a history row. Block rows carry
+// their own timestamp and height, so the timestamp enricher leaves them alone.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function formatBlockProductionEntry(block: ProducedBlock, seqNum: string | undefined, userAddress?: string): any {
+  const events = (block.receipt.events || []).map(normalizeBlockEvent);
+  const { tokenSymbol, totalValueTransferred, tokenTransfers } = summarizeTokenEvents(events);
+  const height = block.header.height;
+  const description = `Produced block ${formatBlockHeight(height)}`;
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const row: any = {
+    id: block.receipt.id,
+    seq_num: seqNum,
+    payer: block.header.signer,
+    operations: [],
+    events,
+    signatures: [],
+    totalValueTransferred,
+    tokenSymbol,
+    tokenTransfers,
+    tags: ['block_production'],
+    primaryTag: 'Block Production',
+    associatedAddress: userAddress || block.header.signer,
+    timestamp: block.header.timestamp,
+    blockId: block.receipt.id,
+    blockHeight: height,
+    isBlockProduction: true,
+  };
+
+  // Only the producer's own movements: the KOIN reward minted to it and the VHP it
+  // burned. Block receipts also mint to the Koinos fund, which is not this account's.
+  // Reward first so the row leads with what was earned.
+  const signer = block.header.signer;
+  const rewardTransfers = extractTransactionActions(row, userAddress)
+    .flatMap((action) => action.tokenTransfers || [])
+    .filter((transfer) => transfer.to === signer || transfer.from === signer)
+    .sort((left, right) => Number(Boolean(right.isPositive)) - Number(Boolean(left.isPositive)));
+  const reward = rewardTransfers.find((transfer) => transfer.isPositive);
+
+  row.actions = [{
+    type: 'block_production',
+    description,
+    tokenTransfers: rewardTransfers,
+    metadata: { height, blockId: block.receipt.id },
+  }];
+
+  const userFriendlyInfo: UserFriendlyTransactionInfo = {
+    actionType: 'minted',
+    description,
+    isPositive: true,
+    ...(reward && { amount: reward.formattedAmount, tokenSymbol: reward.token.symbol }),
+  };
+
+  return { ...row, userFriendlyInfo };
+}
+
 export function formatDetailedTransactions(transactions: DetailedTransaction[], userAddress?: string): any[] {
   // Guard against non-array input
   if (!Array.isArray(transactions)) {
     console.warn('formatDetailedTransactions received non-array input:', transactions);
     return [];
   }
-  return transactions.map((tx) => {
-    const { call_contract, upload_contract, set_system_call, set_system_contract } = tx.trx.transaction.operations[0] || {};
-    const events = (tx.trx.receipt.events || []).map(normalizeTransactionEvent);
-    
-    // Process token info from transfer events if available
-    let tokenSymbol = 'KOIN';
-    let totalValueTransferred = '0';
-    
-    // Track transfers for multiple tokens
-    const tokenTransfers: Record<string, string> = {};
-    
-    if (tx.trx.receipt && events) {
-      const transferEvents = events.filter(event => event.name.includes('transfer_event'));
-      
-      // Process each transfer event
-      if (transferEvents.length > 0) {
-        transferEvents.forEach(event => {
-          const transferData = decodeTokenTransferEventData(event.data);
-          if (event.source && transferData?.value) {
-            try {
-              // Identify the token
-              let eventTokenSymbol = 'Unknown';
-              eventTokenSymbol = getTokenSymbolSync(event.source);
-              
-              // Add to the token's total
-              const value = BigInt(transferData.value);
-              if (tokenTransfers[eventTokenSymbol]) {
-                // Convert existing value to BigInt, add the new value, and store back as string
-                const currentTotal = BigInt(tokenTransfers[eventTokenSymbol]);
-                tokenTransfers[eventTokenSymbol] = (currentTotal + value).toString();
-              } else {
-                tokenTransfers[eventTokenSymbol] = value.toString();
-              }
-              
-              // For backward compatibility, keep track of the first token for single-token display
-              if (transferEvents.indexOf(event) === 0) {
-                tokenSymbol = eventTokenSymbol;
-                totalValueTransferred = value.toString();
-              }
-            } catch (err) {
-              console.error('Error processing transfer event:', err);
-            }
-          }
-        });
-      }
-      
-      // Also check for mint events
-      const mintEvents = events.filter(event => event.name.includes('mint_event'));
-      if (mintEvents.length > 0) {
-        mintEvents.forEach(event => {
-          const eventData = typeof event.data === 'string' ? null : event.data;
-          if (event.source && eventData?.value) {
-            try {
-              // Identify the token
-              let eventTokenSymbol = 'Unknown';
-              eventTokenSymbol = getTokenSymbolSync(event.source);
-              
-              // Add to the token's total
-              const value = BigInt(eventData.value);
-              if (tokenTransfers[eventTokenSymbol]) {
-                // Convert existing value to BigInt, add the new value, and store back as string
-                const currentTotal = BigInt(tokenTransfers[eventTokenSymbol]);
-                tokenTransfers[eventTokenSymbol] = (currentTotal + value).toString();
-              } else {
-                tokenTransfers[eventTokenSymbol] = value.toString();
-              }
-              
-              // If no transfer events, use the first mint event for display
-              if (transferEvents.length === 0 && mintEvents.indexOf(event) === 0) {
-                tokenSymbol = eventTokenSymbol;
-                totalValueTransferred = value.toString();
-              }
-            } catch (err) {
-              console.error('Error processing mint event:', err);
-            }
-          }
-        });
-      }
+  return transactions.flatMap((entry) => {
+    if (entry.block) {
+      return [formatBlockProductionEntry(entry.block, entry.seq_num, userAddress)];
     }
-    
+
+    if (!entry.trx?.transaction || !entry.trx.receipt) {
+      console.warn('Skipping account history entry with an unknown shape:', entry);
+      return [];
+    }
+
+    const tx = entry as TransactionHistoryEntry;
+    const events = (tx.trx.receipt.events || []).map(normalizeTransactionEvent);
+    const { tokenSymbol, totalValueTransferred, tokenTransfers } = summarizeTokenEvents(events);
+
     // Create a base formatted transaction with empty tags array
     const formattedTx: any = {
       id: tx.trx.transaction.id,
@@ -1160,10 +1329,10 @@ export function formatDetailedTransactions(transactions: DetailedTransaction[], 
     const userFriendlyInfo = generateUserFriendlyInfo(formattedTx);
 
     // Add the user-friendly info to the transaction
-    return {
+    return [{
       ...formattedTx,
       userFriendlyInfo
-    };
+    }];
   });
 }
 
@@ -1479,6 +1648,7 @@ export async function enrichTransactionsWithTimestamps(restNode: string, transac
     const batch = transactions.slice(index, index + 2);
     const enrichedBatch = await Promise.all(
       batch.map(async (tx) => {
+      if (tx.timestamp) return tx;
       try {
         const txDetails = await getTransactionDetails(restNode, tx.id);
         

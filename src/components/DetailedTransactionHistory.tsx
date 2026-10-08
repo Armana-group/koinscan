@@ -790,8 +790,11 @@ export function DetailedTransactionHistory({
     const sentTransfers = allTransfers.filter(t => !t.isPositive);
     const receivedTransfers = allTransfers.filter(t => t.isPositive);
 
+    // A produced block burns VHP and mints KOIN; that is a reward, not a swap.
+    const isBlockProduction = primaryAction.type === 'block_production';
+
     // Detect if this is a swap (has both sent and received transfers with different tokens)
-    const isSwap = sentTransfers.length > 0 && receivedTransfers.length > 0 &&
+    const isSwap = !isBlockProduction && sentTransfers.length > 0 && receivedTransfers.length > 0 &&
       sentTransfers[0]?.token.address !== receivedTransfers[0]?.token.address;
 
     // Get the primary token transfer for display (used for non-swap transactions)
@@ -825,6 +828,8 @@ export function DetailedTransactionHistory({
           return FileUp;
         case 'governance':
           return BarChart4;
+        case 'block_production':
+          return Layers;
         default:
           return Layers;
       }
@@ -949,8 +954,12 @@ export function DetailedTransactionHistory({
               </div>
             )}
 
-            {/* Counterparty */}
-            {counterparty && (
+            {/* Counterparty, or the block for a production reward */}
+            {isBlockProduction ? (
+              <div className="text-xs text-muted-foreground truncate">
+                {primaryAction.description}
+              </div>
+            ) : counterparty && (
               <div className="text-xs text-muted-foreground truncate">
                 {counterpartyLabel} {shortenAddress(counterparty)}
               </div>
@@ -1009,8 +1018,8 @@ export function DetailedTransactionHistory({
                 </div>
               ))}
 
-              {/* Mana used - only in advanced mode */}
-              {showAdvanced && (
+              {/* Mana used - only in advanced mode; block rows have none */}
+              {showAdvanced && tx.rc_used && (
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
                   <Flame className="h-3 w-3" />
                   <span>{formatTokenAmount(tx.rc_used, 8)} mana</span>

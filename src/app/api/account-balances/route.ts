@@ -1,43 +1,26 @@
 import { NextResponse } from "next/server";
-import { Contract, Provider } from "koilib";
-import tokenAbi from "@/koinos/abi";
+import { Provider } from "koilib";
+import {
+  DEFAULT_JSON_RPC_NODE,
+  KNOWN_RPC_ORIGINS,
+  normalizeRpcOrigin,
+} from "@/koinos/known-nodes";
+import { createKoilibBalanceReader } from "@/lib/balance-reader";
 import { getAllTokens } from "@/lib/tokens";
 import { loadWalletBalances } from "@/lib/wallet-balances";
 
-const DEFAULT_RPC_ORIGIN = "https://api.koinos.io";
-const ALLOWED_RPC_ORIGINS = new Set([
-  DEFAULT_RPC_ORIGIN,
-  "https://api.koinosblocks.com",
-]);
+// This proxy only relays to the trusted node list. Custom nodes are read directly
+// from the browser instead (see WalletBalances), so the server never fetches
+// arbitrary user-supplied URLs.
+const ALLOWED_RPC_ORIGINS = KNOWN_RPC_ORIGINS;
 const KOINOS_ADDRESS_PATTERN = /^[1-9A-HJ-NP-Za-km-z]{20,60}$/;
-
-function normalizeRpcOrigin(rpcNode: string | null): string | null {
-  try {
-    const url = new URL(rpcNode || DEFAULT_RPC_ORIGIN);
-    if (url.protocol !== "https:") return null;
-    return url.origin;
-  } catch {
-    return null;
-  }
-}
-
-function createBalanceReader(provider: Provider) {
-  return async (contractAddress: string, owner: string) => {
-    const contract = new Contract({
-      id: contractAddress,
-      provider,
-      abi: tokenAbi,
-    });
-
-    const { result } = await contract.functions.balanceOf({ owner });
-    return result?.value ?? "0";
-  };
-}
 
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url);
   const address = requestUrl.searchParams.get("address") || "";
-  const rpcOrigin = normalizeRpcOrigin(requestUrl.searchParams.get("rpcNode"));
+  const rpcOrigin = normalizeRpcOrigin(
+    requestUrl.searchParams.get("rpcNode") || DEFAULT_JSON_RPC_NODE,
+  );
 
   if (!KOINOS_ADDRESS_PATTERN.test(address)) {
     return NextResponse.json({ error: "Invalid Koinos address" }, { status: 400 });
@@ -53,7 +36,7 @@ export async function GET(request: Request) {
     const initialResult = await loadWalletBalances(
       tokens,
       address,
-      createBalanceReader(provider),
+      createKoilibBalanceReader(provider),
     );
 
     let result = initialResult;
@@ -67,7 +50,7 @@ export async function GET(request: Request) {
         const retryResult = await loadWalletBalances(
           initialResult.failures.map(({ token }) => token),
           address,
-          createBalanceReader(retryProvider),
+          createKoilibBalanceReader(retryProvider),
           1,
         );
 

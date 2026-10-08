@@ -75,6 +75,14 @@ assert(
 );
 
 assert(
+  'CSP connect-src allows custom https nodes without opening wildcard or plain-http hosts',
+  nextConfig.includes("connect-src 'self' https: http://localhost:*") &&
+    !nextConfig.includes('connect-src *') &&
+    !/connect-src[^"]*\shttp:\s/.test(nextConfig) &&
+    !/connect-src[^"]*\swss:\s/.test(nextConfig),
+);
+
+assert(
   'production builds do not ignore TypeScript errors',
   !nextConfig.includes('ignoreBuildErrors: true'),
 );

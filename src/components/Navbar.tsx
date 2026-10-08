@@ -4,9 +4,9 @@ import { NavigationWithSearch } from "./NavigationWithSearch";
 import { Logo } from "./Logo";
 import { WalletButton } from "./WalletButton";
 import { ThemeToggle } from "./theme-toggle";
+import { RpcNodePicker } from "./RpcNodePicker";
 import { Menu, Settings } from "lucide-react";
 import { Button } from "./ui/button";
-import { RPC_NODE_STORAGE_KEY, useWallet } from "@/contexts/WalletContext";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -16,9 +16,6 @@ import {
 } from "./ui/dropdown-menu";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
-import { Input } from "./ui/input";
-import { Provider } from "koilib";
 
 const menuItems = [
   { name: "Home", href: "/" },
@@ -31,28 +28,6 @@ const menuItems = [
 
 export function Navbar() {
   const pathname = usePathname();
-  const { provider, setProvider } = useWallet();
-  const [newRpcNode, setNewRpcNode] = useState("");
-
-  const handleRpcNodeChange = () => {
-    if (newRpcNode) {
-      // Update local storage
-      localStorage.setItem(RPC_NODE_STORAGE_KEY, newRpcNode);
-      
-      // Update provider in WalletContext
-      const newProvider = new Provider([newRpcNode]);
-      setProvider(newProvider);
-      
-      // Clear input
-      setNewRpcNode("");
-    }
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' && newRpcNode) {
-      handleRpcNodeChange();
-    }
-  };
 
   return (
     <header className="w-full bg-background/80 backdrop-blur-sm">
@@ -84,26 +59,7 @@ export function Navbar() {
               })}
               <DropdownMenuSeparator />
               <div className="px-2 py-2 space-y-2">
-                <div className="space-y-2">
-                  <div className="text-sm font-medium text-muted-foreground">RPC Node</div>
-                  <div className="flex items-center gap-2">
-                    <Input
-                      value={newRpcNode}
-                      onChange={(e) => setNewRpcNode(e.target.value)}
-                      placeholder={(provider as Provider)?.rpcNodes[0]}
-                      className="h-8 text-xs"
-                    />
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={handleRpcNodeChange}
-                      className="h-8 px-2"
-                      disabled={!newRpcNode}
-                    >
-                      Save
-                    </Button>
-                  </div>
-                </div>
+                <RpcNodePicker compact />
                 <ThemeToggle />
               </div>
             </DropdownMenuContent>
@@ -137,31 +93,10 @@ export function Navbar() {
               </DropdownMenuTrigger>
               <DropdownMenuContent
                 align="end"
-                className="w-72 p-4 bg-background/95 backdrop-blur-sm border border-border/80 shadow-lg rounded-xl"
+                className="w-80 p-4 bg-background/95 backdrop-blur-sm border border-border/80 shadow-lg rounded-xl"
                 sideOffset={8}
               >
-                <div className="space-y-4">
-                  <div>
-                    <div className="text-sm font-medium mb-2">RPC Node</div>
-                    <div className="text-sm text-muted-foreground mb-3">{(provider as Provider)?.rpcNodes[0]}</div>
-                    <div className="flex items-center gap-2">
-                      <Input
-                        value={newRpcNode}
-                        onChange={(e) => setNewRpcNode(e.target.value)}
-                        onKeyDown={handleKeyDown}
-                        placeholder="Enter new RPC node URL"
-                        className="flex-1"
-                      />
-                      <Button
-                        onClick={handleRpcNodeChange}
-                        disabled={!newRpcNode}
-                        variant="secondary"
-                      >
-                        Save
-                      </Button>
-                    </div>
-                  </div>
-                </div>
+                <RpcNodePicker />
               </DropdownMenuContent>
             </DropdownMenu>
             <ThemeToggle />

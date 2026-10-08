@@ -1,5 +1,6 @@
 "use client";
 
+import { DEFAULT_JSON_RPC_NODE } from "@/koinos/known-nodes";
 import { SignerInterface, ProviderInterface, Provider } from "koilib";
 import { createContext, useContext, useState, ReactNode, useEffect, useCallback, useRef } from "react";
 import * as kondor from "kondor-js";
@@ -25,7 +26,7 @@ export const RPC_NODE_STORAGE_KEY = "rpc-node";
 export const REST_NODE_STORAGE_KEY = "rest-node";
 
 // Default endpoints
-const DEFAULT_RPC_NODE = "https://api.koinos.io"; // JSON-RPC for koilib Provider
+const DEFAULT_RPC_NODE = DEFAULT_JSON_RPC_NODE; // JSON-RPC for koilib Provider
 const DEFAULT_REST_NODE = "https://rest.koinos.io"; // REST API for account history, balances
 
 // Add kondor type declaration to make TypeScript happy

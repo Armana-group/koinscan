@@ -8,11 +8,42 @@ import Image from 'next/image';
 import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { InfoIcon } from 'lucide-react';
 import { useWallet } from '@/contexts/WalletContext';
+import { Provider } from 'koilib';
+import { isKnownRpcNode } from '@/koinos/known-nodes';
+import { createKoilibBalanceReader } from '@/lib/balance-reader';
+import { getAllTokens } from '@/lib/tokens';
 import {
+  loadWalletBalances,
   type TokenBalance,
   type TokenBalanceFailure,
   type WalletBalanceLoadResult,
 } from '@/lib/wallet-balances';
+
+// Trusted nodes go through the server proxy. A custom node is read directly from
+// the browser so the server never has to relay to arbitrary user-supplied URLs.
+async function loadBalancesFromProxy(
+  address: string,
+  rpcNode: string,
+  signal: AbortSignal,
+): Promise<WalletBalanceLoadResult> {
+  const searchParams = new URLSearchParams({ address, rpcNode });
+  const response = await fetch(`/api/account-balances?${searchParams.toString()}`, { signal });
+
+  if (!response.ok) {
+    throw new Error(`Balance request failed with status ${response.status}`);
+  }
+
+  return await response.json() as WalletBalanceLoadResult;
+}
+
+async function loadBalancesFromCustomNode(
+  address: string,
+  rpcNode: string,
+): Promise<WalletBalanceLoadResult> {
+  const tokens = await getAllTokens();
+  const provider = new Provider([rpcNode]);
+  return loadWalletBalances(tokens, address, createKoilibBalanceReader(provider));
+}
 
 interface WalletBalancesProps {
   address: string;
@@ -50,19 +81,9 @@ export function WalletBalances({ address }: WalletBalancesProps) {
         setError(null);
         setBalanceFailures([]);
 
-        const searchParams = new URLSearchParams({
-          address,
-          rpcNode: jsonRpcNode,
-        });
-        const response = await fetch(`/api/account-balances?${searchParams.toString()}`, {
-          signal: controller.signal,
-        });
-
-        if (!response.ok) {
-          throw new Error(`Balance request failed with status ${response.status}`);
-        }
-
-        const { balances, failures } = await response.json() as WalletBalanceLoadResult;
+        const { balances, failures } = isKnownRpcNode(jsonRpcNode)
+          ? await loadBalancesFromProxy(address, jsonRpcNode, controller.signal)
+          : await loadBalancesFromCustomNode(address, jsonRpcNode);
 
         if (controller.signal.aborted) return;
 

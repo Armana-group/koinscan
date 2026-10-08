@@ -80,7 +80,9 @@ const nextConfig = {
               "frame-ancestors 'none'",
               "object-src 'none'",
               "img-src 'self' data: blob: https://raw.githubusercontent.com https://githubusercontent.com https://walletconnect.com https://koinscan.com https://iili.io",
-              "connect-src 'self' https://api.koinos.io https://api.koinosblocks.com https://rest.koinos.io https://raw.githubusercontent.com wss://relay.walletconnect.com https://relay.walletconnect.com",
+              // Any https origin so users can point the app at a custom Koinos node.
+              // Plain http is limited to localhost for local node testing.
+              "connect-src 'self' https: http://localhost:* wss://relay.walletconnect.com",
               "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
               "style-src 'self' 'unsafe-inline'",
               "font-src 'self' data:",

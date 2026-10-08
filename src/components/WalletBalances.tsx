@@ -11,6 +11,7 @@ import { useWallet } from '@/contexts/WalletContext';
 import { Provider } from 'koilib';
 import { isKnownRpcNode } from '@/koinos/known-nodes';
 import { createKoilibBalanceReader } from '@/lib/balance-reader';
+import { probeRpcNode, RpcNodeUnreachableError } from '@/lib/rpc-probe';
 import { getAllTokens } from '@/lib/tokens';
 import {
   loadWalletBalances,
@@ -30,6 +31,10 @@ async function loadBalancesFromProxy(
   const response = await fetch(`/api/account-balances?${searchParams.toString()}`, { signal });
 
   if (!response.ok) {
+    const body = await response.json().catch(() => null) as { unreachable?: boolean } | null;
+    if (body?.unreachable) {
+      throw new RpcNodeUnreachableError(rpcNode);
+    }
     throw new Error(`Balance request failed with status ${response.status}`);
   }
 
@@ -40,6 +45,7 @@ async function loadBalancesFromCustomNode(
   address: string,
   rpcNode: string,
 ): Promise<WalletBalanceLoadResult> {
+  await probeRpcNode(rpcNode);
   const tokens = await getAllTokens();
   const provider = new Provider([rpcNode]);
   return loadWalletBalances(tokens, address, createKoilibBalanceReader(provider));
@@ -94,7 +100,11 @@ export function WalletBalances({ address }: WalletBalancesProps) {
         console.error('Error fetching wallet balances:', err);
         setTokenBalances([]);
         setBalanceFailures([]);
-        setError('Failed to load balances');
+        setError(
+          err instanceof RpcNodeUnreachableError
+            ? `Could not reach the RPC node at ${err.rpcNode}. Check the node in settings.`
+            : 'Failed to load balances',
+        );
       } finally {
         if (!controller.signal.aborted) setLoading(false);
       }

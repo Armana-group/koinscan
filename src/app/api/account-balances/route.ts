@@ -6,6 +6,7 @@ import {
   normalizeRpcOrigin,
 } from "@/koinos/known-nodes";
 import { createKoilibBalanceReader } from "@/lib/balance-reader";
+import { probeRpcNode, RpcNodeUnreachableError } from "@/lib/rpc-probe";
 import { getAllTokens } from "@/lib/tokens";
 import { loadWalletBalances } from "@/lib/wallet-balances";
 
@@ -31,6 +32,7 @@ export async function GET(request: Request) {
   }
 
   try {
+    await probeRpcNode(rpcOrigin);
     const provider = new Provider([rpcOrigin]);
     const tokens = await getAllTokens();
     const initialResult = await loadWalletBalances(
@@ -67,6 +69,10 @@ export async function GET(request: Request) {
       headers: { "Cache-Control": "no-store" },
     });
   } catch (error) {
+    if (error instanceof RpcNodeUnreachableError) {
+      console.warn(error.message);
+      return NextResponse.json({ error: error.message, unreachable: true }, { status: 502 });
+    }
     console.error("Error loading account balances:", error);
     return NextResponse.json({ error: "Failed to load account balances" }, { status: 502 });
   }

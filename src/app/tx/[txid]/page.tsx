@@ -36,7 +36,7 @@ import { Label } from "@/components/ui/label";
 // Helper function to get human-readable date
 const formatDate = (timestamp: string | number): string => {
   if (!timestamp) return 'Unknown';
-  const date = new Date(parseInt(String(timestamp)) * 1000);
+  const date = new Date(parseInt(String(timestamp)));
   return date.toLocaleString();
 };
 

@@ -19,6 +19,16 @@ assert.match(
 );
 assert.match(
   changelog.html,
+  /Custom RPC nodes and a trusted node picker/,
+  "the custom RPC node fix is documented",
+);
+assert.match(
+  changelog.html,
+  /59fe8ae/,
+  "the custom RPC node fix points to its deployed commit",
+);
+assert.match(
+  changelog.html,
   /Fogata v2 beta, guide, and link previews/,
   "the Fogata v2 beta release is documented",
 );

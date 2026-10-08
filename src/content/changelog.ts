@@ -10,6 +10,21 @@ export interface ChangelogEntry {
 
 export const changelogEntries = [
   {
+    date: "2026-10-08",
+    displayDate: "October 8, 2026",
+    title: "Custom RPC nodes and a trusted node picker",
+    summary:
+      "Pointing KoinScan at your own Koinos node works again, and the settings menu now offers trusted nodes you can pick with one click.",
+    changes: [
+      "Fix custom RPC nodes, which the browser had been refusing since the June security hardening.",
+      "Pick a trusted node from the settings menu: Koinos Community Foundation, Armana, or KoinosBlocks.",
+      "Keep the free-text field for any other node. Custom nodes are read directly from your browser, never relayed through KoinScan's servers.",
+      "Allow a local node over http://localhost for development and testing.",
+    ],
+    contributors: ["Ron Hamenahem"],
+    commits: ["59fe8ae"],
+  },
+  {
     date: "2026-10-02",
     displayDate: "October 2, 2026",
     title: "Fogata v2 beta, guide, and link previews",

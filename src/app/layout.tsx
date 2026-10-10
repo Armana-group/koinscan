@@ -13,6 +13,7 @@ import { WalletSheet } from "@/components/chrome/WalletSheet";
 import { Veil } from "@/components/chrome/Veil";
 import { Glow } from "@/components/chrome/Glow";
 import { pageMetadata, SITE_DESCRIPTION, SITE_TITLE } from "@/lib/social-metadata";
+import { SITE_URL } from "@/lib/site-url";
 
 const poppins = Poppins({
   subsets: ["latin"],
@@ -27,7 +28,7 @@ const ACCENT_SCRIPT = `(function(){var p=[['#e05252','#fff'],['#e4b80c','#16121c
 
 // The default card image comes from src/app/opengraph-image.tsx.
 export const metadata: Metadata = {
-  metadataBase: new URL("https://koinscan.com"),
+  metadataBase: SITE_URL,
   ...pageMetadata(SITE_TITLE, SITE_DESCRIPTION),
   manifest: "/manifest.json",
   // The public beta (beta.koinscan.io) sets SITE_STAGE=beta so search engines keep listing the main site only.

@@ -1,11 +1,8 @@
 import { NextResponse } from 'next/server';
+import { DEFAULT_REST_NODE, KNOWN_REST_ORIGINS } from '@/koinos/known-nodes';
 
-const DEFAULT_REST_ORIGIN = 'https://rest.koinos.io';
-const ALLOWED_REST_ORIGINS = new Set([
-  DEFAULT_REST_ORIGIN,
-  'https://api.koinos.io',
-  'https://api.koinosblocks.com',
-]);
+const DEFAULT_REST_ORIGIN = DEFAULT_REST_NODE;
+const ALLOWED_REST_ORIGINS = KNOWN_REST_ORIGINS;
 
 const ALLOWED_REST_PATHS = [
   /^\/v1\/chain\/head_info$/,

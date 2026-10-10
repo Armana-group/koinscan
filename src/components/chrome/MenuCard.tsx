@@ -24,7 +24,7 @@ const toolRow =
 export function MenuCard() {
   const pathname = usePathname();
   const { menuOpen, closeAll, openWallet } = useChrome();
-  const { signer, savedAddress, jsonRpcNode, setJsonRpcNode } = useWallet();
+  const { signer, savedAddress, jsonRpcNode, setJsonRpcNode, setRpcNode } = useWallet();
   const [nodeOpen, setNodeOpen] = useState(false);
   const [customNode, setCustomNode] = useState("");
 
@@ -87,7 +87,11 @@ export function MenuCard() {
                 <button
                   key={node.url}
                   type="button"
-                  onClick={() => setJsonRpcNode(node.url)}
+                  onClick={() => {
+                    // Trusted nodes serve both APIs, so history and balances follow the pick.
+                    setJsonRpcNode(node.url);
+                    setRpcNode(node.url);
+                  }}
                   aria-pressed={on}
                   className={`flex w-full items-center justify-between rounded-[10px] px-3 py-2 text-left text-[13px] hover:bg-raised ${on ? "font-normal text-ink" : "text-sub"}`}
                 >

@@ -1,6 +1,6 @@
 "use client";
 
-import { DEFAULT_JSON_RPC_NODE } from "@/koinos/known-nodes";
+import { DEFAULT_JSON_RPC_NODE, DEFAULT_REST_NODE as KNOWN_DEFAULT_REST_NODE, KNOWN_REST_ORIGINS, normalizeRpcOrigin } from "@/koinos/known-nodes";
 import { SignerInterface, ProviderInterface, Provider } from "koilib";
 import { createContext, useContext, useState, ReactNode, useEffect, useCallback, useRef } from "react";
 import * as kondor from "kondor-js";
@@ -27,7 +27,7 @@ export const REST_NODE_STORAGE_KEY = "rest-node";
 
 // Default endpoints
 const DEFAULT_RPC_NODE = DEFAULT_JSON_RPC_NODE; // JSON-RPC for koilib Provider
-const DEFAULT_REST_NODE = "https://rest.koinos.io"; // REST API for account history, balances
+const DEFAULT_REST_NODE = KNOWN_DEFAULT_REST_NODE; // REST API for account history, balances
 
 // Add kondor type declaration to make TypeScript happy
 declare global {
@@ -221,7 +221,10 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     if (typeof window !== 'undefined') {
       // REST API endpoint for account history, balances, etc.
       let storedRestNode = localStorage.getItem(REST_NODE_STORAGE_KEY);
-      if (!storedRestNode) {
+      // The server proxy only relays to trusted REST hosts; anything else
+      // left over from an older version falls back to the default.
+      const storedRestOrigin = normalizeRpcOrigin(storedRestNode);
+      if (!storedRestNode || !storedRestOrigin || !KNOWN_REST_ORIGINS.has(storedRestOrigin)) {
         storedRestNode = DEFAULT_REST_NODE;
         localStorage.setItem(REST_NODE_STORAGE_KEY, storedRestNode);
       }

@@ -31,12 +31,12 @@ interface RestTransaction {
         rc_limit: string;
         nonce: string;
       };
-      operations: any[];
+      operations: { call_contract?: { args?: unknown } }[];
     };
     receipt: {
       id: string;
       payer: string;
-      events: any[];
+      events: { data?: unknown }[];
       rc_used: string;
     };
   };
@@ -46,7 +46,7 @@ interface KoilibTransaction {
   id: string;
   payer: string;
   timestamp?: string;
-  operations: any[];
+  operations: unknown[];
 }
 
 async function fetchRestHistory(address: string, limit: number = 20): Promise<RestTransaction[]> {
@@ -101,7 +101,7 @@ async function fetchRpcHistory(address: string, limit: number = 20): Promise<Res
 }
 
 // Keep this for reference - these are alternative koilib methods
-async function fetchKoilibTransactionStore(address: string, limit: number = 20): Promise<KoilibTransaction[]> {
+export async function fetchKoilibTransactionStore(address: string, limit: number = 20): Promise<KoilibTransaction[]> {
   const provider = new Provider([RPC_NODE]);
 
   console.log(`\n🔗 Koilib (transaction_store) Request to: ${RPC_NODE}`);
@@ -139,7 +139,7 @@ async function fetchKoilibTransactionStore(address: string, limit: number = 20):
       const timestampB = parseInt(b.timestamp || '0');
       return timestampB - timestampA;
     }).slice(0, limit);
-  } catch (error) {
+  } catch {
     console.log(`  ⚠️ transaction_store methods not available on this node`);
     return [];
   }
@@ -358,7 +358,7 @@ async function main() {
   const customAddress = process.argv[2];
   const addresses = customAddress ? [customAddress] : TEST_ADDRESSES;
 
-  const results: Record<string, any> = {};
+  const results: Record<string, Awaited<ReturnType<typeof investigateAddress>>> = {};
 
   for (const address of addresses) {
     results[address] = await investigateAddress(address, 20);

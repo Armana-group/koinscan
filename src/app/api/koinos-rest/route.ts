@@ -1,11 +1,14 @@
 import { NextResponse } from 'next/server';
+import { DEFAULT_REST_NODE, KNOWN_REST_ORIGINS } from '@/koinos/known-nodes';
+import { alternates, isImmutablePath, RestCache } from '@/lib/rest-cache';
 
-const DEFAULT_REST_ORIGIN = 'https://rest.koinos.io';
-const ALLOWED_REST_ORIGINS = new Set([
-  DEFAULT_REST_ORIGIN,
-  'https://api.koinos.io',
-  'https://api.koinosblocks.com',
-]);
+// Transactions and blocks never change once a node has them, so they are kept
+// in memory: fresh copies skip the node, and any copy answers when every
+// trusted host is rate limiting or down.
+const immutable = new RestCache();
+
+const DEFAULT_REST_ORIGIN = DEFAULT_REST_NODE;
+const ALLOWED_REST_ORIGINS = KNOWN_REST_ORIGINS;
 
 const ALLOWED_REST_PATHS = [
   /^\/v1\/chain\/head_info$/,
@@ -58,21 +61,56 @@ export async function GET(request: Request) {
     }
   });
 
-  try {
-    const response = await fetch(upstreamUrl, {
-      headers: { Accept: 'application/json' },
-      cache: 'no-store',
-    });
-    const body = await response.text();
-
-    return new NextResponse(body, {
-      status: response.status,
+  const cacheable = isImmutablePath(path);
+  const cacheKey = `${upstreamUrl.pathname}?${upstreamUrl.searchParams.toString()}`;
+  const reply = (body: string, status: number, contentType: string, hit?: 'fresh' | 'stale') =>
+    new NextResponse(body, {
+      status,
       headers: {
-        'Cache-Control': 'no-store',
-        'Content-Type': response.headers.get('content-type') || 'application/json',
+        'Cache-Control': cacheable && status === 200 ? 'public, s-maxage=600, stale-while-revalidate=86400' : 'no-store',
+        'Content-Type': contentType,
+        ...(hit ? { 'X-Koinscan-Cache': hit } : {}),
       },
     });
+
+  if (cacheable) {
+    const fresh = immutable.fresh(cacheKey);
+    if (fresh) return reply(fresh.body, 200, fresh.contentType, 'fresh');
+  }
+
+  const fetchFrom = async (origin: string) => {
+    const url = new URL(upstreamUrl);
+    url.protocol = new URL(origin).protocol;
+    url.host = new URL(origin).host;
+    const response = await fetch(url, { headers: { Accept: 'application/json' }, cache: 'no-store' });
+    return { response, body: await response.text(), contentType: response.headers.get('content-type') || 'application/json' };
+  };
+  const overloaded = (status: number) => status === 429 || status >= 500;
+
+  try {
+    let result = await fetchFrom(restOrigin);
+    // A rate-limited or failing host: try the other trusted ones for data that
+    // is the same everywhere.
+    if (cacheable && overloaded(result.response.status)) {
+      for (const origin of alternates(restOrigin, ALLOWED_REST_ORIGINS)) {
+        const next = await fetchFrom(origin).catch(() => null);
+        if (next && !overloaded(next.response.status)) {
+          result = next;
+          break;
+        }
+      }
+    }
+    if (cacheable && overloaded(result.response.status)) {
+      const stale = immutable.any(cacheKey);
+      if (stale) return reply(stale.body, 200, stale.contentType, 'stale');
+    }
+    if (cacheable && result.response.status === 200) immutable.set(cacheKey, result.body, result.contentType);
+    return reply(result.body, result.response.status, result.contentType);
   } catch (error) {
+    if (cacheable) {
+      const stale = immutable.any(cacheKey);
+      if (stale) return reply(stale.body, 200, stale.contentType, 'stale');
+    }
     console.error('Error proxying Koinos REST request:', error);
     return NextResponse.json({ error: 'Koinos REST request failed' }, { status: 502 });
   }

@@ -32,6 +32,11 @@ export const KNOWN_RPC_ORIGINS: ReadonlySet<string> = new Set(
   KNOWN_RPC_NODES.map((node) => node.url),
 );
 
+// Every trusted node also serves the REST API at the same origin, and the
+// Koinos Community Foundation runs a REST-only host as the default.
+export const DEFAULT_REST_NODE = "https://rest.koinos.io";
+export const KNOWN_REST_ORIGINS: ReadonlySet<string> = new Set([DEFAULT_REST_NODE, ...KNOWN_RPC_ORIGINS]);
+
 export function normalizeRpcOrigin(rpcNode: string | null | undefined): string | null {
   if (!rpcNode) return null;
   try {

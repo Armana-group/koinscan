@@ -1,6 +1,6 @@
 "use client";
 
-import { DEFAULT_JSON_RPC_NODE } from "@/koinos/known-nodes";
+import { DEFAULT_JSON_RPC_NODE, DEFAULT_REST_NODE as KNOWN_DEFAULT_REST_NODE, KNOWN_REST_ORIGINS, normalizeRpcOrigin } from "@/koinos/known-nodes";
 import { SignerInterface, ProviderInterface, Provider } from "koilib";
 import { createContext, useContext, useState, ReactNode, useEffect, useCallback, useRef } from "react";
 import * as kondor from "kondor-js";
@@ -22,18 +22,22 @@ import { saveBetaAccess, clearBetaAccess } from "@/lib/beta-access";
 // Local storage keys
 const ADDRESS_STORAGE_KEY = "koinos-explorer-address";
 const WALLET_TYPE_STORAGE_KEY = "koinos-explorer-wallet-type";
+// Set by Forget until the next account is chosen. Kondor keeps sharing a
+// forgotten account, so after Forget a reconnect must ask instead of
+// silently bringing it back.
+const FORGOTTEN_STORAGE_KEY = "koinos-explorer-forgotten";
 export const RPC_NODE_STORAGE_KEY = "rpc-node";
 export const REST_NODE_STORAGE_KEY = "rest-node";
 
 // Default endpoints
 const DEFAULT_RPC_NODE = DEFAULT_JSON_RPC_NODE; // JSON-RPC for koilib Provider
-const DEFAULT_REST_NODE = "https://rest.koinos.io"; // REST API for account history, balances
+const DEFAULT_REST_NODE = KNOWN_DEFAULT_REST_NODE; // REST API for account history, balances
 
 // Add kondor type declaration to make TypeScript happy
 declare global {
   interface Window {
-    kondor?: any;
-    ethereum?: any;
+    kondor?: { enable: () => Promise<unknown> };
+    ethereum?: unknown;
   }
 }
 
@@ -98,6 +102,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       setSavedAddress(address);
       setSavedWalletType(nextSigner.name ?? null);
       rememberChosenAddress(address);
+      localStorage.removeItem(FORGOTTEN_STORAGE_KEY);
       if (nextSigner.name) localStorage.setItem(WALLET_TYPE_STORAGE_KEY, nextSigner.name);
       if (nextSigner.name === "kondor") {
         const sharedAccounts = accounts ?? getStoredKondorAccounts() ?? [];
@@ -127,10 +132,13 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     try {
       const connection = await connectWallet(wallet);
       if (revision !== walletRevision.current) return "cancelled" as const;
+      const forgotten = localStorage.getItem(FORGOTTEN_STORAGE_KEY) !== null;
       if (wallet === "kondor" && connection.accounts
-        && !connection.accounts.some((account) => account.address === chosenAddress)) {
-        // A fresh connection (including after Forget) requires an explicit
-        // account choice. Kondor's site permission may still return old accounts.
+        && !connection.accounts.some((account) => account.address === chosenAddress)
+        && (connection.accounts.length > 1 || forgotten)) {
+        // Several shared accounts need a choice here. After Forget even one
+        // does: Kondor's site permission still returns the forgotten account.
+        // A first connection that shares one account was already chosen in Kondor.
         setKondorAccountsState(connection.accounts);
         return "choose-account" as const;
       }
@@ -221,7 +229,10 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     if (typeof window !== 'undefined') {
       // REST API endpoint for account history, balances, etc.
       let storedRestNode = localStorage.getItem(REST_NODE_STORAGE_KEY);
-      if (!storedRestNode) {
+      // The server proxy only relays to trusted REST hosts; anything else
+      // left over from an older version falls back to the default.
+      const storedRestOrigin = normalizeRpcOrigin(storedRestNode);
+      if (!storedRestNode || !storedRestOrigin || !KNOWN_REST_ORIGINS.has(storedRestOrigin)) {
         storedRestNode = DEFAULT_REST_NODE;
         localStorage.setItem(REST_NODE_STORAGE_KEY, storedRestNode);
       }
@@ -303,6 +314,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     if (typeof window !== 'undefined') {
       localStorage.removeItem(ADDRESS_STORAGE_KEY);
       localStorage.removeItem(WALLET_TYPE_STORAGE_KEY);
+      localStorage.setItem(FORGOTTEN_STORAGE_KEY, "1");
       setSavedAddress(null);
       setSavedWalletType(null);
     }

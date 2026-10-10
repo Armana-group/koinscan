@@ -6,12 +6,12 @@ import { fetchTokenList, formatTokenAmount } from "@/lib/tokens";
 // Titles, descriptions and transaction summaries for link previews
 // (Open Graph / Twitter cards). The card images are drawn in social-card.tsx.
 
-export const SITE_TITLE = "KoinScan - Koinos Block Explorer";
-export const SITE_DESCRIPTION = "Explore the Koinos blockchain - transactions, blocks, accounts, and smart contracts";
+export const SITE_TITLE = "KoinScan: explore, mine and trade on Koinos";
+export const SITE_DESCRIPTION = "Explore every block, account and contract on Koinos, mine through Fogata pools, and trade VHP.";
 
 // The site card from src/app/opengraph-image.tsx. Segments with their own
 // opengraph-image file override this.
-const SITE_IMAGE = { url: "/opengraph-image", width: 1200, height: 630, alt: "KoinScan, the Koinos block explorer" };
+const SITE_IMAGE = { url: "/opengraph-image", width: 1200, height: 630, alt: "KoinScan: explore, mine and trade on Koinos" };
 
 // The card from src/app/fogata/opengraph-image.tsx, for pages under /fogata
 // that set their own title.

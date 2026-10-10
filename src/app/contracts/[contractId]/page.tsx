@@ -1,722 +1,273 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Abi, Contract, Provider, Serializer, SignerInterface, utils } from "koilib";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { AlertCircle, ArrowRight, BookOpen, Copy, PenLine, Search, ChevronDown, ChevronRight } from "lucide-react";
-import { Input } from "@/components/ui/input";
-import * as toast from "@/lib/toast";
-import styles from "../../page.module.css";
-import { KoinosForm, prettyName } from "@/components/KoinosForm";
-import { FooterComponent } from "@/components/FooterComponent";
-import {
-  BLOCK_EXPLORER,
-  GOVERNANCE_CONTRACT_ID,
-  KOIN_CONTRACT_ID,
-  KOINOS_FUND_CONTRACT_ID,
-  NICKNAMES_CONTRACT_ID,
-  RPC_NODE,
-  VHP_CONTRACT_ID,
-} from "@/koinos/constants";
-import { ContractInfo } from "@/components/ContractInfo";
-import { JsonDisplay } from "@/components/JsonDisplay";
-import { useRouter, useParams } from "next/navigation";
-import { Navbar } from "@/components/Navbar";
+import { type Abi, Contract, utils } from "koilib";
+import { buildSerializer } from "@/koinos/serializer";
+import Link from "next/link";
+import { useParams } from "next/navigation";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useWallet } from "@/contexts/WalletContext";
-import { cn } from "@/lib/utils";
 import { abiGovernance } from "@/koinos/abis";
-import { getTokenImageUrl } from "@/koinos/utils";
-import { abiKoinosFund } from "@/koinos/abis/koinosFund";
 import { abiKoin } from "@/koinos/abis/koin";
+import { abiKoinosFund } from "@/koinos/abis/koinosFund";
+import { GOVERNANCE_CONTRACT_ID, KOIN_CONTRACT_ID, KOINOS_FUND_CONTRACT_ID, NICKNAMES_CONTRACT_ID, VHP_CONTRACT_ID } from "@/koinos/constants";
+import { knownContract } from "@/lib/names";
+import { short } from "@/lib/format";
+import * as toast from "@/lib/toast";
+import { KoinosForm, argumentFields, prettyName } from "@/components/KoinosForm";
+import { TokenFacts } from "@/components/TokenFacts";
+import { CopyButton } from "@/components/ks/Advanced";
+import { Filters } from "@/components/ks/Controls";
+import { Crumb, Empty, H2, Lede, Page, Section, Skeleton, Title } from "@/components/ks/Page";
+import { GlyphMark, TokenMark } from "@/components/ks/Row";
+import { useChrome } from "@/components/chrome/ChromeProvider";
+
+type MethodState = { args: unknown; loading: boolean; results: string; error?: string };
+type Group = "all" | "read" | "write";
+
+function decodeNickname(tokenId: unknown): string {
+  try {
+    return new TextDecoder().decode(utils.toUint8Array(String(tokenId).slice(2)));
+  } catch {
+    return "";
+  }
+}
 
 export default function ContractPage() {
-  const params = useParams();
-  const contractIdParam = params.contractId as string;
-  const router = useRouter();
-  const searchInputRef = useRef<HTMLInputElement>(null);
-  const [methodStates, setMethodStates] = useState<Record<string, {
-    args: unknown;
-    loading: boolean;
-    results: string;
-    error?: string;
-  }>>({});
-  const [selectedMethod, setSelectedMethod] = useState<string>("");
-  const [submitText, setSubmitText] = useState<string>("");
-  const [functionSearchQuery, setFunctionSearchQuery] = useState<string>("");
+  const { contractId: param } = useParams<{ contractId: string }>();
   const { signer, provider } = useWallet();
-  const [code, setCode] = useState<string>("");
-  const [loading, setLoading] = useState<boolean>(false);
-  const [results, setResults] = useState<string>("");
+  const { openWallet } = useChrome();
   const [contract, setContract] = useState<Contract | null>(null);
-  const [error, setError] = useState<string>("");
-  const [info, setInfo] = useState({
-    nickname: "",
-    address: "",
-    image: "",
-    description: "",
-  });
+  const [info, setInfo] = useState({ nickname: "", address: "", description: "" });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [query, setQuery] = useState("");
+  const [group, setGroup] = useState<Group>("all");
+  const [selected, setSelected] = useState("");
+  const [states, setStates] = useState<Record<string, MethodState>>({});
 
   useEffect(() => {
-    if (!provider) {
-      setContract(null);
-      setLoading(false);
-      setError("Provider unavailable");
-      return;
-    }
-
+    if (!provider) return;
+    let active = true;
     (async () => {
       try {
         setLoading(true);
         setError("");
-
-        // Create nicknames contract - handle serializer errors gracefully
-        let nicknames: Contract | null = null;
-        let nicknamesSerializerWorking = false;
-        try {
-          nicknames = new Contract({
-            id: NICKNAMES_CONTRACT_ID,
-            provider,
-            abi: utils.nicknamesAbi,
-          });
-          nicknamesSerializerWorking = true;
-        } catch (e) {
-          console.warn("Failed to create nicknames contract with serializer:", e);
-          // Create without ABI for basic operations
-          nicknames = new Contract({
-            id: NICKNAMES_CONTRACT_ID,
-            provider,
-          });
-        }
-
+        const nicknames = new Contract({ id: NICKNAMES_CONTRACT_ID, provider, abi: utils.nicknamesAbi });
         let contractId = "";
         let nickname = "";
-
-        // Handle contract ID resolution
-        if (contractIdParam.startsWith("1")) {
-          contractId = contractIdParam;
-          if (nicknamesSerializerWorking && nicknames.functions.get_main_token) {
-            try {
-              const { result } = await nicknames.functions.get_main_token({
-                value: contractId,
-              });
-              if (result) {
-                nickname = new TextDecoder().decode(
-                  utils.toUint8Array(result.token_id.slice(2)),
-                );
-              }
-            } catch (error) {
-              console.warn("Failed to resolve nickname for contract:", error);
-            }
+        const slug = knownContract(param) ? undefined : ["koin", "vhp"].includes(param.toLowerCase()) ? param.toLowerCase() : undefined;
+        if (slug === "koin") contractId = KOIN_CONTRACT_ID;
+        else if (slug === "vhp") contractId = VHP_CONTRACT_ID;
+        else if (param.startsWith("1")) {
+          contractId = param;
+          try {
+            const { result } = await nicknames.functions.get_main_token({ value: contractId });
+            if (result?.token_id) nickname = decodeNickname(result.token_id);
+          } catch {
+            /* no nickname */
           }
         } else {
-          nickname = contractIdParam.replace("@", "");
-
-          if (nicknamesSerializerWorking && nicknames.functions.get_address) {
-            try {
-              // resolve nickname using contract
-              const { result } = await nicknames.functions.get_address({
-                value: nickname,
-              });
-              if (!result || !result.value) {
-                throw new Error(`Contract not found for nickname: @${nickname}`);
-              }
-              contractId = result.value;
-            } catch (error) {
-              throw new Error(`Failed to resolve address for @${nickname}`);
-            }
-          } else {
-            // Fallback: use provider to call contract directly
-            try {
-              const entryPoint = 0xa61ae5e8; // get_address entry point from nicknamesAbi
-
-              // Encode argument as protobuf common.str: { value: string }
-              // Field 1 (string) = tag 0x0a, then length, then bytes
-              const nicknameBytes = new TextEncoder().encode(nickname);
-              const argBuffer = new Uint8Array(2 + nicknameBytes.length);
-              argBuffer[0] = 0x0a; // tag for field 1, wire type 2 (length-delimited)
-              argBuffer[1] = nicknameBytes.length;
-              argBuffer.set(nicknameBytes, 2);
-              const args = utils.encodeBase64url(argBuffer);
-
-              const response = await provider.readContract({
-                contract_id: NICKNAMES_CONTRACT_ID,
-                entry_point: entryPoint,
-                args,
-              });
-
-              if (response.result) {
-                // Decode the result as protobuf address_data: { value: bytes (ADDRESS) }
-                const resultBytes = utils.decodeBase64url(response.result);
-                // Field 1 (bytes) = tag 0x0a, then length, then address bytes
-                if (resultBytes.length > 2 && resultBytes[0] === 0x0a) {
-                  const addrLen = resultBytes[1];
-                  const addrBytes = resultBytes.slice(2, 2 + addrLen);
-                  contractId = utils.encodeBase58(addrBytes);
-                }
-              }
-
-              if (!contractId) {
-                throw new Error(`Contract not found for nickname: @${nickname}`);
-              }
-            } catch (error) {
-              throw new Error(`Failed to resolve address for @${nickname}`);
-            }
-          }
+          nickname = param.replace("@", "");
+          const { result } = await nicknames.functions.get_address({ value: nickname });
+          if (!result?.value) throw new Error(`Nothing is called @${nickname}.`);
+          contractId = result.value;
         }
+        if (!contractId) throw new Error("No contract address found.");
 
-        if (!contractId) {
-          throw new Error("No contract address found");
-        }
-
-        const image = getTokenImageUrl(contractId, nickname);
         let description = "";
-        
-        // Try to fetch metadata if nickname exists
         if (nickname) {
           try {
-            const { result } = await nicknames.functions.metadata_of({
-              token_id: `0x${utils.toHexString(new TextEncoder().encode(nickname))}`,
-            });
-            if (result && result.value) {
-              const metadata = JSON.parse(result.value);
-              if (metadata.image) {
-                // If metadata has an image and it's a full URL, use it as a secondary option
-                if (metadata.image.startsWith('http')) {
-                  // We'll try this URL only if our main image fails to load
-                  console.log(`Using metadata image as backup: ${metadata.image}`);
-                }
-              }
-              description = metadata.bio || '';
-            }
-          } catch (error) {
-            console.warn("Failed to fetch metadata:", error);
+            const { result } = await nicknames.functions.metadata_of({ token_id: `0x${utils.toHexString(new TextEncoder().encode(nickname))}` });
+            if (result?.value) description = JSON.parse(result.value).bio || "";
+          } catch {
+            /* no metadata */
           }
         }
 
-        // Initialize contract
-        const c = new Contract({
-          id: contractId,
-          provider,
-        });
-
-        // Fetch and process ABI
+        const c = new Contract({ id: contractId, provider });
         let abi: Abi | undefined;
-        if (contractId === GOVERNANCE_CONTRACT_ID) {
-          // special case to fix the abi of governance
-          abi = abiGovernance;
-        } else if (contractId === KOIN_CONTRACT_ID) {
-          abi = abiKoin;
-        } else if (contractId === VHP_CONTRACT_ID) {
-          abi = utils.tokenAbi;
-        } else if (contractId === KOINOS_FUND_CONTRACT_ID) {
-          abi = abiKoinosFund;
-        } else {
-          abi = await c.fetchAbi({
-            updateFunctions: false,
-            updateSerializer: false,
-          });
-        }
+        if (contractId === GOVERNANCE_CONTRACT_ID) abi = abiGovernance;
+        else if (contractId === KOIN_CONTRACT_ID) abi = abiKoin;
+        else if (contractId === VHP_CONTRACT_ID) abi = utils.tokenAbi;
+        else if (contractId === KOINOS_FUND_CONTRACT_ID) abi = abiKoinosFund;
+        else abi = await c.fetchAbi({ updateFunctions: false, updateSerializer: false });
+        if (!abi?.methods) throw new Error("This address has no contract, or the contract has no ABI.");
 
-        if (!abi || !abi.methods) {
-          throw new Error(`No ABI found for contract ${contractId}`);
-        }
-
-        // Process ABI methods
         Object.keys(abi.methods).forEach((m) => {
-          // update entry point if it is using an old format
-          if (abi.methods[m].entry_point === undefined) {
-            abi.methods[m].entry_point = Number(
-              (abi.methods[m] as any)["entry-point"]
-            );
-          }
-
-          // update read only if it is using an old format
-          if (abi.methods[m].read_only === undefined) {
-            abi.methods[m].read_only = (abi.methods[m] as any)["read-only"];
-          }
-
-          // force default output for balance of methods
-          const balanceOfReturnTypes = [
-            "token.balance_of_result",
-            "token.uint64",
-            "bitkoincontract.balance_of_result",
-          ];
-          const returnType = abi.methods[m].return;
-          if (
-            returnType &&
-            !abi.methods[m].default_output &&
-            balanceOfReturnTypes.includes(returnType)
-          ) {
-            abi.methods[m].default_output = { value: "0" };
-          }
-
-          // force default output for other methods
-          if (abi.methods[m].return && !abi.methods[m].default_output) {
-            abi.methods[m].default_output = "undefined";
-          }
+          const method = abi.methods[m] as Record<string, unknown> & Abi["methods"][string];
+          if (method.entry_point === undefined) method.entry_point = Number(method["entry-point"]);
+          if (method.read_only === undefined) method.read_only = method["read-only"] as boolean | undefined;
+          const balanceReturns = ["token.balance_of_result", "token.uint64", "bitkoincontract.balance_of_result"];
+          if (method.return && !method.default_output && balanceReturns.includes(method.return)) method.default_output = { value: "0" };
+          if (method.return && !method.default_output) method.default_output = "undefined";
         });
-
         c.abi = abi;
         c.updateFunctionsFromAbi();
-
-        // Try to create a serializer, but continue without one if it fails
-        // Some contracts have ABIs with protobuf extensions that can't be resolved
-        try {
-          if (c.abi.koilib_types) {
-            const serializer = new Serializer(c.abi.koilib_types);
-            c.serializer = serializer;
-          } else if (c.abi.types) {
-            const serializer = new Serializer(c.abi.types);
-            c.serializer = serializer;
-          }
-        } catch (serializerError) {
-          console.warn("Serializer unavailable for contract:", serializerError);
-          // Continue without a serializer - the KoinosForm will show a warning
-        }
-
+        c.serializer = buildSerializer(c.abi) ?? undefined;
+        if (!active) return;
         setContract(c);
-        setInfo({
-          nickname,
-          address: contractId,
-          description,
-          image,
-        });
-      } catch (error) {
-        setError((error as Error).message);
+        setInfo({ nickname, address: contractId, description });
+      } catch (err) {
+        if (!active) return;
+        setError((err as Error).message);
         setContract(null);
       } finally {
-        setLoading(false);
+        if (active) setLoading(false);
       }
     })();
-  }, [contractIdParam, provider]);
+    return () => {
+      active = false;
+    };
+  }, [param, provider]);
 
-  const contractMethods = useMemo(() => {
-    if (!contract) return [];
-    return Object.keys(contract.abi!.methods).map((name) => ({
-      name,
-      prettyName: prettyName(name),
-      readOnly: contract.abi!.methods[name].read_only,
-    }));
+  const methods = useMemo(() => {
+    if (!contract?.abi) return [];
+    return Object.keys(contract.abi.methods)
+      .map((name) => ({
+        name,
+        prettyName: prettyName(name),
+        readOnly: Boolean(contract.abi!.methods[name].read_only),
+        description: contract.abi!.methods[name].description,
+        // A method whose arguments cannot be encoded gets a note instead of a button.
+        callable: argumentFields(contract.serializer, contract.abi!.methods[name].argument) !== null,
+      }))
+      .sort((a, b) => Number(b.readOnly) - Number(a.readOnly) || a.prettyName.localeCompare(b.prettyName));
   }, [contract]);
+  const visible = methods.filter((m) => (group === "all" || (group === "read" ? m.readOnly : !m.readOnly)) && (!query.trim() || m.prettyName.toLowerCase().includes(query.toLowerCase()) || m.name.toLowerCase().includes(query.toLowerCase())));
 
-  // Group and sort methods: read functions first, then write functions, each sorted alphabetically
-  const organizedMethods = useMemo(() => {
-    if (!contractMethods.length) return [];
-    
-    // Separate read and write methods
-    const readMethods = contractMethods.filter(method => method.readOnly);
-    const writeMethods = contractMethods.filter(method => !method.readOnly);
-    
-    // Sort each group alphabetically by prettyName
-    const sortByName = (a: typeof contractMethods[0], b: typeof contractMethods[0]) => 
-      a.prettyName.localeCompare(b.prettyName);
-    
-    readMethods.sort(sortByName);
-    writeMethods.sort(sortByName);
-    
-    // Combine with read methods first, then write methods
-    return [...readMethods, ...writeMethods];
-  }, [contractMethods]);
-
-  // Filter methods based on search query
-  const filteredMethods = useMemo(() => {
-    if (!organizedMethods.length) return [];
-    if (!functionSearchQuery.trim()) return organizedMethods;
-    
-    const query = functionSearchQuery.toLowerCase();
-    return organizedMethods.filter(method => 
-      method.prettyName.toLowerCase().includes(query) || 
-      method.name.toLowerCase().includes(query)
-    );
-  }, [organizedMethods, functionSearchQuery]);
-
-  const handleMethodSubmit = useCallback(async (methodName: string, isRead: boolean) => {
-    if (!contract) return;
-    
-    try {
-      setMethodStates(prev => ({
-        ...prev,
-        [methodName]: {
-          ...prev[methodName],
-          loading: true,
-          results: "",
-          error: undefined
-        }
-      }));
-
-      const { read_only: readOnly } = contract.abi!.methods[methodName];
-      const currentArgs = methodStates[methodName]?.args || {};
-
-      // Debug info about what's being called
-      console.log(`Calling method: ${methodName}`, currentArgs);
-
-      if (isRead) {
-        const { result } = await contract.functions[methodName](currentArgs);
-        
-        // Debug the actual result
-        console.log(`Result from ${methodName}:`, result);
-        
-        // Special handling for balance methods when result is empty or null
-        let processedResult = result;
-        
-        setMethodStates(prev => ({
-          ...prev,
-          [methodName]: {
-            ...prev[methodName],
-            loading: false,
-            results: JSON.stringify(processedResult, null, 2)
-          }
-        }));
-      } else {
-        if (!signer) throw new Error("Connect wallet");
-
-        signer.provider = contract.provider;
-        contract.signer = signer;
-        const { transaction, receipt } = await contract.functions[methodName](currentArgs, {
-          rcLimit: 10_00000000,
-        });
-
-        toast.success("Transaction submitted", {
-          duration: 15000,
-        });
-        
-        setMethodStates(prev => ({
-          ...prev,
-          [methodName]: {
-            ...prev[methodName],
-            loading: false,
-            results: JSON.stringify(receipt, null, 2)
-          }
-        }));
-
-        await transaction!.wait();
-
-        toast.custom(
-          <div className="flex flex-col gap-2">
-            <div className="font-medium">Transaction mined</div>
-            <div>
-              see confirmation in{" "}
-              <a
-                href={`/tx/${transaction!.id!}`}
-                className="text-primary hover:underline"
-              >
-                view transaction
+  const run = useCallback(
+    async (name: string, readOnly: boolean) => {
+      if (!contract) return;
+      setStates((prev) => ({ ...prev, [name]: { ...prev[name], loading: true, results: "", error: undefined } }));
+      try {
+        const args = states[name]?.args || {};
+        if (readOnly) {
+          const { result } = await contract.functions[name](args);
+          setStates((prev) => ({ ...prev, [name]: { ...prev[name], loading: false, results: JSON.stringify(result, null, 2) } }));
+        } else {
+          if (!signer) throw new Error("Connect a wallet to send this.");
+          signer.provider = contract.provider;
+          contract.signer = signer;
+          const { transaction, receipt } = await contract.functions[name](args, { rcLimit: 10_00000000 });
+          toast.success("Transaction sent", { duration: 8000 });
+          setStates((prev) => ({ ...prev, [name]: { ...prev[name], loading: false, results: JSON.stringify(receipt, null, 2) } }));
+          await transaction!.wait();
+          toast.custom(
+            <span>
+              Transaction mined.{" "}
+              <a href={`/tx/${transaction!.id!}`} className="ks-link">
+                View it
               </a>
-            </div>
-          </div>,
-          {
-            duration: 15000,
-            icon: '✅',
-          }
-        );
-      }
-    } catch (error) {
-      const errorMessage = (error as Error).message;
-      console.error(`Error calling ${methodName}:`, errorMessage);
-      
-      setMethodStates(prev => ({
-        ...prev,
-        [methodName]: {
-          ...prev[methodName],
-          loading: false,
-          error: errorMessage
+            </span>,
+            { duration: 12000, icon: "✅" },
+          );
         }
-      }));
-      toast.error(errorMessage, {
-        duration: 15000,
-      });
-    }
-  }, [contract, signer, methodStates]);
-
-  const handleMethodArgsChange = useCallback((methodName: string, newArgs: unknown) => {
-    setMethodStates(prev => ({
-      ...prev,
-      [methodName]: {
-        ...prev[methodName],
-        args: newArgs
+      } catch (err) {
+        const message = (err as Error).message;
+        setStates((prev) => ({ ...prev, [name]: { ...prev[name], loading: false, error: message } }));
+        toast.error(message, { duration: 8000 });
       }
-    }));
-  }, []);
+    },
+    [contract, signer, states],
+  );
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (searchInputRef.current?.value) {
-      router.push(`/contracts/${searchInputRef.current.value}`);
-    }
-  };
-
-  // Add a copy to clipboard function
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
-    toast.success("Copied to clipboard");
-  };
-
-  // Handler for function search input
-  const handleFunctionSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFunctionSearchQuery(e.target.value);
-  };
+  const known = info.address ? knownContract(info.address) : undefined;
+  const title = known?.name ?? (info.nickname ? `@${info.nickname}` : "Contract");
+  const account = signer?.getAddress() ?? null;
 
   return (
-    <>
-      <Navbar />
-      <main className="min-h-screen bg-background p-4 md:p-8">
-        <div className="max-w-[980px] mx-auto space-y-2">
-          {/* Contract Info Section */}
-          {!error && contract && (
-            <div className="space-y-8">
-              <div className="text-center space-y-4 py-8">
-                <h1 className="text-5xl font-semibold text-foreground">
-                  {info.nickname ? `@${info.nickname}` : "Smart Contract"}
-                </h1>
-                <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-                  {info.description || "Interact with this smart contract on the Koinos blockchain"}
-                </p>
+    <Page>
+      <Crumb back="Contracts" backHref="/contracts" right={<span>Contract</span>} />
+      {loading && <Skeleton lines={2} />}
+      {!loading && error && (
+        <>
+          <Title>Not a contract</Title>
+          <Lede>{error}</Lede>
+        </>
+      )}
+      {!loading && !error && contract && (
+        <>
+          <section className="ks-who" aria-label="Contract">
+            {known?.slug ? <TokenMark symbol={known.name} address={known.slug} large /> : <GlyphMark glyph={known?.glyph ?? "call"} large />}
+            <div style={{ minWidth: 0 }}>
+              <Title>{title}</Title>
+              <div className="ks-hashline">
+                <span>{short(info.address, 8, 6)}</span>
+                <CopyButton value={info.address} what="Address" />
+                <Link href={`/address/${info.address}`} className="ks-link">
+                  Activity ›
+                </Link>
               </div>
-              
-              <ContractInfo {...info} signer={signer} />
             </div>
-          )}
-          
-          {/* Function Groups */}
-          {error ? (
-            <div className="flex items-center justify-center min-h-[400px]">
-              <Card className="max-w-md w-full p-8 bg-background/80 backdrop-blur-xl border-border shadow-sm rounded-2xl">
-                <div className="flex flex-col items-center gap-6">
-                  <div className="rounded-full bg-red-500/10 p-4">
-                    <svg
-                      className="h-8 w-8 text-red-500"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth="2"
-                        d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-                      />
-                    </svg>
-                  </div>
-                  <div>
-                    <div className="text-xl font-semibold text-red-500 text-center">Contract Not Found</div>
-                    <div className="text-center text-muted-foreground mt-2">{error}</div>
-                  </div>
-                  
-                  <form onSubmit={handleSearch} className="w-full space-y-3">
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
-                        <Search className="h-3.5 w-3.5 text-muted-foreground" />
-                      </div>
-                      <Input
-                        ref={searchInputRef}
-                        className="pl-8 bg-background transition-shadow duration-200 focus-visible:shadow-sm"
-                        placeholder="Try another contract address or @nickname"
-                        defaultValue=""
-                      />
-                    </div>
-                    <Button 
-                      type="submit"
-                      variant="outline" 
-                      className="w-full h-7 text-xs font-medium rounded-md"
-                    >
-                      Search Contract
-                      <ArrowRight className="w-3 h-3 ml-1" />
-                    </Button>
-                  </form>
-                </div>
-              </Card>
+          </section>
+          {(known?.description || info.description) && <Lede>{known?.description ?? info.description}</Lede>}
+
+          <TokenFacts address={info.address} provider={provider} account={account} />
+
+          <Section label="Functions" className="ks-list">
+            <H2 count={methods.length}>Functions</H2>
+            <div className="ks-controls" style={{ marginTop: 8 }}>
+              <Filters
+                options={[
+                  { value: "all", label: "All" },
+                  { value: "read", label: `Read (${methods.filter((m) => m.readOnly).length})` },
+                  { value: "write", label: `Write (${methods.filter((m) => !m.readOnly).length})` },
+                ]}
+                value={group}
+                onChange={setGroup}
+              />
+              <input className="ks-input" style={{ width: 180, height: 34, borderRadius: 17, background: "#fff" }} placeholder="Find a function" value={query} onChange={(e) => setQuery(e.target.value)} aria-label="Find a function" />
             </div>
-          ) : loading ? (
-            <div className="flex items-center justify-center h-32">
-              <div className="text-lg text-muted-foreground">Loading contract...</div>
-            </div>
-          ) : contract ? (
-            <div className="space-y-6">
-              {/* Read Functions */}
-              <div className="space-y-6">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-xl bg-blue-500/10">
-                    <BookOpen className="w-4 h-4 text-blue-600" />
-                  </div>
-                  <h2 className="text-2xl font-semibold text-foreground flex items-center gap-2">
-                    Functions{" "}
-                    <span className="text-muted-foreground flex items-center">
-                      ({contractMethods?.length || 0})
-                      <span className="flex items-center gap-1 ml-2">
-                        <Badge variant="outline" className="text-xs py-0 h-4 bg-blue-500/5 text-blue-400 border-0">
-                          {contractMethods?.filter(m => m.readOnly).length || 0} Read
-                        </Badge>
-                        <Badge variant="outline" className="text-xs py-0 h-4 bg-purple-500/5 text-purple-400 border-0">
-                          {contractMethods?.filter(m => !m.readOnly).length || 0} Write
-                        </Badge>
+            <div className="ks-list" style={{ marginTop: 8 }}>
+              {visible.length === 0 && <Empty>No function matches.</Empty>}
+              {visible.map((method) => {
+                const open = selected === method.name;
+                const state = states[method.name];
+                return (
+                  <div key={method.name} className={`ks-run${open ? " open" : ""}`}>
+                    <button type="button" className="ks-row no-lead" onClick={() => setSelected(open ? "" : method.name)} aria-expanded={open}>
+                      <span className="ks-what">
+                        <span className="ks-t">{method.prettyName}</span>
+                        <span className="ks-d">{method.description || (method.readOnly ? "Reads from the chain" : "Sends a transaction")}</span>
                       </span>
-                    </span>
-                  </h2>
-                </div>
-
-                {/* Function search input */}
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
-                    <Search className="h-3.5 w-3.5 text-muted-foreground" />
-                  </div>
-                  <Input
-                    className="pl-8 bg-background transition-shadow duration-200 focus-visible:shadow-sm"
-                    placeholder="Search functions..."
-                    value={functionSearchQuery}
-                    onChange={handleFunctionSearch}
-                  />
-                </div>
-
-                <div className="space-y-3">
-                  {filteredMethods.length === 0 ? (
-                    <div className="text-center py-8 text-muted-foreground">
-                      No functions match your search
-                    </div>
-                  ) : (
-                    filteredMethods.map((method) => (
-                      <Card 
-                        key={method.name} 
-                        className="group bg-transparent border-0 shadow-none rounded-lg overflow-hidden transition-all"
-                      >
-                        <CardHeader 
-                          className="p-4 cursor-pointer"
-                          onClick={() => {
-                            setSelectedMethod(selectedMethod === method.name ? "" : method.name);
-                          }}
-                        >
-                          <div className="flex items-start justify-between">
-                            <div className="flex items-center gap-3">
-                              {selectedMethod === method.name ? (
-                                <ChevronDown className="w-4 h-4 text-muted-foreground" />
-                              ) : (
-                                <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                              )}
-                              <div>
-                                <CardTitle className="text-xl font-semibold text-foreground">
-                                  {method.prettyName}
-                                </CardTitle>
-                                <CardDescription className="mt-1 text-muted-foreground">
-                                  {contract.abi?.methods[method.name].description || "No description available"}
-                                </CardDescription>
-                              </div>
-                            </div>
-                            <Badge 
-                              className={cn(
-                                "rounded-full border-0 px-2.5 py-0 text-xs h-5",
-                                method.readOnly 
-                                  ? "bg-blue-500/5 text-blue-400" 
-                                  : "bg-purple-500/5 text-purple-400"
-                              )}
-                            >
-                              {method.readOnly ? "Read" : "Write"}
-                            </Badge>
+                      <span className="ks-amt plain">{method.readOnly ? "Read" : "Write"}</span>
+                      <span className="ks-chev">›</span>
+                    </button>
+                    {open && (
+                      <div style={{ padding: "4px 0 20px" }}>
+                        <KoinosForm contract={contract} protobufType={method.name} onChange={(args) => setStates((prev) => ({ ...prev, [method.name]: { ...prev[method.name], args } }))} />
+                        {method.callable && (
+                          <div className="ks-actions" style={{ marginTop: 16 }}>
+                            {method.readOnly ? (
+                              <button type="button" className="ks-btn ghost md" onClick={() => run(method.name, true)} disabled={state?.loading}>
+                                {state?.loading ? "Reading…" : "Read"}
+                              </button>
+                            ) : signer ? (
+                              <button type="button" className="ks-btn md" onClick={() => run(method.name, false)} disabled={state?.loading}>
+                                {state?.loading ? "Sending…" : `Send as ${short(signer.getAddress())}`}
+                              </button>
+                            ) : (
+                              <button type="button" className="ks-btn md" onClick={openWallet}>
+                                Connect wallet to send
+                              </button>
+                            )}
                           </div>
-                        </CardHeader>
-                        {selectedMethod === method.name && (
-                          <CardContent className="p-6 pt-0">
-                            <div className="rounded-xl p-4">
-                              <KoinosForm
-                                contract={contract}
-                                protobufType={method.name}
-                                onChange={(newArgs) => handleMethodArgsChange(method.name, newArgs)}
-                              />
-                            </div>
-                            {!method.readOnly && signer ? (
-                              <div className="mt-3 text-sm text-muted-foreground flex items-center gap-2">
-                                <div className="w-2 h-2 rounded-full bg-[hsl(var(--logo-color-2))]" />
-                                <span>Signing as: {signer.getAddress()}</span>
-                              </div>
-                            ) : !method.readOnly ? (
-                              <div className="mt-3 text-sm text-muted-foreground flex items-center gap-2">
-                                <div className="w-2 h-2 rounded-full bg-yellow-500" />
-                                <span>Please connect your wallet to execute this function</span>
-                              </div>
-                            ) : null}
-                            <Button 
-                              type="button"
-                              className={cn(
-                                "mt-3 transition-all duration-200 ease-in-out rounded-md text-xs font-medium",
-                                "ml-auto",
-                                "h-6 px-2",
-                                "bg-transparent border border-border/60",
-                                method.readOnly
-                                  ? "text-blue-600 hover:border-blue-400 hover:text-blue-500"
-                                  : signer
-                                  ? "text-purple-600 hover:border-purple-400 hover:text-purple-500"
-                                  : "text-muted-foreground hover:border-muted-foreground/60"
-                              )}
-                              onClick={(e) => {
-                                e.preventDefault();
-                                handleMethodSubmit(method.name, Boolean(method.readOnly));
-                              }}
-                              disabled={(!signer && !method.readOnly) || methodStates[method.name]?.loading}
-                            >
-                              {methodStates[method.name]?.loading ? (
-                                <div className="flex items-center gap-1 justify-center">
-                                  <div className="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin" />
-                                  <span>{method.readOnly ? "Reading..." : "Executing..."}</span>
-                                </div>
-                              ) : (
-                                <>
-                                  {method.readOnly
-                                    ? "Read Data"
-                                    : signer
-                                    ? "Execute Transaction"
-                                    : "Connect Wallet"}
-                                  <ArrowRight className="w-3 h-3 ml-1" />
-                                </>
-                              )}
-                            </Button>
-                            {methodStates[method.name]?.results && (
-                              <div className="mt-6 animate-in fade-in slide-in-from-top-4">
-                                {/* <div className="text-sm font-medium text-foreground mb-2">
-                                  {method.readOnly ? "Result" : "Receipt"}
-                                </div> */}
-                                <div className="rounded-xl p-4 overflow-x-auto relative">
-                                  <JsonDisplay data={JSON.parse(methodStates[method.name].results)} />
-                                </div>
-                              </div>
-                            )}
-
-                            {/* Error display */}
-                            {methodStates[method.name]?.error && (
-                              <div className="mt-6 animate-in fade-in slide-in-from-top-4">
-                                <div className="text-sm font-medium text-red-500 mb-2 flex items-center justify-between gap-2">
-                                  <div className="flex items-center gap-2">
-                                    <AlertCircle className="h-4 w-4" />
-                                    Error
-                                  </div>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-6 px-2 rounded-md text-xs opacity-80 hover:opacity-100 hover:bg-red-100 dark:hover:bg-red-900/30"
-                                    onClick={() => copyToClipboard(methodStates[method.name].error || "")}
-                                  >
-                                    <Copy className="h-3.5 w-3.5 mr-1" />
-                                    Copy
-                                  </Button>
-                                </div>
-                                <div className="rounded-xl p-4 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800">
-                                  <div className="font-mono text-sm text-red-700 dark:text-red-400 whitespace-pre-wrap break-words">
-                                    {methodStates[method.name].error}
-                                  </div>
-                                </div>
-                              </div>
-                            )}
-                          </CardContent>
                         )}
-                      </Card>
-                    ))
-                  )}
-                </div>
-              </div>
+                        {state?.results && <pre className="ks-raw">{state.results}</pre>}
+                        {state?.error && (
+                          <pre className="ks-raw" style={{ color: "var(--bad)" }}>
+                            {state.error}
+                          </pre>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
-          ) : null}
-          <FooterComponent />
-        </div>
-      </main>
-    </>
+          </Section>
+        </>
+      )}
+    </Page>
   );
 }

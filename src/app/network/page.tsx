@@ -13,6 +13,7 @@ import tokenAbi from "@/koinos/abi";
 import { abiPob } from "@/koinos/abis";
 import { KOIN_CONTRACT_ID, POB_CONTRACT_ID, VHP_CONTRACT_ID } from "@/koinos/constants";
 import { compact, fmt, short } from "@/lib/format";
+import { retry } from "@/lib/retry";
 import { Filters } from "@/components/ks/Controls";
 import { Empty, Lede, Page, RowSkeleton, Title } from "@/components/ks/Page";
 import { Avatar, More, Row } from "@/components/ks/Row";
@@ -64,22 +65,25 @@ export default function NetworkPage() {
   const [loaded, setLoaded] = useState<{ key: string; data: NetworkData | null; error: boolean } | null>(null);
   const [view, setView] = useState<View>("producers");
   const [shown, setShown] = useState(SHOW);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     if (!provider) return;
     let active = true;
-    getNetworkData(provider)
-      .then((result) => active && setLoaded({ key: jsonRpcNode, data: result, error: false }))
+    // A hundred blocks in one request is what public nodes throttle first after
+    // a burst of page loads; two more tries a couple of seconds apart usually get through.
+    retry(() => getNetworkData(provider), 3, 2000)
+      .then((result) => active && setLoaded({ key: `${jsonRpcNode}|${attempt}`, data: result, error: false }))
       .catch((err) => {
         console.error("[network]", err);
-        if (active) setLoaded({ key: jsonRpcNode, data: null, error: true });
+        if (active) setLoaded({ key: `${jsonRpcNode}|${attempt}`, data: null, error: true });
       });
     return () => {
       active = false;
     };
-  }, [provider, jsonRpcNode]);
+  }, [provider, jsonRpcNode, attempt]);
 
-  const current = loaded?.key === jsonRpcNode ? loaded : null;
+  const current = loaded?.key === `${jsonRpcNode}|${attempt}` ? loaded : null;
   const data = current?.data ?? null;
   const error = current?.error ?? false;
   const producers = useMemo(() => data?.producers ?? [], [data]);
@@ -109,7 +113,12 @@ export default function NetworkPage() {
       />
 
       {!data && !error && <RowSkeleton rows={6} />}
-      {error && <Empty>Network data could not be loaded from this node. Pick another node in the menu.</Empty>}
+      {error && (
+        <>
+          <Empty>The node did not answer, it may be busy. Try again in a moment, or pick another node in the menu.</Empty>
+          <More onClick={() => setAttempt((n) => n + 1)}>Try again</More>
+        </>
+      )}
 
       {data && view === "producers" && (
         <>

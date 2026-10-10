@@ -1,62 +1,30 @@
 "use client";
 
-import {
-  BlockHeaderJson,
-  Contract,
-  Multicall,
-  ProviderInterface,
-  utils,
-} from "koilib";
+import { type BlockHeaderJson, Contract, Multicall, type ProviderInterface, utils } from "koilib";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
-import { Plus, Trash2 } from "lucide-react";
-
+import { useWallet } from "@/contexts/WalletContext";
 import { abiFogata2Pool } from "@/koinos/abis/fogata2Pool";
 import tokenAbi from "@/koinos/abi";
-import { abiFogata2ListPools } from "@/koinos/abis/fogata2ListPools";
 import { abiKoin } from "@/koinos/abis/koin";
 import { abiPob } from "@/koinos/abis";
-import {
-  FOGATA2_LIST_POOLS_CONTRACT_ID,
-  KOIN_CONTRACT_ID,
-  POB_CONTRACT_ID,
-  VHP_CONTRACT_ID,
-} from "@/koinos/constants";
-import { useWallet } from "@/contexts/WalletContext";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Skeleton } from "@/components/ui/skeleton";
-import { WalletButton } from "@/components/WalletButton";
-import { cn } from "@/lib/utils";
-import { computePoolApy, estimateEarnings, formatAmountForInput, formatKoinEstimate, formatPayoutPeriod, getNetworkApy, poolHealth, sanitizeDecimalInput } from "@/lib/fogata";
-import { AmountField } from "@/components/fogata/AmountField";
-import { LineList, LineRow } from "@/components/fogata/LineRow";
-import { PoolLogo } from "@/components/fogata/PoolLogo";
-import { WordTabs } from "@/components/fogata/WordTabs";
-import {
-  footnote,
-  ghostButton,
-  pageWide,
-  primaryButton,
-  quietLink,
-  splitColumns,
-} from "@/components/fogata/styles";
+import { KOIN_CONTRACT_ID, POB_CONTRACT_ID, VHP_CONTRACT_ID } from "@/koinos/constants";
+import { computePoolApy, estimateEarnings, formatAmountForInput, formatKoinEstimate, formatPayoutPeriod, getNetworkStaking, poolHealth, sanitizeDecimalInput, type NetworkStaking } from "@/lib/fogata";
+import { ago, compact, fmt, fmtRaw, rawToNumber, short, until } from "@/lib/format";
 import * as toast from "@/lib/toast";
+import { Sheet } from "@/components/chrome/Sheet";
+import { ConnectButton } from "@/components/chrome/WalletSheet";
+import { ManagePoolSheet } from "@/components/fogata/ManagePoolSheet";
+import { PoolMark } from "@/components/fogata/PoolMark";
+import { toBaseUnits, type Beneficiary } from "@/components/fogata/pool-form";
+import { Advanced, CopyButton, KV, Lines, Mono } from "@/components/ks/Advanced";
+import { AmountInput, Segmented } from "@/components/ks/Controls";
+import { Crumb, Dot, H2, Lede, Page, Section, Skeleton, Title } from "@/components/ks/Page";
 
 type RewardMode = "percentage" | "virtual";
-
-const DECIMALS = 8;
-const SCALE = 10 ** DECIMALS;
+const SCALE = 1e8;
+const DAY = 86_400_000;
 
 interface PoolParams {
   name: string;
@@ -65,24 +33,15 @@ interface PoolParams {
   beneficiaries: Beneficiary[];
   payment_period: string;
 }
-
-interface Beneficiary {
-  address: string;
-  percentage: number;
-}
-
 interface PoolBalance {
   koin_amount: string;
   vhp_amount: string;
-  vapor_amount: string;
 }
-
-interface CollectKoinPreferences {
+interface Preferences {
   percentage_koin: string;
   all_after_virtual: string;
 }
-
-interface PoolPerformance {
+interface Performance {
   vhpAmount?: number;
   koinAmount?: number;
   manaPercentage?: number;
@@ -91,608 +50,279 @@ interface PoolPerformance {
   effectiveness?: number;
   lastBlockHeight?: number;
   lastBlockTime?: Date;
+  blocksLastDay?: number;
+  sampleSize?: number;
 }
 
-interface PoolState {
-  next_snapshot?: string;
+function duration(ms?: number): string {
+  if (ms === undefined || !Number.isFinite(ms) || ms < 0) return "—";
+  const s = Math.round(ms / 1000);
+  if (s < 90) return `${s} s`;
+  const m = Math.round(s / 60);
+  if (m < 90) return `${m} min`;
+  const h = Math.round(m / 60);
+  if (h < 48) return `${h} h`;
+  return `${Math.round(h / 24)} d`;
 }
 
-function formatAmount(raw: string): string {
-  const value = Number(raw) / SCALE;
-  if (value === 0) return "0";
-  return value.toLocaleString(undefined, { maximumFractionDigits: 8 });
-}
-
-function formatTokenAmount(amount?: number, symbol = "VHP"): string {
-  if (amount === undefined) return "Unavailable";
-  if (amount >= 1e9) return `${(amount / 1e9).toFixed(2)}B ${symbol}`;
-  if (amount >= 1e6) return `${(amount / 1e6).toFixed(2)}M ${symbol}`;
-  if (amount >= 1e3) return `${(amount / 1e3).toFixed(2)}K ${symbol}`;
-  return `${amount.toLocaleString(undefined, {
-    maximumFractionDigits: 2,
-  })} ${symbol}`;
-}
-
-function formatDuration(milliseconds?: number): string {
-  if (
-    milliseconds === undefined ||
-    !Number.isFinite(milliseconds) ||
-    milliseconds < 0
-  ) {
-    return "Unavailable";
-  }
-
-  const seconds = Math.floor(milliseconds / 1000);
-  if (seconds < 60) return `${seconds}s`;
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ${seconds % 60}s`;
-  const hours = Math.floor(minutes / 60);
-  return `${hours}h ${minutes % 60}m`;
-}
-
-function formatTimeAgo(date?: Date): string {
-  if (!date) return "Never";
-
-  const difference = Math.floor((Date.now() - date.getTime()) / 1000);
-  const seconds = Math.abs(difference);
-  const relative =
-    seconds < 60
-      ? `${seconds}s`
-      : seconds < 3600
-        ? `${Math.floor(seconds / 60)}m`
-        : seconds < 86400
-          ? `${Math.floor(seconds / 3600)}h`
-          : `${Math.floor(seconds / 86400)}d`;
-
-  return difference < 0 ? `in ${relative}` : `${relative} ago`;
-}
-
-async function getRecentProducedBlocks(
-  provider: ProviderInterface,
-  producer: string
-): Promise<{ header: BlockHeaderJson }[]> {
-  const result = await provider.call<{
-    values?: {
-      block?: {
-        header: BlockHeaderJson;
-      };
-    }[];
-  }>("account_history.get_account_history", {
+async function recentBlocks(provider: ProviderInterface, producer: string): Promise<{ header: BlockHeaderJson }[]> {
+  const result = await provider.call<{ values?: { block?: { header: BlockHeaderJson } }[] }>("account_history.get_account_history", {
     address: producer,
     ascending: false,
     limit: 30,
     irreversible: false,
     seq_num: null,
   });
-
-  return (result.values ?? []).flatMap((entry) =>
-    entry.block ? [entry.block] : []
-  );
-}
-
-function toBaseUnits(amount: string): string {
-  const value = parseFloat(amount);
-  if (Number.isNaN(value) || value <= 0) return "0";
-  return Math.floor(value * SCALE).toString();
-}
-
-function isMulticallError(result: unknown): result is Error {
-  return result instanceof Error;
+  return (result.values ?? []).flatMap((entry) => (entry.block ? [entry.block] : []));
 }
 
 export default function FogataPoolPage() {
-  const params = useParams<{ poolId: string }>();
-  const router = useRouter();
-  const poolId = params.poolId;
+  const { poolId } = useParams<{ poolId: string }>();
   const { provider, signer, savedAddress } = useWallet();
-
   const account = signer?.getAddress() ?? savedAddress ?? null;
 
-  const [poolParams, setPoolParams] = useState<PoolParams | null>(null);
-  const [walletBalances, setWalletBalances] = useState<{ koin: string; vhp: string } | null>(null);
-  const [poolBalance, setPoolBalance] = useState<PoolBalance | null>(null);
-  const [preferences, setPreferences] = useState<CollectKoinPreferences | null>(null);
-  const [poolOwner, setPoolOwner] = useState<string | null>(null);
+  const [params, setParams] = useState<PoolParams | null>(null);
+  const [owner, setOwner] = useState<string | null>(null);
   const [reservedKoin, setReservedKoin] = useState<string | null>(null);
-  const [registeredPublicKey, setRegisteredPublicKey] = useState("");
-  const [performance, setPerformance] = useState<PoolPerformance>({});
+  const [publicKey, setPublicKey] = useState("");
+  const [performance, setPerformance] = useState<Performance>({});
   const [nextPayment, setNextPayment] = useState<Date | null>(null);
+  const [wallet, setWallet] = useState<{ koin: string; vhp: string } | null>(null);
+  const [balance, setBalance] = useState<PoolBalance | null>(null);
+  const [balanceError, setBalanceError] = useState(false);
+  const [preferences, setPreferences] = useState<Preferences | null>(null);
+  const [network, setNetwork] = useState<NetworkStaking | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
-  const [koinDeposit, setKoinDeposit] = useState("");
-  const [vhpDeposit, setVhpDeposit] = useState("");
-  const [koinWithdraw, setKoinWithdraw] = useState("");
-  const [vhpWithdraw, setVhpWithdraw] = useState("");
+  const [sheet, setSheet] = useState<"deposit" | "withdraw" | "rewards" | "manage" | null>(null);
+  const [depositToken, setDepositToken] = useState<"koin" | "vhp">("koin");
+  const [withdrawToken, setWithdrawToken] = useState<"koin" | "vhp">("vhp");
+  const [depositAmount, setDepositAmount] = useState("");
+  const [withdrawAmount, setWithdrawAmount] = useState("");
   const [rewardMode, setRewardMode] = useState<RewardMode>("percentage");
   const [percentageKoin, setPercentageKoin] = useState("100");
   const [allAfterVirtual, setAllAfterVirtual] = useState("");
-  const [poolName, setPoolName] = useState("");
-  const [poolImage, setPoolImage] = useState("");
-  const [poolDescription, setPoolDescription] = useState("");
-  const [reburnPeriodDays, setReburnPeriodDays] = useState("");
-  const [beneficiaries, setBeneficiaries] = useState<Beneficiary[]>([]);
-  const [reservedKoinAmount, setReservedKoinAmount] = useState("");
-  const [publicKey, setPublicKey] = useState("");
-  const [deleteConfirmation, setDeleteConfirmation] = useState("");
-
-  const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [poolBalanceError, setPoolBalanceError] = useState<string | null>(null);
-  const isOwner = Boolean(account && poolOwner && account === poolOwner);
-
-  const [sheet, setSheet] = useState<"deposit" | "withdraw" | "rewards" | null>(null);
-  const [manageOpen, setManageOpen] = useState(false);
-  const [depositToken, setDepositToken] = useState<"koin" | "vhp">("koin");
-  const [withdrawToken, setWithdrawToken] = useState<"koin" | "vhp">("vhp");
-  const [networkApy, setNetworkApy] = useState<number | null>(null);
-
-  const openDeposit = () => {
-    setKoinDeposit("");
-    setVhpDeposit("");
-    setDepositToken(
-      walletBalances && BigInt(walletBalances.vhp) > BigInt(walletBalances.koin) ? "vhp" : "koin"
-    );
-    setSheet("deposit");
-  };
-
-  const openWithdraw = () => {
-    setKoinWithdraw("");
-    setVhpWithdraw("");
-    setSheet("withdraw");
-  };
 
   useEffect(() => {
     if (!provider) return;
-    getNetworkApy(provider)
-      .then(setNetworkApy)
-      .catch((err) => console.info("Unable to load network APY:", err));
+    getNetworkStaking(provider)
+      .then(setNetwork)
+      .catch((err) => console.info("[fogata] network unavailable:", err));
   }, [provider]);
 
-  const poolApy =
-    networkApy !== null && poolParams
-      ? computePoolApy(networkApy, poolParams.beneficiaries ?? [])
-      : null;
-  const health = poolHealth(performance);
-  const feePercent = (poolParams?.beneficiaries ?? []).reduce(
-    (sum, beneficiary) => sum + beneficiary.percentage,
-    0
-  ) / 1000;
-  const stakedVhp = poolBalance
-    ? (BigInt(poolBalance.vhp_amount) + BigInt(poolBalance.koin_amount)).toString()
-    : null;
-  const hasStake = stakedVhp !== null && BigInt(stakedVhp) > BigInt(0);
-  const payoutPeriod = formatPayoutPeriod(poolParams?.payment_period);
-  const stakeEarnings =
-    hasStake && poolApy !== null
-      ? estimateEarnings(Number(stakedVhp) / SCALE, poolApy, poolParams?.payment_period)
-      : null;
-  const depositAmount = Number(depositToken === "koin" ? koinDeposit : vhpDeposit);
-  const depositEarnings =
-    poolApy !== null && depositAmount > 0 ? estimateEarnings(depositAmount, poolApy) : null;
-
-  const loadData = useCallback(async () => {
+  const load = useCallback(async () => {
     if (!provider || !poolId) return;
-
     setLoading(true);
-    setError(null);
-
+    setError(false);
     try {
-      const poolContract = new Contract({
-        id: poolId,
-        provider,
-        abi: abiFogata2Pool,
-      });
-      const pobContract = new Contract({
-        id: POB_CONTRACT_ID,
-        provider,
-        abi: abiPob,
-      });
-      const koinContract = new Contract({
-        id: KOIN_CONTRACT_ID,
-        provider,
-        abi: abiKoin,
-      });
-      const vhpContract = new Contract({
-        id: VHP_CONTRACT_ID,
-        provider,
-        abi: tokenAbi,
-      });
-      const multicall = new Multicall({
-        provider,
-        contracts: [poolContract, pobContract, koinContract, vhpContract],
-      });
-
-      await multicall.add(poolContract.functions.get_pool_params, {});
-      await multicall.add(poolContract.functions.get_owner, {});
-      await multicall.add(poolContract.functions.get_all_reserved_koin, {});
-      await multicall.add(vhpContract.functions.balanceOf, {
-        owner: poolId,
-      });
-      await multicall.add(koinContract.functions.balanceOf, {
-        owner: poolId,
-      });
-      await multicall.add(koinContract.functions.get_account_rc, {
-        owner: poolId,
-      });
-      await multicall.add(pobContract.functions.get_metadata, {});
-      await multicall.add(poolContract.functions.get_pool_state, {});
+      const pool = new Contract({ id: poolId, provider, abi: abiFogata2Pool });
+      const pob = new Contract({ id: POB_CONTRACT_ID, provider, abi: abiPob });
+      const koin = new Contract({ id: KOIN_CONTRACT_ID, provider, abi: abiKoin });
+      const vhp = new Contract({ id: VHP_CONTRACT_ID, provider, abi: tokenAbi });
+      const multicall = new Multicall({ provider, contracts: [pool, pob, koin, vhp] });
+      await multicall.add(pool.functions.get_pool_params, {});
+      await multicall.add(pool.functions.get_owner, {});
+      await multicall.add(pool.functions.get_all_reserved_koin, {});
+      await multicall.add(vhp.functions.balanceOf, { owner: poolId });
+      await multicall.add(koin.functions.balanceOf, { owner: poolId });
+      await multicall.add(koin.functions.get_account_rc, { owner: poolId });
+      await multicall.add(pob.functions.get_metadata, {});
+      await multicall.add(pool.functions.get_pool_state, {});
       if (account) {
-        await multicall.add(koinContract.functions.balanceOf, {
-          owner: account,
-        });
-        await multicall.add(vhpContract.functions.balanceOf, {
-          owner: account,
-        });
-        await multicall.add(
-          poolContract.functions.get_collect_koin_preferences,
-          { value: account }
-        );
+        await multicall.add(koin.functions.balanceOf, { owner: account });
+        await multicall.add(vhp.functions.balanceOf, { owner: account });
+        await multicall.add(pool.functions.get_collect_koin_preferences, { value: account });
       }
-
-      const publicKeyRequest = account
-        ? pobContract.functions
-            .get_public_key({ producer: poolId })
-            .catch((err) => {
-              console.info("No public key registered for this pool:", err);
-              return null;
-            })
-        : Promise.resolve(null);
-      const poolBalanceRequest = account
-        ? poolContract.functions
+      const keyRequest = account ? pob.functions.get_public_key({ producer: poolId }).catch(() => null) : Promise.resolve(null);
+      const balanceRequest = account
+        ? pool.functions
             .balance_of({ value: account })
-            .then((response) => ({
-              result: response.result as Partial<PoolBalance> | undefined,
-              error: null,
-            }))
-            .catch((err) => ({
-              result: undefined,
-              error:
-                err instanceof Error
-                  ? err.message
-                  : "The pool contract could not return your balance",
-            }))
+            .then((r) => ({ result: r.result as Partial<PoolBalance> | undefined, error: false }))
+            .catch(() => ({ result: undefined, error: true }))
         : Promise.resolve(null);
+      const blocksRequest = recentBlocks(provider, poolId).catch(() => [] as { header: BlockHeaderJson }[]);
+      const [results, keyResponse, balanceResponse, blocks] = await Promise.all([multicall.call(), keyRequest, balanceRequest, blocksRequest]);
 
-      const recentBlocksRequest = getRecentProducedBlocks(provider, poolId).catch(
-        (err) => {
-          console.info("Unable to load recent blocks for this pool:", err);
-          return [];
-        }
-      );
-
-      const [results, publicKeyResponse, poolBalanceResponse, recentBlocks] =
-        await Promise.all([
-          multicall.call(),
-          publicKeyRequest,
-          poolBalanceRequest,
-          recentBlocksRequest,
-        ]);
+      const isErr = (v: unknown): v is Error => v instanceof Error;
       const paramsResult = results[0] as PoolParams | Error;
       const ownerResult = results[1] as { value?: string } | Error;
-      const reservedResult = results[2] as { value?: string } | Error;
-      const poolVhpResult = results[3] as { value?: string } | Error;
-      const poolKoinResult = results[4] as { value?: string } | Error;
-      const poolManaResult = results[5] as { value?: string } | Error;
-      const metadataResult = results[6] as
-        | { value?: { difficulty?: string } }
-        | Error;
-      const poolStateResult = results[7] as PoolState | Error;
+      if (isErr(paramsResult)) throw paramsResult;
+      if (isErr(ownerResult)) throw ownerResult;
+      setParams(paramsResult);
+      setOwner(ownerResult.value ?? null);
+      const reserved = results[2] as { value?: string } | Error;
+      setReservedKoin(isErr(reserved) ? null : (reserved.value ?? "0"));
+      setPublicKey(keyResponse?.result?.value ?? "");
+      const state = results[7] as { next_snapshot?: string } | Error;
+      const nextSnapshot = isErr(state) ? NaN : Number(state.next_snapshot);
+      setNextPayment(Number.isFinite(nextSnapshot) && nextSnapshot > 0 ? new Date(nextSnapshot) : null);
 
-      if (isMulticallError(paramsResult)) throw paramsResult;
-      if (isMulticallError(ownerResult)) throw ownerResult;
-
-      setPoolParams(paramsResult);
-      setPoolOwner(ownerResult.value ?? null);
-      setReservedKoin(
-        isMulticallError(reservedResult) ? null : (reservedResult.value ?? "0")
-      );
-      setRegisteredPublicKey(publicKeyResponse?.result?.value ?? "");
-      setPoolName(paramsResult.name ?? "");
-      setPoolImage(paramsResult.image ?? "");
-      setPoolDescription(paramsResult.description ?? "");
-      setBeneficiaries(paramsResult.beneficiaries ?? []);
-      setReburnPeriodDays(
-        paramsResult.payment_period
-          ? String(Number(paramsResult.payment_period) / 1000 / 86400)
-          : ""
-      );
-      const nextSnapshot = isMulticallError(poolStateResult)
-        ? undefined
-        : Number(poolStateResult.next_snapshot);
-      setNextPayment(
-        nextSnapshot !== undefined &&
-          Number.isFinite(nextSnapshot) &&
-          nextSnapshot > 0
-          ? new Date(nextSnapshot)
-          : null
-      );
-
-      const vhpAmount = isMulticallError(poolVhpResult)
-        ? undefined
-        : Number(poolVhpResult.value ?? "0") / SCALE;
-      const koinAmount = isMulticallError(poolKoinResult)
-        ? undefined
-        : Number(poolKoinResult.value ?? "0") / SCALE;
-      const manaAmount = isMulticallError(poolManaResult)
-        ? undefined
-        : Number(poolManaResult.value ?? "0") / SCALE;
-      const manaPercentage =
-        manaAmount !== undefined &&
-        koinAmount !== undefined &&
-        koinAmount > 0
-          ? (manaAmount * 100) / koinAmount
-          : undefined;
-      let expectedTimeToProduce: number | undefined;
-
-      if (
-        !isMulticallError(metadataResult) &&
-        metadataResult.value?.difficulty &&
-        vhpAmount !== undefined &&
-        vhpAmount > 0
-      ) {
-        const difficulty = Number(
-          "0x" +
-            utils.toHexString(
-              utils.decodeBase64url(metadataResult.value.difficulty)
-            )
-        );
-        const expected = (10 * difficulty) / (vhpAmount * SCALE);
-        if (Number.isFinite(expected)) expectedTimeToProduce = expected;
+      const read = (v: unknown) => (isErr(v) ? undefined : Number((v as { value?: string }).value ?? "0") / SCALE);
+      const vhpAmount = read(results[3]);
+      const koinAmount = read(results[4]);
+      const mana = read(results[5]);
+      const metadata = results[6] as { value?: { difficulty?: string } } | Error;
+      let expected: number | undefined;
+      if (!isErr(metadata) && metadata.value?.difficulty && vhpAmount && vhpAmount > 0) {
+        const difficulty = Number("0x" + utils.toHexString(utils.decodeBase64url(metadata.value.difficulty)));
+        const value = (10 * difficulty) / (vhpAmount * SCALE);
+        if (Number.isFinite(value)) expected = value;
       }
-
-      const newestBlock = recentBlocks[0];
-      const oldestBlock = recentBlocks[recentBlocks.length - 1];
-      const newestTime = newestBlock
-        ? Number(newestBlock.header.timestamp)
-        : undefined;
-      const oldestTime = oldestBlock
-        ? Number(oldestBlock.header.timestamp)
-        : undefined;
-      let averageTimeToProduce: number | undefined;
-
-      if (
-        newestTime !== undefined &&
-        oldestTime !== undefined &&
-        expectedTimeToProduce !== undefined
-      ) {
-        const timeSinceLastBlock = Date.now() - newestTime;
-        if (timeSinceLastBlock > expectedTimeToProduce) {
-          averageTimeToProduce =
-            (Date.now() - oldestTime) / recentBlocks.length;
-        } else if (recentBlocks.length > 1) {
-          averageTimeToProduce =
-            (newestTime - oldestTime) / (recentBlocks.length - 1);
-        }
+      const newest = blocks[0];
+      const oldest = blocks[blocks.length - 1];
+      const newestTime = newest ? Number(newest.header.timestamp) : undefined;
+      const oldestTime = oldest ? Number(oldest.header.timestamp) : undefined;
+      let average: number | undefined;
+      if (newestTime !== undefined && oldestTime !== undefined && expected !== undefined) {
+        if (Date.now() - newestTime > expected) average = (Date.now() - oldestTime) / blocks.length;
+        else if (blocks.length > 1) average = (newestTime - oldestTime) / (blocks.length - 1);
       }
-
-      const effectiveness =
-        expectedTimeToProduce !== undefined &&
-        averageTimeToProduce !== undefined &&
-        averageTimeToProduce > 0
-          ? (expectedTimeToProduce * 100) / averageTimeToProduce
-          : undefined;
-
+      const effectiveness = expected !== undefined && average !== undefined && average > 0 ? (expected * 100) / average : undefined;
       setPerformance({
         vhpAmount,
         koinAmount,
-        manaPercentage: Number.isFinite(manaPercentage)
-          ? manaPercentage
-          : undefined,
-        expectedTimeToProduce,
-        averageTimeToProduce,
-        effectiveness: Number.isFinite(effectiveness)
-          ? effectiveness
-          : undefined,
-        lastBlockHeight: newestBlock
-          ? Number(newestBlock.header.height)
-          : undefined,
-        lastBlockTime:
-          newestTime !== undefined ? new Date(newestTime) : undefined,
+        manaPercentage: mana !== undefined && koinAmount ? (mana * 100) / koinAmount : undefined,
+        expectedTimeToProduce: expected,
+        averageTimeToProduce: average,
+        effectiveness: effectiveness !== undefined && Number.isFinite(effectiveness) ? effectiveness : undefined,
+        lastBlockHeight: newest ? Number(newest.header.height) : undefined,
+        lastBlockTime: newestTime !== undefined ? new Date(newestTime) : undefined,
+        blocksLastDay: blocks.filter((b) => Date.now() - Number(b.header.timestamp) < DAY).length,
+        sampleSize: blocks.length,
       });
 
       if (account) {
-        const koinResult = results[8] as { value?: string } | Error;
-        const vhpResult = results[9] as { value?: string } | Error;
-        const preferencesResult = results[10] as
-          | Partial<CollectKoinPreferences>
-          | Error;
-
-        if (isMulticallError(koinResult) || isMulticallError(vhpResult)) {
-          setWalletBalances(null);
+        const k = results[8] as { value?: string } | Error;
+        const v = results[9] as { value?: string } | Error;
+        setWallet(isErr(k) || isErr(v) ? null : { koin: k.value ?? "0", vhp: v.value ?? "0" });
+        if (!balanceResponse?.result || balanceResponse.result.koin_amount === undefined || balanceResponse.result.vhp_amount === undefined) {
+          setBalance(null);
+          setBalanceError(true);
         } else {
-          setWalletBalances({
-            koin: koinResult.value ?? "0",
-            vhp: vhpResult.value ?? "0",
-          });
+          setBalance({ koin_amount: balanceResponse.result.koin_amount, vhp_amount: balanceResponse.result.vhp_amount });
+          setBalanceError(false);
         }
-
-        if (
-          !poolBalanceResponse?.result ||
-          poolBalanceResponse.result.koin_amount === undefined ||
-          poolBalanceResponse.result.vhp_amount === undefined
-        ) {
-          setPoolBalance(null);
-          setPoolBalanceError(
-            poolBalanceResponse?.error ??
-              "The pool contract could not return your balance"
-          );
-        } else {
-          setPoolBalance({
-            koin_amount: poolBalanceResponse.result.koin_amount,
-            vhp_amount: poolBalanceResponse.result.vhp_amount,
-            vapor_amount: poolBalanceResponse.result.vapor_amount ?? "0",
-          });
-          setPoolBalanceError(null);
-        }
-
-        if (
-          !isMulticallError(preferencesResult) &&
-          (preferencesResult.percentage_koin !== undefined ||
-            preferencesResult.all_after_virtual !== undefined)
-        ) {
-          const prefs = {
-            percentage_koin: preferencesResult.percentage_koin ?? "0",
-            all_after_virtual: preferencesResult.all_after_virtual ?? "0",
-          };
-          setPreferences(prefs);
-          if (BigInt(prefs.all_after_virtual || "0") > BigInt(0)) {
+        const prefs = results[10] as Partial<Preferences> | Error;
+        if (!isErr(prefs) && (prefs.percentage_koin !== undefined || prefs.all_after_virtual !== undefined)) {
+          const next = { percentage_koin: prefs.percentage_koin ?? "0", all_after_virtual: prefs.all_after_virtual ?? "0" };
+          setPreferences(next);
+          if (BigInt(next.all_after_virtual || "0") > BigInt(0)) {
             setRewardMode("virtual");
-            const virtualAmount = Number(prefs.all_after_virtual) / SCALE;
-            setAllAfterVirtual(
-              Number.isFinite(virtualAmount) ? String(virtualAmount) : ""
-            );
+            setAllAfterVirtual(String(Number(next.all_after_virtual) / SCALE));
             setPercentageKoin("0");
           } else {
             setRewardMode("percentage");
-            setPercentageKoin(String(Number(prefs.percentage_koin) / 1000));
+            setPercentageKoin(String(Number(next.percentage_koin) / 1000));
             setAllAfterVirtual("");
           }
-        } else {
-          setPreferences(null);
-        }
+        } else setPreferences(null);
       } else {
-        setWalletBalances(null);
-        setPoolBalance(null);
+        setWallet(null);
+        setBalance(null);
         setPreferences(null);
-        setPoolBalanceError(null);
+        setBalanceError(false);
       }
     } catch (err) {
-      console.error("Error loading pool:", err);
-      setError(err instanceof Error ? err.message : "Failed to load pool");
+      console.error("[fogata] pool:", err);
+      setError(true);
     } finally {
       setLoading(false);
     }
   }, [provider, poolId, account]);
 
   useEffect(() => {
-    loadData();
-  }, [loadData]);
+    void load();
+  }, [load]);
+
+  const apy = network && params ? computePoolApy(network.apy, params.beneficiaries ?? []) : null;
+  const health = poolHealth(performance);
+  const fee = (params?.beneficiaries ?? []).reduce((sum, b) => sum + b.percentage, 0) / 1000;
+  const staked = balance ? (BigInt(balance.vhp_amount) + BigInt(balance.koin_amount)).toString() : null;
+  const hasStake = staked !== null && BigInt(staked) > BigInt(0);
+  const payout = formatPayoutPeriod(params?.payment_period);
+  const earnings = hasStake && apy !== null ? estimateEarnings(Number(staked) / SCALE, apy, params?.payment_period) : null;
+  const share = network && performance.vhpAmount ? (performance.vhpAmount * 100) / network.vhpProducing : null;
+  const isOwner = Boolean(account && owner && account === owner);
+  const depositValue = Number(depositAmount);
+  const depositEstimate = apy !== null && depositValue > 0 ? estimateEarnings(depositValue, apy) : null;
+  const rewardsText = preferences
+    ? BigInt(preferences.all_after_virtual || "0") > BigInt(0)
+      ? `keep ${fmtRaw(preferences.all_after_virtual, 8, 2)} VHP`
+      : Number(preferences.percentage_koin) === 0
+        ? "kept as VHP"
+        : `${Number(preferences.percentage_koin) / 1000}% as KOIN`
+    : null;
 
   const requireWallet = (): string | null => {
-    if (!account) {
+    if (!account || !signer) {
       toast.error("Connect your wallet to continue");
-      return null;
-    }
-    if (!signer) {
-      toast.error("Wallet signer not available");
       return null;
     }
     return account;
   };
 
-  const handleStake = async () => {
-    const userAccount = requireWallet();
-    if (!userAccount || !provider) return;
-
-    const koinAmount = toBaseUnits(koinDeposit);
-    const vhpAmount = toBaseUnits(vhpDeposit);
-    if (koinAmount === "0" && vhpAmount === "0") {
-      toast.error("Enter a KOIN or VHP amount to deposit");
-      return;
-    }
-
+  const submit = async (label: string, success: string, action: () => Promise<{ transaction?: { wait: () => Promise<unknown> }; receipt?: { reverted?: boolean } }>) => {
     setSubmitting(true);
-    const loadingToast = toast.loading("Submitting deposit...");
+    const loadingToast = toast.loading(label);
     try {
-      const koinContract = new Contract({
-        id: KOIN_CONTRACT_ID,
-        signer,
-        provider,
-        abi: utils.tokenAbi,
-      });
-      const vhpContract = new Contract({
-        id: VHP_CONTRACT_ID,
-        signer,
-        provider,
-        abi: utils.tokenAbi,
-      });
-      const { operation: opApproveBurn } = await koinContract.functions.approve({ 
-        owner: userAccount,
-        spender: POB_CONTRACT_ID,
-        value: koinAmount,
-      }, { onlyOperation: true });
-      const { operation: opApproveTransfer } = await vhpContract.functions.approve({ 
-        owner: userAccount,
-        spender: poolId,
-        value: (BigInt(vhpAmount) + BigInt(koinAmount)).toString(),
-      }, { onlyOperation: true });
-
-      const poolContract = new Contract({
-        id: poolId,
-        signer,
-        provider,
-        abi: abiFogata2Pool,
-      });
-      const { transaction, receipt } = await poolContract.functions.stake(
-        { account: userAccount, koin_amount: koinAmount, vhp_amount: vhpAmount },
-        { previousOperations: [opApproveBurn, opApproveTransfer] }
-      );
-      if (receipt?.reverted) {
-        throw new Error("Transaction reverted");
-      }
+      const { transaction, receipt } = await action();
+      if (receipt?.reverted) throw new Error("Transaction reverted");
       await transaction?.wait();
       toast.dismiss(loadingToast);
-      toast.success("Deposit submitted successfully");
-      setKoinDeposit("");
-      setVhpDeposit("");
+      toast.success(success);
       setSheet(null);
-      await loadData();
+      await load();
     } catch (err) {
-      console.error("error", err);
-      toast.error(err instanceof Error ? err.message : "Deposit failed");
+      toast.dismiss(loadingToast);
+      toast.error(err instanceof Error ? err.message : "Something went wrong");
     } finally {
       setSubmitting(false);
     }
   };
 
-  const handleUnstake = async () => {
-    const userAccount = requireWallet();
-    if (!userAccount || !provider) return;
-
-    const koinAmount = toBaseUnits(koinWithdraw);
-    const vhpAmount = toBaseUnits(vhpWithdraw);
-    if (koinAmount === "0" && vhpAmount === "0") {
-      toast.error("Enter a KOIN or VHP amount to withdraw");
+  const deposit = async () => {
+    const user = requireWallet();
+    if (!user || !provider) return;
+    const amount = toBaseUnits(depositAmount);
+    if (amount === "0") {
+      toast.error(`Enter a ${depositToken.toUpperCase()} amount`);
       return;
     }
-
-    setSubmitting(true);
-    const loadingToast = toast.loading("Submitting withdrawal...");
-    try {
-      const poolContract = new Contract({
-        id: poolId,
-        signer,
-        provider,
-        abi: abiFogata2Pool,
-      });
-      const { transaction, receipt } = await poolContract.functions.unstake(
-        { account: userAccount, koin_amount: koinAmount, vhp_amount: vhpAmount },
-      );
-      if (receipt?.reverted) {
-        throw new Error("Transaction reverted");
-      }
-      await transaction?.wait();
-      toast.dismiss(loadingToast);
-      toast.success("Withdrawal submitted successfully");
-      setKoinWithdraw("");
-      setVhpWithdraw("");
-      setSheet(null);
-      await loadData();
-    } catch (err) {
-      toast.dismiss(loadingToast);
-      toast.error(err instanceof Error ? err.message : "Withdrawal failed");
-    } finally {
-      setSubmitting(false);
-    }
+    const koinAmount = depositToken === "koin" ? amount : "0";
+    const vhpAmount = depositToken === "vhp" ? amount : "0";
+    await submit("Submitting deposit…", "Deposit submitted", async () => {
+      const koin = new Contract({ id: KOIN_CONTRACT_ID, signer, provider, abi: utils.tokenAbi });
+      const vhp = new Contract({ id: VHP_CONTRACT_ID, signer, provider, abi: utils.tokenAbi });
+      const { operation: approveBurn } = await koin.functions.approve({ owner: user, spender: POB_CONTRACT_ID, value: koinAmount }, { onlyOperation: true });
+      const { operation: approveTransfer } = await vhp.functions.approve({ owner: user, spender: poolId, value: (BigInt(vhpAmount) + BigInt(koinAmount)).toString() }, { onlyOperation: true });
+      const pool = new Contract({ id: poolId, signer, provider, abi: abiFogata2Pool });
+      return pool.functions.stake({ account: user, koin_amount: koinAmount, vhp_amount: vhpAmount }, { previousOperations: [approveBurn, approveTransfer] });
+    });
+    setDepositAmount("");
   };
 
-  const handleSavePreferences = async () => {
-    const userAccount = requireWallet();
-    if (!userAccount || !provider) return;
+  const withdraw = async () => {
+    const user = requireWallet();
+    if (!user || !provider) return;
+    const amount = toBaseUnits(withdrawAmount);
+    if (amount === "0") {
+      toast.error(`Enter a ${withdrawToken.toUpperCase()} amount`);
+      return;
+    }
+    await submit("Submitting withdrawal…", "Withdrawal submitted", () => {
+      const pool = new Contract({ id: poolId, signer, provider, abi: abiFogata2Pool });
+      return pool.functions.unstake({ account: user, koin_amount: withdrawToken === "koin" ? amount : "0", vhp_amount: withdrawToken === "vhp" ? amount : "0" });
+    });
+    setWithdrawAmount("");
+  };
 
+  const savePreferences = async () => {
+    const user = requireWallet();
+    if (!user || !provider) return;
     let percentage_koin = "0";
     let all_after_virtual = "0";
-
     if (rewardMode === "percentage") {
       const pct = parseFloat(percentageKoin);
       if (Number.isNaN(pct) || pct < 0 || pct > 100) {
@@ -701,993 +331,315 @@ export default function FogataPoolPage() {
       }
       percentage_koin = String(Math.round(pct * 1000));
     } else {
-      const amount = toBaseUnits(allAfterVirtual);
-      if (amount === "0") {
+      all_after_virtual = toBaseUnits(allAfterVirtual);
+      if (all_after_virtual === "0") {
         toast.error("Enter a VHP amount to keep");
         return;
       }
-      all_after_virtual = amount;
     }
-
-    setSubmitting(true);
-    const loadingToast = toast.loading("Saving preferences...");
-    try {
-      const poolContract = new Contract({
-        id: poolId,
-        signer,
-        provider,
-        abi: abiFogata2Pool,
-      });
-      const { transaction, receipt } =
-        await poolContract.functions.set_collect_koin_preferences({
-          account: userAccount,
-          percentage_koin,
-          all_after_virtual,
-        });
-      if (receipt?.reverted) {
-        throw new Error("Transaction reverted");
-      }
-      await transaction?.wait();
-      toast.dismiss(loadingToast);
-      toast.success("Preferences saved");
-      setSheet(null);
-      await loadData();
-    } catch (err) {
-      toast.dismiss(loadingToast);
-      toast.error(err instanceof Error ? err.message : "Failed to save preferences");
-    } finally {
-      setSubmitting(false);
-    }
+    await submit("Saving…", "Reward settings saved", () => {
+      const pool = new Contract({ id: poolId, signer, provider, abi: abiFogata2Pool });
+      return pool.functions.set_collect_koin_preferences({ account: user, percentage_koin, all_after_virtual });
+    });
   };
 
-  const requireOwner = (): string | null => {
-    const userAccount = requireWallet();
-    if (!userAccount) return null;
-    if (userAccount !== poolOwner) {
-      toast.error("Only the pool owner can perform this action");
-      return null;
-    }
-    return userAccount;
-  };
-
-  const handleSavePoolParams = async () => {
-    if (!requireOwner() || !provider) return;
-
-    const days = Number(reburnPeriodDays);
-    const totalBeneficiaryPercentage = beneficiaries.reduce(
-      (sum, beneficiary) => sum + beneficiary.percentage,
-      0
-    );
-    if (!poolName.trim()) {
-      toast.error("Pool name is required");
-      return;
-    }
-    if (!Number.isFinite(days) || days <= 0) {
-      toast.error("Reburn period must be greater than zero");
-      return;
-    }
-    if (
-      beneficiaries.some(
-        (beneficiary) =>
-          !beneficiary.address.trim() ||
-          !Number.isFinite(beneficiary.percentage) ||
-          beneficiary.percentage <= 0
-      )
-    ) {
-      toast.error("Each beneficiary needs an address and a positive percentage");
-      return;
-    }
-    if (totalBeneficiaryPercentage > 100_000) {
-      toast.error("Beneficiary percentages cannot exceed 100%");
-      return;
-    }
-
-    setSubmitting(true);
-    const loadingToast = toast.loading("Updating pool parameters...");
-    try {
-      const poolContract = new Contract({
-        id: poolId,
-        signer,
-        provider,
-        abi: abiFogata2Pool,
-      });
-      const { transaction, receipt } =
-        await poolContract.functions.set_pool_params({
-          name: poolName.trim(),
-          image: poolImage.trim(),
-          description: poolDescription.trim(),
-          beneficiaries: beneficiaries.map((beneficiary) => ({
-            address: beneficiary.address.trim(),
-            percentage: beneficiary.percentage,
-          })),
-          payment_period: String(Math.round(days * 86_400_000)),
-        });
-      if (receipt?.reverted) throw new Error("Transaction reverted");
-      await transaction?.wait();
-      toast.dismiss(loadingToast);
-      toast.success("Pool parameters updated");
-      await loadData();
-    } catch (err) {
-      toast.dismiss(loadingToast);
-      toast.error(err instanceof Error ? err.message : "Failed to update pool");
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const handleReservedKoin = async (action: "add" | "remove") => {
-    const owner = requireOwner();
-    if (!owner || !provider) return;
-
-    const amount = toBaseUnits(reservedKoinAmount);
-    if (amount === "0") {
-      toast.error("Enter a KOIN amount");
-      return;
-    }
-    if (action === "remove" && reservedKoin === null) {
-      toast.error("Couldn't read the pool's reserved KOIN. Reload and try again.");
-      return;
-    }
-    if (action === "remove" && reservedKoin !== null && BigInt(amount) > BigInt(reservedKoin)) {
-      toast.error("Amount exceeds the pool's reserved KOIN");
-      return;
-    }
-
-    setSubmitting(true);
-    const loadingToast = toast.loading(
-      action === "add" ? "Adding reserved KOIN..." : "Removing reserved KOIN..."
-    );
-    try {
-      const poolContract = new Contract({
-        id: poolId,
-        signer,
-        provider,
-        abi: abiFogata2Pool,
-      });
-      let response;
-      if (action === "add") {
-        const koinContract = new Contract({
-          id: KOIN_CONTRACT_ID,
-          signer,
-          provider,
-          abi: utils.tokenAbi,
-        });
-        const { operation: approveOperation } =
-          await koinContract.functions.approve(
-            { owner, spender: poolId, value: amount },
-            { onlyOperation: true }
-          );
-        response = await poolContract.functions.add_reserved_koin(
-          { account: owner, koin_amount: amount },
-          { previousOperations: [approveOperation] }
-        );
-      } else {
-        response = await poolContract.functions.remove_reserved_koin({
-          account: owner,
-          koin_amount: amount,
-        });
-      }
-      if (response.receipt?.reverted) throw new Error("Transaction reverted");
-      await response.transaction?.wait();
-      toast.dismiss(loadingToast);
-      toast.success(
-        action === "add" ? "Reserved KOIN added" : "Reserved KOIN removed"
-      );
-      setReservedKoinAmount("");
-      await loadData();
-    } catch (err) {
-      toast.dismiss(loadingToast);
-      toast.error(
-        err instanceof Error ? err.message : `Failed to ${action} reserved KOIN`
-      );
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const handleRegisterPublicKey = async () => {
-    if (!requireOwner() || !provider) return;
-    const normalizedPublicKey = publicKey.trim();
-    if (!normalizedPublicKey) {
-      toast.error("Enter the node operator public key");
-      return;
-    }
-
-    setSubmitting(true);
-    const loadingToast = toast.loading("Registering public key...");
-    try {
-      const pobContract = new Contract({
-        id: POB_CONTRACT_ID,
-        signer,
-        provider,
-        abi: abiPob,
-      });
-      const { transaction, receipt } =
-        await pobContract.functions.register_public_key({
-          producer: poolId,
-          public_key: normalizedPublicKey,
-        });
-      if (receipt?.reverted) throw new Error("Transaction reverted");
-      await transaction?.wait();
-      toast.dismiss(loadingToast);
-      toast.success("Public key registered");
-      setPublicKey("");
-      await loadData();
-    } catch (err) {
-      toast.dismiss(loadingToast);
-      toast.error(
-        err instanceof Error ? err.message : "Failed to register public key"
-      );
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const handleDeletePool = async () => {
-    if (!requireOwner() || !provider || deleteConfirmation !== poolId) return;
-
-    setSubmitting(true);
-    const loadingToast = toast.loading("Removing pool from the Fogata list...");
-    try {
-      const listContract = new Contract({
-        id: FOGATA2_LIST_POOLS_CONTRACT_ID,
-        signer,
-        provider,
-        abi: abiFogata2ListPools,
-      });
-      const { transaction, receipt } = await listContract.functions.remove_pool({
-        value: poolId,
-      });
-      if (receipt?.reverted) throw new Error("Transaction reverted");
-      await transaction?.wait();
-      toast.dismiss(loadingToast);
-      toast.success("Pool removed from the Fogata list");
-      router.push("/dapps/fogata");
-    } catch (err) {
-      toast.dismiss(loadingToast);
-      toast.error(err instanceof Error ? err.message : "Failed to remove pool");
-      setSubmitting(false);
-    }
+  const openDeposit = () => {
+    setDepositAmount("");
+    setDepositToken(wallet && BigInt(wallet.vhp) > BigInt(wallet.koin) ? "vhp" : "koin");
+    setSheet("deposit");
   };
 
   const healthWord = health === "producing" ? "Producing" : health === "late" ? "Producing slowly" : "Paused";
-  const healthDot = (
-    <span
-      aria-label={healthWord}
-      className={cn(
-        "inline-block h-2 w-2 shrink-0 rounded-full",
-        health === "producing" && "bg-emerald-500",
-        health === "late" && "bg-amber-500",
-        health === "paused" && "bg-red-500"
-      )}
-    />
-  );
+  const name = params?.name || "Unnamed pool";
 
   return (
-    <div className={pageWide}>
-      <div className="mb-7 flex items-center justify-between text-[13px] text-muted-foreground">
-        <Link href="/fogata" className="hover:text-foreground">‹ Fogata</Link>
-        <Link href="/fogata/help#choose-a-pool-and-read-its-page" className="hover:text-foreground">Pool guide ›</Link>
-      </div>
+    <Page>
+      <Crumb back="Fogata" backHref="/fogata" right={<Link href="/fogata/help#choose-a-pool-and-read-its-page">Pool guide ›</Link>} />
 
-      {loading && (
-        <div className="space-y-4" aria-busy="true">
-          <Skeleton className="h-11 w-11 rounded-xl" />
-          <Skeleton className="h-6 w-40" />
-          <Skeleton className="h-12 w-56" />
-        </div>
-      )}
-
-      {error && !loading && (
-        <div>
-          <h1 className="break-all font-mono text-lg">{poolId}</h1>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Couldn&apos;t load this pool.{" "}
-            <button type="button" className={quietLink} onClick={() => loadData()}>
+      {loading && <Skeleton lines={2} />}
+      {!loading && error && (
+        <>
+          <Title>Could not load</Title>
+          <Lede>
+            This pool did not answer.{" "}
+            <button type="button" className="ks-link" onClick={() => load()}>
               Retry
             </button>
+          </Lede>
+          <p className="ks-status">
+            <Mono>{poolId}</Mono>
           </p>
-        </div>
+        </>
       )}
 
-      {!loading && !error && poolParams && (
+      {!loading && !error && params && (
         <>
-          <div className={splitColumns}>
-            <div>
-              <header className="flex items-center gap-4">
-                <PoolLogo poolId={poolId} name={poolParams.name} image={poolParams.image} size={44} className="h-11 w-11 rounded-[13px] text-base" />
-                <div className="min-w-0">
-                  <h1 className="flex items-center gap-2.5 text-[22px] font-semibold leading-tight tracking-[-0.02em]">
-                    <span className="truncate">{poolParams.name || "Unnamed pool"}</span>
-                    {healthDot}
-                  </h1>
-                  <p className="text-[13px] text-muted-foreground">
-                    {healthWord}
-                    {health === "paused" && performance.lastBlockTime && (
-                      <> · last block {formatTimeAgo(performance.lastBlockTime)}</>
-                    )}
-                    {poolApy !== null && <> · {poolApy.toFixed(1)}% yield</>}
-                    {isOwner && (
-                      <>
-                        {" "}·{" "}
-                        <button
-                          type="button"
-                          className={quietLink}
-                          onClick={() => setManageOpen(true)}
-                        >
-                          Manage
-                        </button>
-                      </>
-                    )}
-                  </p>
+          <section className="ks-who" aria-label="Pool">
+            <PoolMark poolId={poolId} name={params.name} image={params.image} large />
+            <div style={{ minWidth: 0 }}>
+              <Title>{name}</Title>
+              <p className="ks-status" style={{ marginTop: 8 }}>
+                <Dot tone={health === "producing" ? "ok" : health} />
+                <span>
+                  {healthWord}
+                  {performance.lastBlockTime && <> · last block {ago(performance.lastBlockTime)}</>}
+                </span>
+              </p>
+            </div>
+          </section>
+
+          <Section className="ks-big" label={account && hasStake ? "Your stake" : "Yield"}>
+            {account && hasStake ? (
+              <>
+                <H2>Your stake</H2>
+                <div className="ks-n">
+                  {fmtRaw(staked!, 8, 2)}
+                  <small>VHP</small>
                 </div>
-              </header>
-
-              <section className="mt-12" aria-label={account && hasStake ? "Your stake" : "Estimated yearly yield"}>
-                {!account && (
-                  <>
-                    <p className="text-xs text-muted-foreground">Estimated yearly yield</p>
-                    <p className="mt-1.5 text-[56px] font-semibold leading-none tracking-[-0.05em] tabular-nums max-sm:text-[44px]">
-                      {poolApy !== null ? poolApy.toFixed(1) : <span className="font-normal text-muted-foreground/40">—</span>}
-                      <span className="ml-2 text-lg font-medium tracking-normal text-muted-foreground">%</span>
-                    </p>
-                    <div className="mt-7 flex">
-                      <WalletButton connectLabel="Connect wallet" connectClassName={cn(primaryButton, "w-auto")} />
-                    </div>
-                  </>
+                {earnings && apy !== null && (
+                  <p className="ks-est">
+                    <b>About {formatKoinEstimate(earnings.yearly / 365)} KOIN a day</b>, {formatKoinEstimate(earnings.yearly)} a year at {apy.toFixed(1)}%.
+                  </p>
                 )}
-
-                {account && !hasStake && (
-                  <>
-                    <p className="text-xs text-muted-foreground">Estimated yearly yield</p>
-                    <p className="mt-1.5 text-[56px] font-semibold leading-none tracking-[-0.05em] tabular-nums max-sm:text-[44px]">
-                      {poolApy !== null ? poolApy.toFixed(1) : <span className="font-normal text-muted-foreground/40">—</span>}
-                      <span className="ml-2 text-lg font-medium tracking-normal text-muted-foreground">%</span>
-                    </p>
-                    <p className="mt-2.5 text-[13px] text-muted-foreground">You have nothing staked here.</p>
-                    <div className="mt-7 flex">
-                      <button type="button" className={cn(primaryButton, "w-auto")} onClick={openDeposit}>
-                        Deposit
-                      </button>
-                    </div>
-                  </>
-                )}
-
-                {account && hasStake && (
-                  <>
-                    <p className="text-xs text-muted-foreground">Your stake</p>
-                    <p className="mt-1.5 text-[56px] font-semibold leading-none tracking-[-0.05em] tabular-nums max-sm:text-[44px]">
-                      {formatAmount(stakedVhp!)}
-                      <span className="ml-2 text-lg font-medium tracking-normal text-muted-foreground">VHP</span>
-                    </p>
-                    {stakeEarnings && (
-                      <p className="mt-3 text-[15px] tabular-nums">
-                        ≈ {formatKoinEstimate(stakeEarnings.yearly)} KOIN a year
-                        <span className="text-muted-foreground">
-                          {stakeEarnings.perPayout !== null && payoutPeriod !== "—" && (
-                            <> · about {formatKoinEstimate(stakeEarnings.perPayout)} KOIN {payoutPeriod.toLowerCase()}</>
-                          )}
-                          {" "}at {poolApy!.toFixed(1)}%
-                        </span>
-                      </p>
-                    )}
-                    <p className="mt-2.5 text-[13px] text-muted-foreground">
-                      {poolBalance && BigInt(poolBalance.koin_amount) > BigInt(0) && (
-                        <>includes {formatAmount(poolBalance.koin_amount)} KOIN being converted · </>
-                      )}
-                      {nextPayment && <>next payout {formatTimeAgo(nextPayment)} · </>}
-                      rewards{" "}
-                      {preferences && BigInt(preferences.all_after_virtual || "0") > BigInt(0)
-                        ? `keep ${formatAmount(preferences.all_after_virtual)} VHP`
-                        : preferences && Number(preferences.percentage_koin) === 0
-                          ? "kept as VHP"
-                          : preferences
-                            ? `${Number(preferences.percentage_koin) / 1000}% as KOIN`
-                            : "—"}{" "}
-                      ·{" "}
-                      <button type="button" className={quietLink} onClick={() => setSheet("rewards")}>
-                        change
-                      </button>
-                    </p>
-                    <div className="mt-7 flex items-center gap-2.5">
-                      <button type="button" className={cn(primaryButton, "w-auto")} onClick={openDeposit}>
-                        Deposit
-                      </button>
-                      <button type="button" className={cn(ghostButton, "w-auto")} onClick={openWithdraw}>
-                        Withdraw
-                      </button>
-                    </div>
-                  </>
-                )}
-                {poolBalanceError && account && (
-                  <p className="mt-3 text-xs text-muted-foreground">Couldn&apos;t load your balance in this pool.</p>
-                )}
-              </section>
-            </div>
-            <div>
-              <section className="mt-14 lg:mt-0">
-                <h2 className="text-xs font-normal text-muted-foreground">About this pool</h2>
-                {poolParams.description && (
-                  <p className="mt-2 mb-4 max-w-[60ch] whitespace-pre-line break-words text-[13px] leading-relaxed text-muted-foreground">{poolParams.description}</p>
-                )}
-                <LineList className={poolParams.description ? "" : "mt-2"}>
-                  <LineRow label="Effectiveness">
-                    <span className="inline-flex items-center gap-2 tabular-nums">{healthDot}{performance.effectiveness !== undefined ? `${performance.effectiveness.toFixed(0)}%` : "—"}</span>
-                  </LineRow>
-                  <LineRow label="Block time">
-                    <span className="tabular-nums">
-                      {formatDuration(performance.averageTimeToProduce)}
-                      {performance.expectedTimeToProduce !== undefined && <span className="ml-2 text-muted-foreground">expected {formatDuration(performance.expectedTimeToProduce)}</span>}
-                    </span>
-                  </LineRow>
-                  {performance.lastBlockHeight !== undefined ? (
-                    <LineRow label="Last block" href={`/blocks/${performance.lastBlockHeight}`}>
-                      <span className="tabular-nums">
-                        #{performance.lastBlockHeight}
-                        {performance.lastBlockTime && <span className="text-muted-foreground"> · {formatTimeAgo(performance.lastBlockTime)}</span>}
-                      </span>
-                    </LineRow>
-                  ) : (
-                    <LineRow label="Last block">—</LineRow>
-                  )}
-                  <LineRow label="Staked in pool"><span className="tabular-nums">{formatTokenAmount(performance.vhpAmount, "VHP")}</span></LineRow>
-                  <LineRow label="Fee"><span className="tabular-nums">{feePercent}%</span></LineRow>
-                  <LineRow label="Payout">{formatPayoutPeriod(poolParams.payment_period)}</LineRow>
-                  <LineRow label="Next payout">{nextPayment ? formatTimeAgo(nextPayment) : "—"}</LineRow>
-                  <LineRow label="Address" href={`/address/${poolId}`}>
-                    <span className="font-mono text-xs">{poolId.slice(0, 8)}…{poolId.slice(-6)}</span>
-                  </LineRow>
-                  <LineRow label="Contract" href={`/contracts/${poolId}`}>Fogata Pool v2</LineRow>
-                  <LineRow label="Trade" href="/fogata/trade">Sell VHP for KOIN</LineRow>
-                </LineList>
-              </section>
-
-              <section className="mt-10">
-                <h2 className="text-xs font-normal text-muted-foreground">Pool account</h2>
-                <LineList className="mt-2">
-                  <LineRow label="KOIN balance"><span className="tabular-nums">{formatTokenAmount(performance.koinAmount, "KOIN")}</span></LineRow>
-                  <LineRow label="Mana">
-                    <span className="tabular-nums">{performance.manaPercentage !== undefined ? `${performance.manaPercentage.toFixed(1)}%` : "—"}</span>
-                  </LineRow>
-                  <LineRow label="Reserved KOIN">
-                    <span className="tabular-nums">{reservedKoin !== null ? formatTokenAmount(Number(reservedKoin) / SCALE, "KOIN") : "—"}</span>
-                  </LineRow>
-                </LineList>
-                <p className={cn(footnote, "mt-2.5")}>
-                  Withdrawals use the pool&apos;s mana. If mana is low a withdrawal can fail; mana recovers
-                  over time, so try again later.
+                <p className="ks-meta">
+                  {balance && BigInt(balance.koin_amount) > BigInt(0) && <>Includes {fmtRaw(balance.koin_amount, 8, 2)} KOIN being converted · </>}
+                  {nextPayment && <>Next payout {until(nextPayment)} · </>}
+                  rewards {rewardsText ?? "—"} ·{" "}
+                  <button type="button" onClick={() => setSheet("rewards")}>
+                    change
+                  </button>
                 </p>
-              </section>
-            </div>
-          </div>
+                <div className="ks-actions">
+                  <button type="button" className="ks-btn" onClick={openDeposit}>
+                    Deposit
+                  </button>
+                  <button
+                    type="button"
+                    className="ks-btn ghost"
+                    onClick={() => {
+                      setWithdrawAmount("");
+                      setSheet("withdraw");
+                    }}
+                  >
+                    Withdraw
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <H2>Yield</H2>
+                <div className="ks-n">
+                  {apy !== null ? apy.toFixed(1) : "—"}
+                  <small>% a year</small>
+                </div>
+                <p className="ks-est">After the pool&apos;s {fee}% fee. It moves with how much VHP the whole network is staking.</p>
+                {account && <p className="ks-meta">You have nothing staked here.</p>}
+                <div className="ks-actions">
+                  {account ? (
+                    <button type="button" className="ks-btn" onClick={openDeposit}>
+                      Deposit
+                    </button>
+                  ) : (
+                    <ConnectButton />
+                  )}
+                </div>
+              </>
+            )}
+            {account && balanceError && <p className="ks-foot">Couldn&apos;t load your balance in this pool.</p>}
+          </Section>
 
-          <Dialog open={sheet === "deposit"} onOpenChange={(open) => { if (!open && !submitting) setSheet(null); }}>
-            <DialogContent className="rounded-[22px] p-7 sm:max-w-[400px]">
-              <DialogHeader>
-                <DialogTitle className="text-xl tracking-[-0.02em]">Deposit to {poolParams.name || "this pool"}</DialogTitle>
-                <DialogDescription>
-                  <Link href="/fogata/help#deposit-koin-or-vhp" className={quietLink}>Read the deposit guide</Link>
-                </DialogDescription>
-              </DialogHeader>
-              <WordTabs
-                size="md"
-                ariaLabel="Token"
-                value={depositToken}
-                disabled={submitting}
+          {params.description && (
+            <Section className="ks-about" label="About">
+              <H2>About this pool</H2>
+              <p>{params.description}</p>
+            </Section>
+          )}
+
+          <Section label="Details">
+            <Lines>
+              <KV k="Staked">
+                {performance.vhpAmount !== undefined ? `${fmt(performance.vhpAmount)} VHP` : "—"}
+                {share !== null && <span> · {share.toFixed(1)}% of the network</span>}
+              </KV>
+              <KV k="Blocks">
+                {performance.blocksLastDay !== undefined ? `${performance.blocksLastDay}${performance.sampleSize === 30 && performance.blocksLastDay === 30 ? "+" : ""} in the last day` : "—"}
+                {performance.expectedTimeToProduce !== undefined && <span> · about one every {duration(performance.expectedTimeToProduce)}</span>}
+              </KV>
+              <KV k="Payout">
+                {payout}
+                {nextPayment && <span> · next {until(nextPayment)}</span>}
+              </KV>
+              <KV k="Fee">
+                {fee}% <span>· to the operator</span>
+              </KV>
+              <KV k="Last block">
+                {performance.lastBlockHeight !== undefined ? <Link href={`/blocks/${performance.lastBlockHeight}`}>{fmt(performance.lastBlockHeight)}</Link> : "—"}
+                {performance.lastBlockTime && <span> · {ago(performance.lastBlockTime)}</span>}
+              </KV>
+            </Lines>
+          </Section>
+
+          <Advanced>
+            <KV k="Pool address">
+              <Link href={`/address/${poolId}`}>
+                <Mono>{poolId}</Mono>
+              </Link>{" "}
+              <CopyButton value={poolId} what="Address" />
+            </KV>
+            <KV k="Contract">
+              <Link href={`/contracts/${poolId}`}>Fogata Pool v2</Link>
+            </KV>
+            <KV k="Owner">{owner ? <Link href={`/address/${owner}`}>{short(owner)}</Link> : "—"}</KV>
+            <KV k="Effectiveness">
+              {performance.effectiveness !== undefined ? `${performance.effectiveness.toFixed(0)}%` : "—"} <span className="text-sub">of expected blocks</span>
+            </KV>
+            <KV k="Block time">
+              {duration(performance.averageTimeToProduce)} <span className="text-sub">expected {duration(performance.expectedTimeToProduce)}</span>
+            </KV>
+            <KV k="KOIN balance">{performance.koinAmount !== undefined ? `${fmt(performance.koinAmount, 2)} KOIN` : "—"}</KV>
+            <KV k="Reserved KOIN">
+              {reservedKoin !== null ? `${compact(rawToNumber(reservedKoin))} KOIN` : "—"} <span className="text-sub">kept for mana, not paid out</span>
+            </KV>
+            <KV k="Mana">{performance.manaPercentage !== undefined ? `${performance.manaPercentage.toFixed(0)}%` : "—"}</KV>
+            <p className="ks-foot">Withdrawals use the pool&apos;s mana. If mana is low a withdrawal can fail; it recovers over time, so try again later.</p>
+            {isOwner && (
+              <button type="button" className="ks-btn ghost md" style={{ marginTop: 14 }} onClick={() => setSheet("manage")}>
+                Manage this pool
+              </button>
+            )}
+          </Advanced>
+
+          <Sheet open={sheet === "deposit"} onOpenChange={(open) => !open && !submitting && setSheet(null)} title={`Deposit to ${name}`} subtitle={<Link href="/fogata/help#deposit-koin-or-vhp" className="ks-guide">Read the deposit guide</Link>}>
+            <div style={{ marginTop: 22 }}>
+              <Segmented
                 options={[
                   { value: "koin", label: "KOIN" },
                   { value: "vhp", label: "VHP" },
                 ]}
+                value={depositToken}
                 onChange={(token) => {
                   setDepositToken(token);
-                  setKoinDeposit("");
-                  setVhpDeposit("");
+                  setDepositAmount("");
                 }}
-              />
-              <div className="mt-4">
-                <AmountField
-                  id={depositToken === "koin" ? "koin-deposit" : "vhp-deposit"}
-                  size="md"
-                  label="Amount"
-                  unit={depositToken.toUpperCase()}
-                  value={depositToken === "koin" ? koinDeposit : vhpDeposit}
-                  onChange={(value) => (depositToken === "koin" ? setKoinDeposit(value) : setVhpDeposit(value))}
-                  disabled={submitting}
-                  onMax={() =>
-                    depositToken === "koin"
-                      ? setKoinDeposit(formatAmountForInput(walletBalances!.koin))
-                      : setVhpDeposit(formatAmountForInput(walletBalances!.vhp))
-                  }
-                  maxDisabled={!walletBalances}
-                  autoFocus
-                />
-              </div>
-              <div className={cn(footnote, "flex justify-between tabular-nums")}>
-                <span>
-                  Wallet {walletBalances ? formatAmount(depositToken === "koin" ? walletBalances.koin : walletBalances.vhp) : "—"} {depositToken.toUpperCase()}
-                </span>
-                {depositEarnings ? (
-                  <span>≈ {formatKoinEstimate(depositEarnings.yearly)} KOIN a year</span>
-                ) : (
-                  poolApy !== null && <span>≈ {poolApy.toFixed(1)}% yearly</span>
-                )}
-              </div>
-              {depositToken === "koin" && formatPayoutPeriod(poolParams.payment_period) !== "—" && (
-                <p className="mt-2 text-[13px] leading-relaxed text-muted-foreground">
-                  Your KOIN is staked as VHP to produce blocks. {formatPayoutPeriod(poolParams.payment_period)} the
-                  pool pays your share in small KOIN payments, or stakes it again, depending on your reward
-                  setting. To get out faster, sell VHP on{" "}
-                  <Link href="/fogata/trade" className={quietLink}>Trade</Link>.
-                </p>
-              )}
-              <button
-                type="button"
-                className={cn(primaryButton, "mt-3")}
-                onClick={handleStake}
-                disabled={!account || submitting || !(Number(depositToken === "koin" ? koinDeposit : vhpDeposit) > 0)}
-              >
-                {submitting
-                  ? "Submitting…"
-                  : `Deposit ${depositToken === "koin" ? koinDeposit || "0" : vhpDeposit || "0"} ${depositToken.toUpperCase()}`}
-              </button>
-            </DialogContent>
-          </Dialog>
-
-          <Dialog open={sheet === "withdraw"} onOpenChange={(open) => { if (!open && !submitting) setSheet(null); }}>
-            <DialogContent className="rounded-[22px] p-7 sm:max-w-[400px]">
-              <DialogHeader>
-                <DialogTitle className="text-xl tracking-[-0.02em]">Withdraw from {poolParams.name || "this pool"}</DialogTitle>
-                <DialogDescription>
-                  <Link href="/fogata/help#withdraw-or-leave-a-pool" className={quietLink}>Read the withdrawal guide</Link>
-                </DialogDescription>
-              </DialogHeader>
-              <WordTabs
-                size="md"
-                ariaLabel="Token"
-                value={withdrawToken}
                 disabled={submitting}
+              />
+            </div>
+            <div style={{ marginTop: 18 }}>
+              <AmountInput
+                id="deposit-amount"
+                value={depositAmount}
+                onChange={(value) => setDepositAmount(sanitizeDecimalInput(value))}
+                unit={depositToken.toUpperCase()}
+                onMax={() => wallet && setDepositAmount(formatAmountForInput(depositToken === "koin" ? wallet.koin : wallet.vhp))}
+                maxDisabled={!wallet}
+                disabled={submitting}
+                autoFocus
+              />
+            </div>
+            <div className="flex justify-between text-[13px] text-sub" style={{ marginTop: 10 }}>
+              <span>
+                Wallet {wallet ? fmtRaw(depositToken === "koin" ? wallet.koin : wallet.vhp, 8, 2) : "—"} {depositToken.toUpperCase()}
+              </span>
+              <span>{depositEstimate ? `≈ ${formatKoinEstimate(depositEstimate.yearly)} KOIN a year` : apy !== null ? `≈ ${apy.toFixed(1)}% yearly` : ""}</span>
+            </div>
+            {depositToken === "koin" && (
+              <p className="ks-foot" style={{ marginTop: 14 }}>
+                Your KOIN is staked as VHP to produce blocks. {payout !== "—" ? payout : "Each payout"} the pool pays your share in small KOIN payments, or stakes it again, depending on your reward setting. To get out faster, sell VHP on{" "}
+                <Link href="/fogata/trade" className="ks-link">
+                  Trade
+                </Link>
+                .
+              </p>
+            )}
+            <button type="button" className="ks-btn wide" style={{ marginTop: 18 }} onClick={deposit} disabled={!account || submitting || !(Number(depositAmount) > 0)}>
+              {submitting ? "Submitting…" : `Deposit ${depositAmount || "0"} ${depositToken.toUpperCase()}`}
+            </button>
+          </Sheet>
+
+          <Sheet open={sheet === "withdraw"} onOpenChange={(open) => !open && !submitting && setSheet(null)} title={`Withdraw from ${name}`} subtitle={<Link href="/fogata/help#withdraw-or-leave-a-pool" className="ks-guide">Read the withdrawal guide</Link>}>
+            <div style={{ marginTop: 22 }}>
+              <Segmented
                 options={[
                   { value: "vhp", label: "VHP" },
                   { value: "koin", label: "KOIN" },
                 ]}
+                value={withdrawToken}
                 onChange={(token) => {
                   setWithdrawToken(token);
-                  setKoinWithdraw("");
-                  setVhpWithdraw("");
+                  setWithdrawAmount("");
                 }}
+                disabled={submitting}
               />
-              <div className="mt-4">
-                <AmountField
-                  id={withdrawToken === "koin" ? "koin-withdraw" : "vhp-withdraw"}
-                  size="md"
-                  label="Amount"
-                  unit={withdrawToken.toUpperCase()}
-                  value={withdrawToken === "koin" ? koinWithdraw : vhpWithdraw}
-                  onChange={(value) => (withdrawToken === "koin" ? setKoinWithdraw(value) : setVhpWithdraw(value))}
-                  disabled={submitting}
-                  onMax={() =>
-                    withdrawToken === "koin"
-                      ? setKoinWithdraw(formatAmountForInput(poolBalance!.koin_amount))
-                      : setVhpWithdraw(formatAmountForInput(poolBalance!.vhp_amount))
-                  }
-                  maxDisabled={!poolBalance}
-                  autoFocus
-                />
-              </div>
-              <p className={cn(footnote, "tabular-nums")}>
-                In pool {poolBalance ? formatAmount(withdrawToken === "koin" ? poolBalance.koin_amount : poolBalance.vhp_amount) : "—"} {withdrawToken.toUpperCase()}
-              </p>
-              <button
-                type="button"
-                className={cn(primaryButton, "mt-3")}
-                onClick={handleUnstake}
-                disabled={!account || submitting || !(Number(withdrawToken === "koin" ? koinWithdraw : vhpWithdraw) > 0)}
-              >
-                {submitting
-                  ? "Submitting…"
-                  : `Withdraw ${withdrawToken === "koin" ? koinWithdraw || "0" : vhpWithdraw || "0"} ${withdrawToken.toUpperCase()}`}
-              </button>
-            </DialogContent>
-          </Dialog>
+            </div>
+            <div style={{ marginTop: 18 }}>
+              <AmountInput
+                id="withdraw-amount"
+                value={withdrawAmount}
+                onChange={(value) => setWithdrawAmount(sanitizeDecimalInput(value))}
+                unit={withdrawToken.toUpperCase()}
+                onMax={() => balance && setWithdrawAmount(formatAmountForInput(withdrawToken === "koin" ? balance.koin_amount : balance.vhp_amount))}
+                maxDisabled={!balance}
+                disabled={submitting}
+                autoFocus
+              />
+            </div>
+            <p className="text-[13px] text-sub" style={{ marginTop: 10 }}>
+              In pool {balance ? fmtRaw(withdrawToken === "koin" ? balance.koin_amount : balance.vhp_amount, 8, 4) : "—"} {withdrawToken.toUpperCase()}
+            </p>
+            <button type="button" className="ks-btn wide" style={{ marginTop: 18 }} onClick={withdraw} disabled={!account || submitting || !(Number(withdrawAmount) > 0)}>
+              {submitting ? "Submitting…" : `Withdraw ${withdrawAmount || "0"} ${withdrawToken.toUpperCase()}`}
+            </button>
+          </Sheet>
 
-          <Dialog open={sheet === "rewards"} onOpenChange={(open) => { if (!open && !submitting) setSheet(null); }}>
-            <DialogContent className="rounded-[22px] p-7 sm:max-w-[400px]">
-              <DialogHeader>
-                <DialogTitle className="text-xl tracking-[-0.02em]">Reward settings</DialogTitle>
-                <DialogDescription>
-                  Rewards are paid in KOIN. Choose what the pool does with them.{" "}
-                  <Link href="/fogata/help#choose-your-reward-settings" className={quietLink}>Reward settings guide</Link>
-                </DialogDescription>
-              </DialogHeader>
-              <RadioGroup
-                value={rewardMode}
-                onValueChange={(value) =>
-                  setRewardMode(value as RewardMode)
-                }
-                disabled={!account || submitting}
-                className="mt-2 gap-0 border-t border-border"
-              >
-                <div className="border-b border-border py-4">
-                  <div className="flex items-center gap-2.5">
-                    <RadioGroupItem value="percentage" id="reward-percentage" />
-                    <Label htmlFor="reward-percentage" className="text-sm font-medium">
-                      Take a share as KOIN
-                    </Label>
-                  </div>
-                  <div className={cn("mt-3 pl-[26px] transition-opacity", rewardMode !== "percentage" && "opacity-40")}>
-                    <div className="flex items-baseline gap-2 border-b border-border pb-2 focus-within:border-foreground">
-                      <input
-                        id="percentage-koin"
-                        type="text"
-                        inputMode="decimal"
-                        aria-label="Percentage of rewards taken as KOIN"
-                        className="w-full min-w-0 bg-transparent text-2xl font-semibold tracking-[-0.03em] tabular-nums outline-none placeholder:text-muted-foreground/50"
-                        placeholder="0"
-                        value={percentageKoin}
-                        onChange={(e) => setPercentageKoin(sanitizeDecimalInput(e.target.value))}
-                        disabled={
-                          !account ||
-                          submitting ||
-                          rewardMode !== "percentage"
-                        }
-                      />
-                      <span className="text-sm font-medium text-muted-foreground">%</span>
-                    </div>
-                    <p className={cn(footnote, "mt-2")}>
-                      Take this percentage of your KOIN allocation and
-                      reinvest the rest into VHP.
-                      {preferences &&
-                        BigInt(preferences.all_after_virtual || "0") ===
-                          BigInt(0) && (
-                          <>
-                            {" "}
-                            Current:{" "}
-                            {Number(preferences.percentage_koin) / 1000}%
-                          </>
-                        )}
-                    </p>
-                  </div>
-                </div>
+          <Sheet open={sheet === "rewards"} onOpenChange={(open) => !open && !submitting && setSheet(null)} title="Reward settings" subtitle={<Link href="/fogata/help#choose-your-reward-settings" className="ks-guide">Reward settings guide</Link>}>
+            <p className="ks-foot" style={{ marginTop: 10 }}>
+              Rewards are paid in KOIN. Choose what the pool does with them.
+            </p>
+            <div style={{ marginTop: 16 }}>
+              <label className="ks-radio">
+                <input type="radio" name="reward-mode" checked={rewardMode === "percentage"} onChange={() => setRewardMode("percentage")} disabled={!account || submitting} />
+                <span style={{ flex: 1 }}>
+                  <span className="ks-rt">Take a share as KOIN</span>
+                  <span className="ks-rd">This share of your KOIN allocation is paid out; the rest is staked again as VHP.</span>
+                  {rewardMode === "percentage" && (
+                    <span style={{ display: "block", marginTop: 10 }}>
+                      <AmountInput id="percentage-koin" value={percentageKoin} onChange={(v) => setPercentageKoin(sanitizeDecimalInput(v))} unit="%" disabled={!account || submitting} />
+                    </span>
+                  )}
+                </span>
+              </label>
+              <label className="ks-radio">
+                <input type="radio" name="reward-mode" checked={rewardMode === "virtual"} onChange={() => setRewardMode("virtual")} disabled={!account || submitting} />
+                <span style={{ flex: 1 }}>
+                  <span className="ks-rt">Keep a VHP amount, take the rest as KOIN</span>
+                  <span className="ks-rd">Hold this much VHP in the pool and take anything above it as KOIN, as the pool&apos;s KOIN allows.</span>
+                  {rewardMode === "virtual" && (
+                    <span style={{ display: "block", marginTop: 10 }}>
+                      <AmountInput id="all-after-virtual" value={allAfterVirtual} onChange={(v) => setAllAfterVirtual(sanitizeDecimalInput(v))} unit="VHP" disabled={!account || submitting} />
+                    </span>
+                  )}
+                </span>
+              </label>
+            </div>
+            <button type="button" className="ks-btn wide" style={{ marginTop: 18 }} onClick={savePreferences} disabled={!account || submitting}>
+              {submitting ? "Saving…" : "Save"}
+            </button>
+          </Sheet>
 
-                <div className="border-b border-border py-4">
-                  <div className="flex items-center gap-2.5">
-                    <RadioGroupItem value="virtual" id="reward-virtual" />
-                    <Label htmlFor="reward-virtual" className="text-sm font-medium">
-                      Keep a VHP amount, take the rest as KOIN
-                    </Label>
-                  </div>
-                  <div className={cn("mt-3 pl-[26px] transition-opacity", rewardMode !== "virtual" && "opacity-40")}>
-                    <div className="flex items-baseline gap-2 border-b border-border pb-2 focus-within:border-foreground">
-                      <input
-                        id="all-after-virtual"
-                        type="text"
-                        inputMode="decimal"
-                        aria-label="VHP to keep"
-                        className="w-full min-w-0 bg-transparent text-2xl font-semibold tracking-[-0.03em] tabular-nums outline-none placeholder:text-muted-foreground/50"
-                        placeholder="0"
-                        value={allAfterVirtual}
-                        onChange={(e) => setAllAfterVirtual(sanitizeDecimalInput(e.target.value))}
-                        disabled={
-                          !account || submitting || rewardMode !== "virtual"
-                        }
-                      />
-                      <span className="text-sm font-medium text-muted-foreground">VHP</span>
-                    </div>
-                    <p className={cn(footnote, "mt-2")}>
-                      Retain this participation amount and take eligible
-                      excess as KOIN, subject to the pool&apos;s available KOIN.
-                      {preferences &&
-                        BigInt(preferences.all_after_virtual || "0") >
-                          BigInt(0) && (
-                          <>
-                            {" "}
-                            Current:{" "}
-                            {formatAmount(preferences.all_after_virtual)}{" "}
-                            VHP
-                          </>
-                        )}
-                    </p>
-                  </div>
-                </div>
-              </RadioGroup>
-              <button
-                type="button"
-                className={cn(primaryButton, "mt-3")}
-                onClick={handleSavePreferences}
-                disabled={!account || submitting}
-              >
-                {submitting ? "Saving…" : "Save"}
-              </button>
-            </DialogContent>
-          </Dialog>
-
-          {isOwner && (
-            <Dialog open={manageOpen} onOpenChange={(open) => { if (!open && !submitting) setManageOpen(false); }}>
-              <DialogContent className="max-h-[85vh] overflow-y-auto rounded-[22px] p-7 sm:max-w-[520px]">
-                <DialogHeader>
-                  <DialogTitle className="text-xl tracking-[-0.02em]">Manage {poolParams.name || "this pool"}</DialogTitle>
-                  <DialogDescription>Only the pool owner sees these settings.</DialogDescription>
-                </DialogHeader>
-                <div className="space-y-10">
-                  <section className="border-t border-border pt-5">
-                    <h3 className="text-base font-semibold tracking-[-0.01em]">Pool parameters</h3>
-                    <p className={cn(footnote, "mt-1")}>
-                      Update the public details, beneficiaries, and reburn
-                      period using the pool&apos;s set_pool_params function.
-                    </p>
-                    <div className="mt-5 space-y-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="pool-name">Name</Label>
-                        <Input
-                          id="pool-name"
-                          value={poolName}
-                          onChange={(event) => setPoolName(event.target.value)}
-                          disabled={submitting}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="pool-image">Image URL</Label>
-                        <Input
-                          id="pool-image"
-                          type="url"
-                          value={poolImage}
-                          onChange={(event) => setPoolImage(event.target.value)}
-                          disabled={submitting}
-                        />
-                        <p className={footnote}>Direct HTTPS image: PNG, JPEG, WebP or GIF, up to 2 MB and 16 megapixels. Logos appear as static thumbnails. SVG and redirect links aren&apos;t supported.</p>
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="pool-description">Description</Label>
-                        <textarea
-                          id="pool-description"
-                          value={poolDescription}
-                          onChange={(event) =>
-                            setPoolDescription(event.target.value)
-                          }
-                          disabled={submitting}
-                          rows={4}
-                          className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="reburn-period">Reburn period (days)</Label>
-                        <Input
-                          id="reburn-period"
-                          type="text"
-                          inputMode="decimal"
-                          value={reburnPeriodDays}
-                          onChange={(event) =>
-                            setReburnPeriodDays(event.target.value)
-                          }
-                          disabled={submitting}
-                        />
-                      </div>
-
-                      <div className="space-y-3">
-                        <div className="flex items-center justify-between gap-3">
-                          <Label>Beneficiaries</Label>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() =>
-                              setBeneficiaries((current) => [
-                                ...current,
-                                { address: "", percentage: 0 },
-                              ])
-                            }
-                            disabled={submitting}
-                          >
-                            <Plus className="mr-2 h-4 w-4" />
-                            Add
-                          </Button>
-                        </div>
-                        {beneficiaries.length === 0 && (
-                          <p className="text-sm text-muted-foreground">
-                            No beneficiaries configured.
-                          </p>
-                        )}
-                        {beneficiaries.map((beneficiary, index) => (
-                          <div
-                            key={index}
-                            className="grid gap-2 rounded-md border p-3 sm:grid-cols-[1fr_8rem_auto]"
-                          >
-                            <Input
-                              aria-label={`Beneficiary ${index + 1} address`}
-                              placeholder="Beneficiary address"
-                              value={beneficiary.address}
-                              onChange={(event) =>
-                                setBeneficiaries((current) =>
-                                  current.map((item, itemIndex) =>
-                                    itemIndex === index
-                                      ? { ...item, address: event.target.value }
-                                      : item
-                                  )
-                                )
-                              }
-                              disabled={submitting}
-                            />
-                            <Input
-                              aria-label={`Beneficiary ${index + 1} percentage`}
-                              type="text"
-                              inputMode="decimal"
-                              placeholder="%"
-                              value={beneficiary.percentage / 1000}
-                              onChange={(event) =>
-                                setBeneficiaries((current) =>
-                                  current.map((item, itemIndex) =>
-                                    itemIndex === index
-                                      ? {
-                                          ...item,
-                                          percentage: Math.round(
-                                            Number(event.target.value) * 1000
-                                          ),
-                                        }
-                                      : item
-                                  )
-                                )
-                              }
-                              disabled={submitting}
-                            />
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              aria-label={`Remove beneficiary ${index + 1}`}
-                              onClick={() =>
-                                setBeneficiaries((current) =>
-                                  current.filter(
-                                    (_, itemIndex) => itemIndex !== index
-                                  )
-                                )
-                              }
-                              disabled={submitting}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        ))}
-                        <p className="text-xs text-muted-foreground">
-                          Total beneficiary share:{" "}
-                          {beneficiaries.reduce(
-                            (sum, beneficiary) =>
-                              sum + beneficiary.percentage,
-                            0
-                          ) / 1000}
-                          %
-                        </p>
-                      </div>
-
-                      <button
-                        type="button"
-                        className={primaryButton}
-                        onClick={handleSavePoolParams}
-                        disabled={submitting}
-                      >
-                        {submitting ? "Saving…" : "Save pool parameters"}
-                      </button>
-                    </div>
-                  </section>
-
-                  <section className="border-t border-border pt-5">
-                    <h3 className="text-base font-semibold tracking-[-0.01em]">Reserved KOIN</h3>
-                    <p className={cn(footnote, "mt-1")}>
-                      Reserved KOIN provides mana for operating the pool and is
-                      not burned. Lower reburn periods require more frequent
-                      operations, so more reserved KOIN is recommended. As a
-                      base reference, use about 2,000 KOIN for a 4-day reburn
-                      period.
-                    </p>
-                    <div className="mt-5 space-y-4">
-                      <p className="text-sm">
-                        <span className="text-muted-foreground">
-                          Currently reserved:{" "}
-                        </span>
-                        {reservedKoin !== null ? `${formatAmount(reservedKoin)} KOIN` : "—"}
-                      </p>
-                      <div className="space-y-2">
-                        <Label htmlFor="reserved-koin-amount">KOIN amount</Label>
-                        <Input
-                          id="reserved-koin-amount"
-                          type="text"
-                          inputMode="decimal"
-                          placeholder="0"
-                          value={reservedKoinAmount}
-                          onChange={(event) =>
-                            setReservedKoinAmount(event.target.value)
-                          }
-                          disabled={submitting}
-                        />
-                      </div>
-                      <div className="grid gap-2.5 sm:grid-cols-2">
-                        <button
-                          type="button"
-                          className={primaryButton}
-                          onClick={() => handleReservedKoin("add")}
-                          disabled={submitting}
-                        >
-                          Add reserved KOIN
-                        </button>
-                        <button
-                          type="button"
-                          className={ghostButton}
-                          onClick={() => handleReservedKoin("remove")}
-                          disabled={submitting}
-                        >
-                          Remove reserved KOIN
-                        </button>
-                      </div>
-                    </div>
-                  </section>
-
-                  <section className="border-t border-border pt-5">
-                    <h3 className="text-base font-semibold tracking-[-0.01em]">Node operator public key</h3>
-                    <p className={cn(footnote, "mt-1")}>
-                      Register the public key from{" "}
-                      <code>.koinos/block_producer/public.key</code>. Also set
-                      the <code>producer</code> field in the{" "}
-                      <code>block_producer</code> section of your node&apos;s{" "}
-                      <code>config.yml</code> to this pool address.
-                    </p>
-                    <div className="mt-5 space-y-4">
-                      {registeredPublicKey && (
-                        <div className="space-y-1">
-                          <p className="text-xs text-muted-foreground">
-                            Currently registered public key
-                          </p>
-                          <p className="break-all font-mono text-xs">
-                            {registeredPublicKey}
-                          </p>
-                        </div>
-                      )}
-                      <div className="space-y-2">
-                        <Label htmlFor="public-key">Public key</Label>
-                        <Input
-                          id="public-key"
-                          value={publicKey}
-                          onChange={(event) => setPublicKey(event.target.value)}
-                          placeholder="Paste the contents of public.key"
-                          disabled={submitting}
-                        />
-                      </div>
-                      <button
-                        type="button"
-                        className={primaryButton}
-                        onClick={handleRegisterPublicKey}
-                        disabled={submitting}
-                      >
-                        Register public key
-                      </button>
-                    </div>
-                  </section>
-
-                  <details className="border-t border-border pt-4">
-                    <summary className="cursor-pointer list-none text-sm text-muted-foreground hover:text-foreground [&::-webkit-details-marker]:hidden">Danger zone ›</summary>
-                    <div className="mt-3 space-y-3 text-sm text-muted-foreground">
-                      <p>Removing the pool delists it from Fogata. Stakers keep their funds and can still withdraw. Enter the pool address to confirm.</p>
-                      <Input
-                        aria-label="Pool address confirmation"
-                        value={deleteConfirmation}
-                        onChange={(event) => setDeleteConfirmation(event.target.value)}
-                        placeholder={poolId}
-                        disabled={submitting}
-                      />
-                      <button
-                        type="button"
-                        className={cn(ghostButton, "w-auto border-destructive/60 text-destructive hover:bg-destructive/10")}
-                        onClick={handleDeletePool}
-                        disabled={submitting || deleteConfirmation !== poolId}
-                      >
-                        Remove from Fogata list
-                      </button>
-                    </div>
-                  </details>
-                </div>
-              </DialogContent>
-            </Dialog>
+          {isOwner && sheet === "manage" && (
+            <ManagePoolSheet
+              open
+              onOpenChange={(open) => !open && setSheet(null)}
+              poolId={poolId}
+              poolOwner={owner}
+              initial={{ name: params.name ?? "", image: params.image ?? "", description: params.description ?? "", beneficiaries: params.beneficiaries ?? [], paymentPeriod: params.payment_period }}
+              reservedKoin={reservedKoin}
+              registeredPublicKey={publicKey}
+              onChanged={load}
+            />
           )}
         </>
       )}
-    </div>
+    </Page>
   );
 }

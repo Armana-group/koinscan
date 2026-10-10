@@ -7,7 +7,6 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import styles from "../app/page.module.css";
 import { PlusCircle, Trash2 } from "lucide-react";
 
 const nativeTypes = [

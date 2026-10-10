@@ -1,398 +1,170 @@
 "use client";
 
-import { Abi, BlockHeaderJson, Contract, Provider, ProviderInterface, Serializer, SignerInterface, utils } from "koilib";
-import { abiGovernance, abiPob } from "@/koinos/abis";
-import { useWallet } from "@/contexts/WalletContext";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { ArrowLeft, Clock, Hash, TrendingUp, Vote } from "lucide-react";
-import { useEffect, useState } from "react";
+import { type BlockHeaderJson, Contract, type ProviderInterface, utils } from "koilib";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { KNOWN_PRODUCERS, POB_CONTRACT_ID, VHP_CONTRACT_ID } from "@/koinos/constants";
-import { Navbar } from "@/components/Navbar";
+import { useEffect, useState } from "react";
+import { useWallet } from "@/contexts/WalletContext";
+import { abiPob } from "@/koinos/abis";
+import { POB_CONTRACT_ID, VHP_CONTRACT_ID } from "@/koinos/constants";
+import { ago, compact, fmt, short } from "@/lib/format";
+import { CopyButton, KV, Lines } from "@/components/ks/Advanced";
+import { Crumb, Dot, H2, Lede, Page, Section, Skeleton, Title } from "@/components/ks/Page";
+import { Avatar } from "@/components/ks/Row";
+import { useNameOf } from "@/components/ks/Named";
 
 interface ProducerStats {
-  address: string;
-  name: string;
-  lastBlockHeight?: number;
-  lastBlockTime?: Date;
-  vhpBalance?: number;
-  vhpPercentage?: number;
+  vhpBalance: number;
+  vhpShare: number;
+  expectedMs: number;
+  averageMs?: number;
   effectiveness?: number;
-  totalBlocksProduced?: number;
-  averageTimeToProduce?: number;
-  timeToProduce?: number;
-  governanceProposals?: Array<{
-    id: string;
-    title: string;
-    status: string;
-    votedAt: Date;
-  }>;
+  lastHeight?: number;
+  lastTime?: Date;
+  blocksLastDay: number;
+  sample: number;
+  /** No block in the last day. */
+  idle: boolean;
 }
 
-function formatTimeAgo(date: Date): string {
-  const now = new Date();
-  const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
-  
-  if (diffInSeconds < 60) return `${diffInSeconds} seconds ago`;
-  if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)} minutes ago`;
-  if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)} hours ago`;
-  return `${Math.floor(diffInSeconds / 86400)} days ago`;
+function duration(ms?: number): string {
+  if (ms === undefined || !Number.isFinite(ms) || ms <= 0) return "—";
+  const s = Math.round(ms / 1000);
+  if (s < 90) return `${s} s`;
+  const m = Math.round(s / 60);
+  if (m < 90) return `${m} min`;
+  const h = Math.round(m / 60);
+  if (h < 48) return `${h} h`;
+  return `${Math.round(h / 24)} d`;
 }
 
-function formatVHP(amount: number): string {
-  if (amount >= 1e9) return `${(amount / 1e9).toFixed(2)}B VHP`;
-  if (amount >= 1e6) return `${(amount / 1e6).toFixed(2)}M VHP`;
-  if (amount >= 1e3) return `${(amount / 1e3).toFixed(2)}K VHP`;
-  return `${amount.toFixed(2)} VHP`;
-}
-
-async function getVhpBalance(provider: ProviderInterface, address: string): Promise<number> {
-  const vhpContract = new Contract({ id: VHP_CONTRACT_ID, provider, abi: utils.tokenAbi });
-  const { result } = await vhpContract.functions.balanceOf({ owner: address });
-  if (!result) return 0;
-  return Number(result.value) / 1e8;
-}
-
-async function getDifficulty(provider: ProviderInterface): Promise<number> {
-  const pobContract = new Contract({ id: POB_CONTRACT_ID, provider, abi: abiPob });
-  const { result } = await pobContract.functions.get_metadata();
-  if (!result) return 0;
-  return Number(
-    "0x" + utils.toHexString(utils.decodeBase64url(result.value.difficulty))
-  );
-}
-
-async function getLastBlocksProduced(provider: ProviderInterface, address: string) {
-  const regsPerCall = 30;
-  let seqNum = null;
-  const result = await provider.call<{
-    values: {
-      seq_num: string;
-      block: {
-        header: BlockHeaderJson;
-      };
-    }[];
-  }>("account_history.get_account_history", {
-    address,
-    ascending: false,
-    limit: regsPerCall,
-    irreversible: false,
-    seq_num: seqNum,
-  });
-  if (!result || !result.values) return undefined;
-  const blocks = result.values
-    .filter((val) => {
-      return !!val.block;
-    })
-    .map((val) => val.block);
-  if (blocks.length > 0) return blocks;
-  seqNum = result.values[result.values.length - 1].seq_num;
-  if (Number(seqNum) === 0) return undefined;
-}
-
-async function getProducerStats(provider: ProviderInterface, address: string): Promise<ProducerStats> {
-  const knownProducer = KNOWN_PRODUCERS.find(p => p.address === address);
-  
-  const vhpBalance = await getVhpBalance(provider, address);
-  const difficulty = await getDifficulty(provider);
-  const timeToProduce = Math.floor((10 * difficulty) / (vhpBalance * 1e8));
-  const blocks = await getLastBlocksProduced(provider, address);
-  if (!blocks) return {
-    address,
-    name: knownProducer?.name || address,
-    lastBlockHeight: undefined,
-    lastBlockTime: undefined,
-    vhpBalance,
-    vhpPercentage: 0,
-    effectiveness: 0,
-    totalBlocksProduced: 0,
-    averageTimeToProduce: undefined,
-    timeToProduce,
-    governanceProposals: []
-  };
-
-  const firstBlock = blocks[blocks.length - 1]; // oldest block
-  const lastBlock = blocks[0]; // most recent block
-  const firstTime = Number(firstBlock.header.timestamp);
-  const lastTime = Number(lastBlock.header.timestamp);
-  const now = Date.now();
-
-  // distance to actual time
-  const deltaTime = now - lastTime;
-
-  let averageTimeToProduce: number;
-  if (deltaTime > timeToProduce) {
-    // it should have produced a block already.
-    // this is penalized by assuming a new block after deltaTime
-    averageTimeToProduce = (now - firstTime) / blocks.length;
-  } else {
-    averageTimeToProduce = (lastTime - firstTime) / (blocks.length - 1);
+async function getStats(provider: ProviderInterface, address: string): Promise<ProducerStats> {
+  const vhp = new Contract({ id: VHP_CONTRACT_ID, provider, abi: utils.tokenAbi });
+  const pob = new Contract({ id: POB_CONTRACT_ID, provider, abi: abiPob });
+  const [{ result: balance }, { result: metadata }, history] = await Promise.all([
+    vhp.functions.balanceOf({ owner: address }),
+    pob.functions.get_metadata(),
+    provider.call<{ values?: { block?: { header: BlockHeaderJson } }[] }>("account_history.get_account_history", { address, ascending: false, limit: 30, irreversible: false, seq_num: null }).catch(() => ({ values: [] })),
+  ]);
+  const vhpBalance = Number(balance?.value ?? 0) / 1e8;
+  const difficulty = Number("0x" + utils.toHexString(utils.decodeBase64url(metadata!.value.difficulty)));
+  const vhpProducing = (10 * difficulty) / 3000 / 1e8;
+  const expectedMs = vhpBalance > 0 ? (10 * difficulty) / (vhpBalance * 1e8) : Infinity;
+  const blocks = (history.values ?? []).flatMap((v) => (v.block ? [v.block] : []));
+  const newest = blocks[0];
+  const oldest = blocks[blocks.length - 1];
+  let averageMs: number | undefined;
+  if (newest && oldest && blocks.length > 1) {
+    const newestTime = Number(newest.header.timestamp);
+    const oldestTime = Number(oldest.header.timestamp);
+    averageMs = Date.now() - newestTime > expectedMs ? (Date.now() - oldestTime) / blocks.length : (newestTime - oldestTime) / (blocks.length - 1);
   }
-
-  const effectiveness = (timeToProduce * 100) / averageTimeToProduce;
-  
-  // Calculate effectiveness (blocks produced vs expected)
-  const totalBlocks = 0;
-  const blocksProduced = 0;
-  
-  // Mock VHP data (in a real implementation, this would come from the blockchain)
-  const vhpProducing = 10 * difficulty / 3000 / 1e8;
-  const vhpPercentage = (vhpBalance / vhpProducing) * 100;
-  
-  // Mock governance proposals (in a real implementation, this would query governance contract)
-  const mockProposals = [
-    {
-      id: "PROP-001",
-      title: "Increase block reward by 10%",
-      status: "Approved",
-      votedAt: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000) // Random date within last 30 days
-    },
-    {
-      id: "PROP-002", 
-      title: "Implement new consensus mechanism",
-      status: "Approved",
-      votedAt: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000)
-    },
-    {
-      id: "PROP-003",
-      title: "Update network parameters",
-      status: "Approved", 
-      votedAt: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000)
-    }
-  ];
-  
+  const effectiveness = averageMs && Number.isFinite(expectedMs) ? (expectedMs * 100) / averageMs : undefined;
   return {
-    address,
-    name: knownProducer?.name || address,
-    lastBlockHeight: lastBlock ? Number(lastBlock.header.height) : undefined,
-    lastBlockTime: lastBlock ? new Date(Number(lastBlock.header.timestamp)) : undefined,
     vhpBalance,
-    vhpPercentage,
+    vhpShare: vhpProducing > 0 ? (vhpBalance * 100) / vhpProducing : 0,
+    expectedMs,
+    averageMs,
     effectiveness,
-    totalBlocksProduced: blocksProduced,
-    averageTimeToProduce,
-    timeToProduce,
-    governanceProposals: mockProposals
+    lastHeight: newest ? Number(newest.header.height) : undefined,
+    lastTime: newest ? new Date(Number(newest.header.timestamp)) : undefined,
+    blocksLastDay: blocks.filter((b) => Date.now() - Number(b.header.timestamp) < 86_400_000).length,
+    sample: blocks.length,
+    idle: !newest || Date.now() - Number(newest.header.timestamp) > 86_400_000,
   };
 }
 
 export default function ProducerPage() {
-  const { provider } = useWallet();
-  const params = useParams();
-  const address = params.address as string;
-  const [producerStats, setProducerStats] = useState<ProducerStats | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { address } = useParams<{ address: string }>();
+  const { provider, jsonRpcNode } = useWallet();
+  const nameOf = useNameOf();
+  const key = `${jsonRpcNode}|${address}`;
+  const [loaded, setLoaded] = useState<{ key: string; stats: ProducerStats | null; error: boolean } | null>(null);
 
   useEffect(() => {
-    if (provider && address) {
-      setLoading(true);
-      getProducerStats(provider, address).then((stats) => {
-        setProducerStats(stats);
-        setLoading(false);
-      }).catch((error) => {
-        console.error("Error fetching producer stats:", error);
-        setLoading(false);
+    if (!provider || !address) return;
+    let active = true;
+    getStats(provider, address)
+      .then((s) => active && setLoaded({ key, stats: s, error: false }))
+      .catch((err) => {
+        console.error("[producer]", err);
+        if (active) setLoaded({ key, stats: null, error: true });
       });
-    }
-  }, [provider, address]);
+    return () => {
+      active = false;
+    };
+  }, [provider, address, key]);
 
-  if (loading) {
-    return (
-      <>
-        <Navbar />
-        <main className="min-h-[calc(100vh-4rem)] bg-background">
-          <div className="container mx-auto px-4 py-8">
-            <div className="flex items-center space-x-4 mb-8">
-              <Link href="/network">
-                <Button variant="outline" size="sm">
-                  <ArrowLeft className="h-4 w-4 mr-2" />
-                  Back to Network
-                </Button>
-              </Link>
-            </div>
-            <div className="text-center py-12">
-              <div className="text-muted-foreground">Loading producer details...</div>
-            </div>
-          </div>
-        </main>
-      </>
-    );
-  }
-
-  if (!producerStats) {
-    return (
-      <>
-        <Navbar />
-        <main className="min-h-[calc(100vh-4rem)] bg-background">
-          <div className="container mx-auto px-4 py-8">
-            <div className="flex items-center space-x-4 mb-8">
-              <Link href="/network">
-                <Button variant="outline" size="sm">
-                  <ArrowLeft className="h-4 w-4 mr-2" />
-                  Back to Network
-                </Button>
-              </Link>
-            </div>
-            <div className="text-center py-12">
-              <div className="text-muted-foreground">Producer not found</div>
-            </div>
-          </div>
-        </main>
-      </>
-    );
-  }
+  const current = loaded?.key === key ? loaded : null;
+  const stats = current?.stats ?? null;
+  const error = current?.error ?? false;
+  const name = nameOf(address, "");
+  const idle = stats?.idle ?? true;
 
   return (
-    <>
-      <Navbar />
-      <main className="min-h-[calc(100vh-4rem)] bg-background">
-        <div className="container mx-auto px-4 py-8">
-          {/* Header with back button */}
-          <div className="flex items-center space-x-4 mb-8">
-            <Link href="/network">
-              <Button variant="outline" size="sm">
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Back to Network
-              </Button>
-            </Link>
+    <Page>
+      <Crumb back="Network" backHref="/network" right={<span>Block producer</span>} />
+      <section className="ks-who" aria-label="Producer">
+        <Avatar address={address} name={name || null} large />
+        <div style={{ minWidth: 0 }}>
+          <Title>{name || short(address)}</Title>
+          <div className="ks-hashline">
+            <span>{address}</span>
+            <CopyButton value={address} what="Address" />
           </div>
-
-      {/* Producer Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold tracking-tight">{producerStats.name}</h1>
-        <p className="text-muted-foreground mt-2 font-mono text-sm">
-          {producerStats.address}
-        </p>
-      </div>
-
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">VHP Amount</CardTitle>
-            <Hash className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{formatVHP(producerStats.vhpBalance || 0)}</div>
-            <p className="text-xs text-muted-foreground">
-              {producerStats.vhpPercentage?.toFixed(2)}% of network
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Average Time to Produce</CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {producerStats.averageTimeToProduce ? 
-                `${Math.floor(producerStats.averageTimeToProduce / 1000)}s` : 
-                "N/A"
-              }
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Expected {producerStats.timeToProduce ? 
-                `${Math.floor(producerStats.timeToProduce / 1000)}s` : 
-                "N/A"
-              }
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Effectiveness</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{producerStats.effectiveness?.toFixed(1)}%</div>
-            <p className="text-xs text-muted-foreground">
-              Based on expected time to produce
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Last Block</CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {producerStats.lastBlockHeight ? (
-                <Link href={`/blocks/${producerStats.lastBlockHeight}`} className="hover:underline">
-                  #{producerStats.lastBlockHeight}
-                </Link>
-              ) : (
-                "N/A"
-              )}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {producerStats.lastBlockTime ? formatTimeAgo(producerStats.lastBlockTime) : "Never"}
-            </p>
-          </CardContent>
-        </Card>
-
-        {/*
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Governance</CardTitle>
-            <Vote className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{producerStats.governanceProposals?.length || 0}</div>
-            <p className="text-xs text-muted-foreground">
-              Proposals approved
-            </p>
-          </CardContent>
-        </Card>
-        */}
-      </div>
-
-      {/* Governance Proposals */}
-      {/* <Card>
-        <CardHeader>
-          <CardTitle>Governance Proposals Approved</CardTitle>
-          <CardDescription>
-            List of governance proposals that this producer has approved
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {producerStats.governanceProposals && producerStats.governanceProposals.length > 0 ? (
-            <div className="space-y-4">
-              {producerStats.governanceProposals.map((proposal, index) => (
-                <div key={index} className="flex items-center justify-between p-4 rounded-lg border">
-                  <div className="flex-1">
-                    <div className="flex items-center space-x-3">
-                      <Badge variant="outline" className="text-xs">
-                        {proposal.id}
-                      </Badge>
-                      <Badge variant="default" className="text-xs">
-                        {proposal.status}
-                      </Badge>
-                    </div>
-                    <h4 className="font-medium mt-2">{proposal.title}</h4>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      Voted {formatTimeAgo(proposal.votedAt)}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-8 text-muted-foreground">
-              No governance proposals found for this producer
-            </div>
-          )}
-        </CardContent>
-      </Card> */}
         </div>
-      </main>
-    </>
+      </section>
+
+      {!stats && !error && <Skeleton title={false} lines={3} />}
+      {error && <Lede>This producer could not be loaded from the node.</Lede>}
+      {stats && (
+        <>
+          <Section className="ks-big" label="Share">
+            <H2>Share of the network</H2>
+            <div className="ks-n">
+              {stats.vhpShare.toFixed(1)}
+              <small>%</small>
+            </div>
+            <p className="ks-est">
+              <b>{compact(stats.vhpBalance)} VHP</b> producing, about one block every {duration(stats.expectedMs)}.
+            </p>
+            <p className="ks-status" style={{ marginTop: 10 }}>
+              <Dot tone={idle ? "paused" : stats.effectiveness !== undefined && stats.effectiveness < 50 ? "late" : "ok"} />
+              <span>
+                {stats.lastTime ? (
+                  <>
+                    Last block{" "}
+                    <Link href={`/blocks/${stats.lastHeight}`}>
+                      <b>{fmt(stats.lastHeight)}</b>
+                    </Link>
+                    , {ago(stats.lastTime)}
+                  </>
+                ) : (
+                  "No blocks produced recently"
+                )}
+              </span>
+            </p>
+          </Section>
+          <Section label="Details">
+            <Lines>
+              <KV k="Blocks">
+                {stats.blocksLastDay}
+                {stats.sample === 30 && stats.blocksLastDay === 30 ? "+" : ""} in the last day
+              </KV>
+              <KV k="Block time">
+                {duration(stats.averageMs)} <span>· expected {duration(stats.expectedMs)}</span>
+              </KV>
+              <KV k="Effectiveness">
+                {stats.effectiveness !== undefined ? `${stats.effectiveness.toFixed(0)}%` : "—"} <span>· of expected blocks, over the last {stats.sample}</span>
+              </KV>
+              <KV k="Staked">{fmt(stats.vhpBalance)} VHP</KV>
+              <KV k="Activity">
+                <Link href={`/address/${address}`}>All blocks and transfers ›</Link>
+              </KV>
+            </Lines>
+          </Section>
+        </>
+      )}
+    </Page>
   );
-} 
+}

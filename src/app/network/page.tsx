@@ -1,425 +1,180 @@
 "use client";
 
 /**
- * The VHP producing is calculated from the difficulty of the PoB contract.
- * The PoB contract is designed in a way that, on average, each 3 seconds it
- * should create a new block. Also, the time is measured in fractions of 10
- * milliseconds. Then the total VHP produducing (let's call it VHPprod) will
- * try to mine a block each 10 milliseconds. That is, in 300 attemps the
- * VHPprod should produce 1 block (3sec/10ms = 300).
- * 
- * In the code, it is computed as a "hash" trying to reach a "target".
- * hash = random value / VHPprod
- * target = MAX_VALUE / difficulty
- * 
- * a success value is meet when hash < target.
- * 
- * The hash is computed with a random value that goes from 0 to MAX_VALUE.
- * Each 300 attemps we want a success value. Then the values from 0 to
- * MAX_VALUE/300 will trigger a valid block. Then, on average, the difficulty
- * will be adjusted to match the following formula:
- * 
- * hash = target
- * random value / VHPprod = MAX_VALUE / difficulty
- * (MAX_VALUE / 300) / VHPprod = MAX_VALUE / difficulty
- * VHPprod = difficulty / 300
- *  
- * So, in conclusion the total VHP producing is equal to difficulty / 300.
- * You can get this difficulty from the metadata of the PoB contract.
- * This is also the formula used in the block producer to compute the
- * VHP producing. https://github.com/koinos/koinos-block-producer/blob/master/src/koinos/block_production/pob_producer.cpp#L492
- * 
- * The APY is computed as:
- * APY = 2% * virtual supply / VHP producing
- * 
- * Expected time to produce a block is computed as:
- * The total VHP producing is expected to produce 1 block every 3 seconds.
- * For a particular VHP balance, the expected time to produce a block is:
- * expected time = (3000 milliseconds * VHPproducing) / VHPbalance
- * expected time = (3000 milliseconds * difficulty / 300) / VHPbalance
- * expected time = 10 * difficulty / VHPbalance milliseconds
+ * VHP producing = difficulty / 300 (the PoB contract targets one block per
+ * 300 ten-millisecond attempts), APY = 2% * virtual supply / VHP producing,
+ * and a producer's expected block time is 10 * difficulty / VHP balance ms.
+ * The same formulas as src/lib/fogata.ts and the Koinos block producer.
  */
-
-import { Abi, Contract, Provider, ProviderInterface, Serializer, SignerInterface, utils } from "koilib";
-import { abiGovernance, abiPob } from "@/koinos/abis";
-import tokenAbi from "@/koinos/abi";
-import { getTokenImageUrl } from "@/koinos/utils";
+import { Contract, type ProviderInterface, utils } from "koilib";
+import { useEffect, useMemo, useState } from "react";
 import { useWallet } from "@/contexts/WalletContext";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { 
-  Chart as ChartJS, 
-  ArcElement, 
-  Tooltip, 
-  Legend,
-  CategoryScale,
-  LinearScale,
-  Title
-} from 'chart.js';
-import { Pie } from 'react-chartjs-2';
-import { useEffect, useState } from "react";
-import Link from "next/link";
-import { KNOWN_PRODUCERS } from "@/koinos/constants";
-import { Navbar } from "@/components/Navbar";
+import tokenAbi from "@/koinos/abi";
+import { abiPob } from "@/koinos/abis";
+import { KOIN_CONTRACT_ID, POB_CONTRACT_ID, VHP_CONTRACT_ID } from "@/koinos/constants";
+import { compact, fmt, short } from "@/lib/format";
+import { Filters } from "@/components/ks/Controls";
+import { Empty, Lede, Page, RowSkeleton, Title } from "@/components/ks/Page";
+import { Avatar, More, Row } from "@/components/ks/Row";
+import { KV, Lines } from "@/components/ks/Advanced";
+import { useNameOf } from "@/components/ks/Named";
 
-function formatAmount(amount: number): string {
-  if (amount >= 1e9) return `${(amount / 1e9).toFixed(2)}B`;
-  if (amount >= 1e6) return `${(amount / 1e6).toFixed(2)}M`;
-  if (amount >= 1e3) return `${(amount / 1e3).toFixed(2)}K`;
-  return `${amount.toFixed(2)}`;
+const SAMPLE = 100;
+const SHOW = 12;
+type View = "producers" | "supply" | "yield";
+
+interface NetworkData {
+  producers: { address: string; share: number; blocks: number }[];
+  averageBlockTime: number;
+  totalVhp: number;
+  totalKoin: number;
+  vhpProducing: number;
+  apy: number;
+  difficulty: number;
 }
 
-ChartJS.register(
-  ArcElement, 
-  Tooltip, 
-  Legend,
-  CategoryScale,
-  LinearScale,
-  Title
-);
-
-// Generate colors for dynamic data
-const generateColors = (count: number) => {
-  const colors = [
-    'rgba(54, 162, 235, 0.8)',
-    'rgba(255, 99, 132, 0.8)',
-    'rgba(255, 205, 86, 0.8)',
-    'rgba(75, 192, 192, 0.8)',
-    'rgba(153, 102, 255, 0.8)',
-    'rgba(255, 159, 64, 0.8)',
-    'rgba(199, 199, 199, 0.8)',
-    'rgba(83, 102, 255, 0.8)',
-    'rgba(78, 252, 3, 0.8)',
-    'rgba(252, 3, 244, 0.8)',
-  ];
-  
-  const borderColors = colors.map(color => color.replace('0.8', '1'));
-  
-  return {
-    backgroundColor: colors.slice(0, count),
-    borderColor: borderColors.slice(0, count),
-  };
-};
-
-const chartOptions = {
-  responsive: true,
-  maintainAspectRatio: false,
-  plugins: {
-    legend: {
-      position: 'bottom' as const,
-      labels: {
-        padding: 20,
-        usePointStyle: true,
-        font: {
-          size: 12,
-        },
-      },
-    },
-    tooltip: {
-      callbacks: {
-        label: function(context: any) {
-          const label = context.label || '';
-          const value = context.parsed;
-          const total = context.dataset.data.reduce((a: number, b: number) => a + b, 0);
-          const percentage = ((value / total) * 100).toFixed(1);
-          return `${label}: ${value} (${percentage}%)`;
-        }
-      }
-    }
-  },
-};
-
-/* let networkStats = [
-  {
-    title: "Total Nodes",
-    value: "1,247",
-    change: "+12",
-    changeType: "positive" as const,
-    description: "Active network nodes"
-  },
-  {
-    title: "Total Staked",
-    value: "2.4B KOIN",
-    change: "+5.2%",
-    changeType: "positive" as const,
-    description: "Total staked tokens"
-  },
-  {
-    title: "Network Hash Rate",
-    value: "847 TH/s",
-    change: "+3.1%",
-    changeType: "positive" as const,
-    description: "Current network hash rate"
-  },
-  {
-    title: "Block Time",
-    value: "2.3s",
-    change: "-0.1s",
-    changeType: "negative" as const,
-    description: "Average block time"
-  }
-];
-networkStats = []; */
-
-async function getNetworkData(provider: ProviderInterface) {
-  const numberOfBlocks = 100;
+async function getNetworkData(provider: ProviderInterface): Promise<NetworkData> {
   const head = await provider.getHeadInfo();
-  const blocks = await provider.getBlocks(Number(head.head_topology.height) - numberOfBlocks, numberOfBlocks, "", {
-    returnBlock: true,
-    returnReceipt: false,
-  });
-  const producers: {
-    address: string;
-    name: string;
-    percentage: number;
-  }[] = KNOWN_PRODUCERS.map((p) => ({
-    address: p.address,
-    name: p.name,
-    percentage: 0,
-  }));
+  const blocks = await provider.getBlocks(Number(head.head_topology.height) - SAMPLE, SAMPLE, "", { returnBlock: true, returnReceipt: false });
+  const counts = new Map<string, number>();
   for (const block of blocks) {
     const signer = block.block.header!.signer!;
-    const producer = producers.find((p) => p.address === signer);
-    if (producer) {
-      producer.percentage += 100 / numberOfBlocks;
-    } else {
-      const knownProducer = KNOWN_PRODUCERS.find((p) => p.address === signer);
-      producers.push({
-        address: signer,
-        name: knownProducer?.name || signer,
-        percentage: 100 / numberOfBlocks,
-      });
-    }
+    counts.set(signer, (counts.get(signer) ?? 0) + 1);
   }
-  producers.sort((a, b) => b.percentage - a.percentage);
-  
-  const firstBlock = blocks[0];
-  const lastBlock = blocks[blocks.length - 1];
-  const averageBlockTime = (Number(lastBlock.block.header!.timestamp) - Number(firstBlock.block.header!.timestamp)) / (numberOfBlocks - 1) / 1000;
+  const producers = [...counts.entries()].map(([address, n]) => ({ address, blocks: n, share: (100 * n) / blocks.length })).sort((a, b) => b.share - a.share);
+  const first = blocks[0];
+  const last = blocks[blocks.length - 1];
+  const averageBlockTime = (Number(last.block.header!.timestamp) - Number(first.block.header!.timestamp)) / (blocks.length - 1) / 1000;
 
-  let resultInvoke = await provider.invokeGetContractAddress!("vhp");
-  let id = resultInvoke!.value.address;
-  const vhpContract = new Contract({ id, provider, abi: tokenAbi });
-  const { result: resultVhp } = await vhpContract.functions.totalSupply();
-  const totalVhp = Number(resultVhp!.value) / 1e8;
-
-  resultInvoke = await provider.invokeGetContractAddress!("koin");
-  id = resultInvoke!.value.address;
-  const koinContract = new Contract({ id, provider, abi: tokenAbi });
-  const { result: resultKoin } = await koinContract.functions.totalSupply();
-  const totalKoin = Number(resultKoin!.value) / 1e8;
-
-  resultInvoke = await provider.invokeGetContractAddress!("pob");
-  id = resultInvoke!.value.address;
-  const pobContract = new Contract({ id, provider, abi: abiPob });
-  const { result: resultPob } = await pobContract.functions.get_metadata();
-  const difficulty = Number(
-    "0x" + utils.toHexString(utils.decodeBase64url(resultPob!.value.difficulty))
-  );
-  const timeToProduce = 10 * difficulty / (totalVhp * 1e8) / 1000;
-  const vhpProducing = 10 * difficulty / 3000 / 1e8;
-  const apy = 2 * (totalVhp + totalKoin) / vhpProducing;
-
-  return {
-    producers,
-    averageBlockTime,
-    totalVhp,
-    totalKoin,
-    difficulty,
-    timeToProduce,
-    vhpProducing,
-    apy,
-  };
+  const vhp = new Contract({ id: VHP_CONTRACT_ID, provider, abi: tokenAbi });
+  const koin = new Contract({ id: KOIN_CONTRACT_ID, provider, abi: tokenAbi });
+  const pob = new Contract({ id: POB_CONTRACT_ID, provider, abi: abiPob });
+  const [{ result: vhpSupply }, { result: koinSupply }, { result: metadata }] = await Promise.all([vhp.functions.totalSupply(), koin.functions.totalSupply(), pob.functions.get_metadata()]);
+  const totalVhp = Number(vhpSupply!.value) / 1e8;
+  const totalKoin = Number(koinSupply!.value) / 1e8;
+  const difficulty = Number("0x" + utils.toHexString(utils.decodeBase64url(metadata!.value.difficulty)));
+  const vhpProducing = (10 * difficulty) / 3000 / 1e8;
+  const apy = (2 * (totalVhp + totalKoin)) / vhpProducing;
+  return { producers, averageBlockTime, totalVhp, totalKoin, vhpProducing, apy, difficulty };
 }
 
 export default function NetworkPage() {
-  const { provider } = useWallet();
-  const [networkData, setNetworkData] = useState<{
-    address: string;
-    name: string;
-    percentage: number;
-  }[]>([]);
-  const [networkStats, setNetworkStats] = useState<{
-    title: string;
-    value: string;
-    change: string;
-    changeType: "positive" | "negative";
-    description: string;
-  }[]>([]);
+  const { provider, jsonRpcNode } = useWallet();
+  const nameOf = useNameOf();
+  const [loaded, setLoaded] = useState<{ key: string; data: NetworkData | null; error: boolean } | null>(null);
+  const [view, setView] = useState<View>("producers");
+  const [shown, setShown] = useState(SHOW);
 
   useEffect(() => {
-    if (provider) {
-      getNetworkData(provider).then((data) => {
-        setNetworkData(data.producers);
-        setNetworkStats([
-          {
-            title: "Block Time",
-            value: `${data.averageBlockTime.toFixed(2)}s`,
-            change: "",
-            changeType: "negative" as const,
-            description: "Average block time"
-          },
-          {
-            title: "VHP Producing",
-            value: `${formatAmount(data.vhpProducing)} VHP`,
-            change: "",
-            changeType: "positive" as const,
-            description: "Average VHP producing"
-          },
-          {
-            title: "Virtual Supply",
-            value: `${formatAmount(data.totalVhp + data.totalKoin)} VHP+KOIN`,
-            change: "",
-            changeType: "positive" as const,
-            description: `${formatAmount(data.totalVhp)} VHP + ${formatAmount(data.totalKoin)} KOIN`
-          },
-          {
-            title: "APY",
-            value: `${data.apy.toFixed(2)}%`,
-            change: "",
-            changeType: "positive" as const,
-            description: "Annual percentage yield"
-          },
-        ])
+    if (!provider) return;
+    let active = true;
+    getNetworkData(provider)
+      .then((result) => active && setLoaded({ key: jsonRpcNode, data: result, error: false }))
+      .catch((err) => {
+        console.error("[network]", err);
+        if (active) setLoaded({ key: jsonRpcNode, data: null, error: true });
       });
-    }
-  }, [provider]);
+    return () => {
+      active = false;
+    };
+  }, [provider, jsonRpcNode]);
 
-  // Transform network data for pie chart
-  const chartData = {
-    labels: networkData.map(item => item.name || item.address.slice(0, 8) + '...'),
-    datasets: [
-      {
-        data: networkData.map(item => item.percentage),
-        backgroundColor: generateColors(networkData.length).backgroundColor,
-        borderColor: generateColors(networkData.length).borderColor,
-        borderWidth: 2,
-      },
-    ],
-  };
-
-  // Enhanced chart options with click handling
-  const enhancedChartOptions = {
-    ...chartOptions,
-    onClick: (event: any, elements: any) => {
-      if (elements.length > 0) {
-        const index = elements[0].index;
-        const producer = networkData[index];
-        if (producer) {
-          window.location.href = `/network/${producer.address}`;
-        }
-      }
-    },
-    plugins: {
-      ...chartOptions.plugins,
-      legend: {
-        ...chartOptions.plugins.legend,
-        onClick: (event: any, legendItem: any) => {
-          const producer = networkData[legendItem.index];
-          if (producer) {
-            window.location.href = `/network/${producer.address}`;
-          }
-        }
-      }
-    }
-  };
+  const current = loaded?.key === jsonRpcNode ? loaded : null;
+  const data = current?.data ?? null;
+  const error = current?.error ?? false;
+  const producers = useMemo(() => data?.producers ?? [], [data]);
+  const maxShare = producers[0]?.share ?? 1;
 
   return (
-    <>
-      <Navbar />
-      <main className="min-h-[calc(100vh-4rem)] bg-background">
-        <div className="container mx-auto px-4 py-8">
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold tracking-tight">Network Overview</h1>
-            <p className="text-muted-foreground mt-2">
-              Real-time statistics and distribution of the Koinos network
-            </p>
+    <Page list>
+      <Title>Network</Title>
+      <Lede>
+        {data ? (
+          <>
+            <span className="ks-live" />A block every {data.averageBlockTime.toFixed(1)} seconds. <b>{compact(data.vhpProducing)} VHP</b> producing, <b>{data.apy.toFixed(1)}%</b> yearly yield.
+          </>
+        ) : (
+          "A block every 3 seconds."
+        )}
+      </Lede>
+      <Filters
+        top
+        options={[
+          { value: "producers", label: "Producers" },
+          { value: "supply", label: "Supply" },
+          { value: "yield", label: "Yield" },
+        ]}
+        value={view}
+        onChange={setView}
+      />
+
+      {!data && !error && <RowSkeleton rows={6} />}
+      {error && <Empty>Network data could not be loaded from this node. Pick another node in the menu.</Empty>}
+
+      {data && view === "producers" && (
+        <>
+          <div className="ks-list">
+            {producers.slice(0, shown).map((producer) => {
+              const name = nameOf(producer.address, "");
+              return (
+                <Row
+                  key={producer.address}
+                  lead={<Avatar address={producer.address} name={name || null} />}
+                  title={
+                    <>
+                      {name || short(producer.address)}
+                      <span className="ks-share">
+                        <i style={{ width: `${(producer.share / maxShare) * 100}%` }} />
+                      </span>
+                    </>
+                  }
+                  detail={name ? short(producer.address) : "No name yet"}
+                  amount={`${producer.share.toFixed(1)}%`}
+                  amountSub={`of the last ${SAMPLE} blocks`}
+                  amountTone="in"
+                  href={`/network/${producer.address}`}
+                />
+              );
+            })}
           </div>
+          {producers.length > shown && <More onClick={() => setShown((n) => n + SHOW)}>{fmt(producers.length - shown)} more producers</More>}
+        </>
+      )}
 
-      {/* Network Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        {networkStats.map((stat, index) => (
-          <Card key={index}>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
-                {stat.title}
-              </CardTitle>
-              {/* <Badge 
-                variant={stat.changeType === "positive" ? "default" : "secondary"}
-                className="text-xs"
-              >
-                {stat.change}
-              </Badge> */}
-            </CardHeader>
-            <CardContent>
-              <div className="text-xl sm:text-2xl font-bold truncate">{stat.value}</div>
-              <p className="text-xs text-muted-foreground truncate">
-                {stat.description}
-              </p>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+      {data && view === "supply" && (
+        <Lines className="mt-4">
+          <KV k="KOIN">
+            {fmt(data.totalKoin)} <span>in circulation</span>
+          </KV>
+          <KV k="VHP">
+            {fmt(data.totalVhp)} <span>staked as hash power</span>
+          </KV>
+          <KV k="Virtual supply">
+            {fmt(data.totalKoin + data.totalVhp)} <span>KOIN and VHP together</span>
+          </KV>
+          <KV k="Producing">
+            {fmt(data.vhpProducing)} VHP <span>· {((100 * data.vhpProducing) / data.totalVhp).toFixed(1)}% of all VHP is producing blocks</span>
+          </KV>
+        </Lines>
+      )}
 
-      {/* Pie Chart */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <Card>
-          <CardHeader>
-            <CardTitle>Block Producer Distribution</CardTitle>
-            <CardDescription>
-              Distribution of block production across network nodes
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="h-80 cursor-pointer">
-              {networkData.length > 0 ? (
-                <Pie data={chartData} options={enhancedChartOptions} />
-              ) : (
-                <div className="h-full flex items-center justify-center text-muted-foreground">
-                  Loading network data...
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Block Producer Details</CardTitle>
-            <CardDescription>
-              Key metrics and information about block producers
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-3">
-              {networkData.map((item, index) => (
-                <div key={index} className="flex items-center justify-between gap-3 p-3 rounded-lg border">
-                  <div className="flex items-center space-x-3 min-w-0 flex-1">
-                    <div
-                      className="w-4 h-4 rounded-full flex-shrink-0"
-                      style={{ backgroundColor: generateColors(networkData.length).backgroundColor[index] }}
-                    />
-                    <Link
-                      href={`/network/${item.address}`}
-                      className="font-medium font-mono text-sm hover:underline cursor-pointer truncate"
-                    >
-                      {item.name || item.address.slice(0, 8) + '...'}
-                    </Link>
-                  </div>
-                  <div className="text-right flex-shrink-0">
-                    <div className="font-semibold whitespace-nowrap">{item.percentage === 0 ? "<1.0" : item.percentage.toFixed(1)}%</div>
-                    <div className="text-xs text-muted-foreground whitespace-nowrap">
-                      Block producer
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-        </div>
-      </main>
-    </>
+      {data && view === "yield" && (
+        <>
+          <Lines className="mt-4">
+            <KV k="Yearly yield">
+              {data.apy.toFixed(2)}% <span>for VHP that is producing</span>
+            </KV>
+            <KV k="Inflation">
+              2% <span>of the virtual supply, paid to producers</span>
+            </KV>
+            <KV k="Block time">
+              {data.averageBlockTime.toFixed(2)}s <span>average over the last {SAMPLE} blocks</span>
+            </KV>
+            <KV k="Difficulty">{data.difficulty.toExponential(3)}</KV>
+          </Lines>
+          <p className="ks-foot">The yield is 2% of the virtual supply divided by the VHP producing blocks. When more VHP produces, each VHP earns less.</p>
+        </>
+      )}
+    </Page>
   );
-} 
+}

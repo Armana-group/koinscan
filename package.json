@@ -17,6 +17,7 @@
   "dependencies": {
     "@armana/walletconnect-koinos-sdk-js": "^0.1.4",
     "@radix-ui/react-dialog": "^1.1.6",
+    "@roamin/koinos-pb-to-proto": "0.0.3",
     "clsx": "^2.1.1",
     "ipaddr.js": "2.5.0",
     "koilib": "^9.4.0",

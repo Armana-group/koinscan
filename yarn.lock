@@ -1225,7 +1225,7 @@
   resolved "https://registry.npmjs.org/@radix-ui/react-use-layout-effect/-/react-use-layout-effect-1.1.0.tgz"
   integrity sha512-+FPE0rOdziWSrH9athwI1R0HDVbWlEhd+FR+aSDk4uWGmSJ9Z54sdZVDQPZAinJhJXwfT+qnj969mCsT2gfm5w==
 
-"@roamin/koinos-pb-to-proto@^0.0.3":
+"@roamin/koinos-pb-to-proto@0.0.3", "@roamin/koinos-pb-to-proto@^0.0.3":
   version "0.0.3"
   resolved "https://registry.npmjs.org/@roamin/koinos-pb-to-proto/-/koinos-pb-to-proto-0.0.3.tgz"
   integrity sha512-FR7hOtTM+COIMPBXpR6gc1HlJvFzioGgbAod9h7QAF527ACCF6xQG5mNyTSM65PrpbUVu/SA51O4Itp9BvZlTg==

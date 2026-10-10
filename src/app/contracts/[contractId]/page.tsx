@@ -1,6 +1,7 @@
 "use client";
 
-import { type Abi, Contract, Serializer, utils } from "koilib";
+import { type Abi, Contract, utils } from "koilib";
+import { buildSerializer } from "@/koinos/serializer";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -102,12 +103,7 @@ export default function ContractPage() {
         });
         c.abi = abi;
         c.updateFunctionsFromAbi();
-        try {
-          if (c.abi.koilib_types) c.serializer = new Serializer(c.abi.koilib_types);
-          else if (c.abi.types) c.serializer = new Serializer(c.abi.types);
-        } catch (serializerError) {
-          console.warn("Serializer unavailable for contract:", serializerError);
-        }
+        c.serializer = buildSerializer(c.abi) ?? undefined;
         if (!active) return;
         setContract(c);
         setInfo({ nickname, address: contractId, description });

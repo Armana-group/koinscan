@@ -5,6 +5,7 @@ import { HOME_SEARCH_ATTRIBUTE, useShortcutLabel } from "@/components/chrome/Chr
 import { Glow } from "@/components/chrome/Glow";
 import { ArrowIcon, SearchIcon } from "@/components/chrome/icons";
 import { useHead } from "@/hooks/useHead";
+import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { useSearchNavigation } from "@/hooks/useSearchNavigation";
 import { fmt } from "@/lib/format";
 import { useNameOf } from "@/components/ks/Named";
@@ -20,6 +21,10 @@ export default function Home() {
   const nameOf = useNameOf();
   const [value, setValue] = useState("");
   const [producer, setProducer] = useState<string>("");
+  // The full hint only fits on wide screens; narrower phones get shorter wording so it isn't cut off.
+  const phone = useMediaQuery("(max-width: 760px)");
+  const narrow = useMediaQuery("(max-width: 374px)");
+  const hint = narrow ? "Search Koinos" : phone ? "Address, @name, tx or block" : "Search an address, @nickname, transaction or block";
 
   // Who produced the head block, for the live line.
   useEffect(() => {
@@ -61,7 +66,7 @@ export default function Home() {
             type="text"
             value={value}
             onChange={(event) => setValue(event.target.value)}
-            placeholder={busy ? "Looking…" : "Search an address, @nickname, transaction or block"}
+            placeholder={busy ? "Looking…" : hint}
             aria-label="Search"
             autoComplete="off"
             spellCheck={false}

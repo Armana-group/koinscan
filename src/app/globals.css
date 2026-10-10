@@ -1885,7 +1885,8 @@ button.ks-row:hover .ks-t {
 }
 .ks-pill {
   position: relative;
-  width: min(760px, 43vw);
+  /* 600px floor keeps the full search hint visible on laptops */
+  width: clamp(600px, 43vw, 760px);
   margin-top: 44px;
   height: 64px;
   border-radius: 999px;

@@ -130,14 +130,14 @@ export default function NetworkPage() {
                   }
                   detail={name ? short(producer.address) : "No name yet"}
                   amount={`${producer.share.toFixed(1)}%`}
-                  amountSub={`of the last ${SAMPLE} blocks`}
+                  amountSub={`of the last ${SAMPLE}`}
                   amountTone="in"
                   href={`/network/${producer.address}`}
                 />
               );
             })}
           </div>
-          {producers.length > shown && <More onClick={() => setShown((n) => n + SHOW)}>{fmt(producers.length - shown)} more producers</More>}
+          {producers.length > shown && <More onClick={() => setShown((n) => n + SHOW)}>{fmt(producers.length - shown)} more producer{producers.length - shown === 1 ? "" : "s"}</More>}
         </>
       )}
 

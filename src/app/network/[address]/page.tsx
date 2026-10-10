@@ -109,7 +109,7 @@ export default function ProducerPage() {
         <div style={{ minWidth: 0 }}>
           <Title>{name || short(address)}</Title>
           <div className="ks-hashline">
-            <span>{address}</span>
+            <span>{name ? short(address) : address}</span>
             <CopyButton value={address} what="Address" />
           </div>
         </div>

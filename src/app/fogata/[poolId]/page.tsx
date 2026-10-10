@@ -432,7 +432,7 @@ export default function FogataPoolPage() {
                 <H2>Yield</H2>
                 <div className="ks-n">
                   {apy !== null ? apy.toFixed(1) : "—"}
-                  <small>% a year</small>
+                  {apy !== null && <small>% a year</small>}
                 </div>
                 <p className="ks-est">After the pool&apos;s {fee}% fee. It moves with how much VHP the whole network is staking.</p>
                 {account && <p className="ks-meta">You have nothing staked here.</p>}

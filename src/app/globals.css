@@ -2312,6 +2312,15 @@ button.ks-row:hover .ks-t {
   .ks-panel {
     top: 12px;
     right: 12px;
+    left: 12px;
+    width: auto;
+  }
+  .ks-finder .ks-esc {
+    display: none;
+  }
+  .ks-hashline span {
+    min-width: 0;
+    overflow-wrap: anywhere;
   }
   .ks-who {
     gap: 16px;
@@ -2332,6 +2341,9 @@ button.ks-row:hover .ks-t {
   .ks-pool {
     grid-template-columns: 36px 1fr auto 12px;
     gap: 14px;
+  }
+  .ks-pool .ks-d {
+    white-space: normal;
   }
   .ks-docs {
     gap: 12px 18px;

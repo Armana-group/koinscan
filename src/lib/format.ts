@@ -64,7 +64,7 @@ export function ago(timestamp: number | string | Date | null | undefined, now = 
   const t = toMillis(timestamp);
   if (t === null) return "";
   const s = Math.round((now - t) / 1000);
-  if (s < 0) return "in a moment";
+  // Producers' clocks can run a few seconds ahead, so a future time is still "just now".
   if (s < 5) return "just now";
   if (s < 60) return `${s} seconds ago`;
   const m = Math.round(s / 60);

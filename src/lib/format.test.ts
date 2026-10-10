@@ -26,6 +26,7 @@ test("fmtRaw converts raw token amounts exactly", () => {
 test("ago reads like a sentence", () => {
   const now = Date.UTC(2026, 9, 9, 17, 30, 0);
   assert.equal(ago(now - 2000, now), "just now");
+  assert.equal(ago(now + 3000, now), "just now");
   assert.equal(ago(now - 120_000, now), "2 minutes ago");
   assert.equal(ago(now - 3 * 3_600_000, now), "3 hours ago");
   assert.equal(ago(now - 26 * 3_600_000, now), "yesterday");

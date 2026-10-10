@@ -30,6 +30,8 @@ export const metadata: Metadata = {
   metadataBase: new URL("https://koinscan.com"),
   ...pageMetadata(SITE_TITLE, SITE_DESCRIPTION),
   manifest: "/manifest.json",
+  // The public beta (beta.koinscan.io) sets SITE_STAGE=beta so search engines keep listing the main site only.
+  ...(process.env.SITE_STAGE === "beta" && { robots: { index: false, follow: false } }),
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

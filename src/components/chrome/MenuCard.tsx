@@ -18,6 +18,9 @@ const LINKS = [
   { name: "Fogata", href: "/fogata" },
 ];
 
+// Beta feedback goes to public GitHub issues on the KoinScan repo.
+const FEEDBACK_URL = "https://github.com/Armana-group/koinscan/issues/new";
+
 const toolRow =
   "flex w-full items-center justify-between gap-3 rounded-[14px] px-3.5 py-2.5 text-left text-[13px] hover:bg-raised";
 
@@ -138,6 +141,10 @@ export function MenuCard() {
           <Link href="/changelog" tabIndex={menuOpen ? 0 : -1} onClick={closeAll}>
             Changelog
           </Link>
+          {" · "}
+          <a href={FEEDBACK_URL} target="_blank" rel="noreferrer" tabIndex={menuOpen ? 0 : -1}>
+            Send feedback
+          </a>
         </span>
       </footer>
     </nav>

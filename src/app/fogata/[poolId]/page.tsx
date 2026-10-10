@@ -18,6 +18,7 @@ import { Sheet } from "@/components/chrome/Sheet";
 import { ConnectButton } from "@/components/chrome/WalletSheet";
 import { ManagePoolSheet } from "@/components/fogata/ManagePoolSheet";
 import { PoolMark } from "@/components/fogata/PoolMark";
+import { PoolStakers } from "@/components/fogata/PoolStakers";
 import { toBaseUnits, type Beneficiary } from "@/components/fogata/pool-form";
 import { Advanced, CopyButton, KV, Lines, Mono } from "@/components/ks/Advanced";
 import { AmountInput, Segmented } from "@/components/ks/Controls";
@@ -477,8 +478,13 @@ export default function FogataPoolPage() {
                 {performance.lastBlockHeight !== undefined ? <Link href={`/blocks/${performance.lastBlockHeight}`}>{fmt(performance.lastBlockHeight)}</Link> : "—"}
                 {performance.lastBlockTime && <span> · {ago(performance.lastBlockTime)}</span>}
               </KV>
+              <KV k="Trade">
+                <Link href="/fogata/trade">Sell VHP for KOIN</Link> <span>· or buy VHP with KOIN</span>
+              </KV>
             </Lines>
           </Section>
+
+          <PoolStakers poolId={poolId} account={account} />
 
           <Advanced>
             <KV k="Pool address">

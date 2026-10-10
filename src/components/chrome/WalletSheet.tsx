@@ -38,7 +38,7 @@ export function AccountBalance({ address }: { address: string }) {
 }
 
 export function WalletSheet() {
-  const { walletOpen, closeWallet } = useChrome();
+  const { walletOpen, closeWallet, openConnect } = useChrome();
   const { signer, connect, chooseKondorAccount, kondorAccounts } = useWallet();
   const [busy, setBusy] = useState(false);
 
@@ -49,6 +49,8 @@ export function WalletSheet() {
     try {
       const result = await connect(wallet);
       if (result === "connected") closeWallet();
+      // The sheet can be dismissed while the user is busy in Kondor; bring the account choice back.
+      else if (result === "choose-account") openConnect();
     } catch (error) {
       toast.error((error as Error).message);
     } finally {

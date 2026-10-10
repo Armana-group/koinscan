@@ -118,7 +118,8 @@ export function WalletChip() {
   const forget = async () => {
     forgetAddress();
     if (walletName) await disconnectWallet(walletName).catch(() => undefined);
-    toast.success("Address forgotten.");
+    // Kondor keeps sharing the account with this site; only Kondor can stop that.
+    toast.success(walletName === "kondor" ? "Forgotten here. To stop sharing it, remove KoinScan in Kondor’s Connected sites." : "Address forgotten.");
     closeWalletCard();
   };
 

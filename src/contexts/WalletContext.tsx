@@ -22,6 +22,10 @@ import { saveBetaAccess, clearBetaAccess } from "@/lib/beta-access";
 // Local storage keys
 const ADDRESS_STORAGE_KEY = "koinos-explorer-address";
 const WALLET_TYPE_STORAGE_KEY = "koinos-explorer-wallet-type";
+// Set by Forget until the next account is chosen. Kondor keeps sharing a
+// forgotten account, so after Forget a reconnect must ask instead of
+// silently bringing it back.
+const FORGOTTEN_STORAGE_KEY = "koinos-explorer-forgotten";
 export const RPC_NODE_STORAGE_KEY = "rpc-node";
 export const REST_NODE_STORAGE_KEY = "rest-node";
 
@@ -98,6 +102,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       setSavedAddress(address);
       setSavedWalletType(nextSigner.name ?? null);
       rememberChosenAddress(address);
+      localStorage.removeItem(FORGOTTEN_STORAGE_KEY);
       if (nextSigner.name) localStorage.setItem(WALLET_TYPE_STORAGE_KEY, nextSigner.name);
       if (nextSigner.name === "kondor") {
         const sharedAccounts = accounts ?? getStoredKondorAccounts() ?? [];
@@ -127,10 +132,13 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     try {
       const connection = await connectWallet(wallet);
       if (revision !== walletRevision.current) return "cancelled" as const;
+      const forgotten = localStorage.getItem(FORGOTTEN_STORAGE_KEY) !== null;
       if (wallet === "kondor" && connection.accounts
-        && !connection.accounts.some((account) => account.address === chosenAddress)) {
-        // A fresh connection (including after Forget) requires an explicit
-        // account choice. Kondor's site permission may still return old accounts.
+        && !connection.accounts.some((account) => account.address === chosenAddress)
+        && (connection.accounts.length > 1 || forgotten)) {
+        // Several shared accounts need a choice here. After Forget even one
+        // does: Kondor's site permission still returns the forgotten account.
+        // A first connection that shares one account was already chosen in Kondor.
         setKondorAccountsState(connection.accounts);
         return "choose-account" as const;
       }
@@ -306,6 +314,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     if (typeof window !== 'undefined') {
       localStorage.removeItem(ADDRESS_STORAGE_KEY);
       localStorage.removeItem(WALLET_TYPE_STORAGE_KEY);
+      localStorage.setItem(FORGOTTEN_STORAGE_KEY, "1");
       setSavedAddress(null);
       setSavedWalletType(null);
     }

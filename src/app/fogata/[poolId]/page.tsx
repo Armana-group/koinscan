@@ -12,6 +12,7 @@ import { abiPob } from "@/koinos/abis";
 import { KOIN_CONTRACT_ID, POB_CONTRACT_ID, VHP_CONTRACT_ID } from "@/koinos/constants";
 import { computePoolApy, estimateEarnings, formatAmountForInput, formatKoinEstimate, formatPayoutPeriod, getNetworkStaking, poolHealth, sanitizeDecimalInput, type NetworkStaking } from "@/lib/fogata";
 import { ago, compact, fmt, fmtRaw, rawToNumber, short, until } from "@/lib/format";
+import { retry } from "@/lib/retry";
 import * as toast from "@/lib/toast";
 import { Sheet } from "@/components/chrome/Sheet";
 import { ConnectButton } from "@/components/chrome/WalletSheet";
@@ -107,7 +108,7 @@ export default function FogataPoolPage() {
 
   useEffect(() => {
     if (!provider) return;
-    getNetworkStaking(provider)
+    retry(() => getNetworkStaking(provider))
       .then(setNetwork)
       .catch((err) => console.info("[fogata] network unavailable:", err));
   }, [provider]);
@@ -136,14 +137,14 @@ export default function FogataPoolPage() {
         await multicall.add(pool.functions.get_collect_koin_preferences, { value: account });
       }
       const keyRequest = account ? pob.functions.get_public_key({ producer: poolId }).catch(() => null) : Promise.resolve(null);
+      // An account with nothing staked gets an empty result, not an error.
       const balanceRequest = account
-        ? pool.functions
-            .balance_of({ value: account })
+        ? retry(() => pool.functions.balance_of({ value: account }))
             .then((r) => ({ result: r.result as Partial<PoolBalance> | undefined, error: false }))
             .catch(() => ({ result: undefined, error: true }))
         : Promise.resolve(null);
       const blocksRequest = recentBlocks(provider, poolId).catch(() => [] as { header: BlockHeaderJson }[]);
-      const [results, keyResponse, balanceResponse, blocks] = await Promise.all([multicall.call(), keyRequest, balanceRequest, blocksRequest]);
+      const [results, keyResponse, balanceResponse, blocks] = await Promise.all([retry(() => multicall.call()), keyRequest, balanceRequest, blocksRequest]);
 
       const isErr = (v: unknown): v is Error => v instanceof Error;
       const paramsResult = results[0] as PoolParams | Error;
@@ -197,11 +198,11 @@ export default function FogataPoolPage() {
         const k = results[8] as { value?: string } | Error;
         const v = results[9] as { value?: string } | Error;
         setWallet(isErr(k) || isErr(v) ? null : { koin: k.value ?? "0", vhp: v.value ?? "0" });
-        if (!balanceResponse?.result || balanceResponse.result.koin_amount === undefined || balanceResponse.result.vhp_amount === undefined) {
+        if (balanceResponse?.error) {
           setBalance(null);
           setBalanceError(true);
         } else {
-          setBalance({ koin_amount: balanceResponse.result.koin_amount, vhp_amount: balanceResponse.result.vhp_amount });
+          setBalance({ koin_amount: balanceResponse?.result?.koin_amount ?? "0", vhp_amount: balanceResponse?.result?.vhp_amount ?? "0" });
           setBalanceError(false);
         }
         const prefs = results[10] as Partial<Preferences> | Error;

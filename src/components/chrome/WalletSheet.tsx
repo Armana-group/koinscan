@@ -89,16 +89,20 @@ export function WalletSheet() {
 
         {!connected && (
           <>
-            <button type="button" className={row} onClick={() => connectWith("kondor")} disabled={busy}>
-              <span className="ks-mark">
-                <Image src={kondorLogo} alt="" width={24} height={24} />
-              </span>
-              <span className="ks-what">
-                <span className="ks-t">Kondor</span>
-                <span className="ks-d">Browser extension</span>
-              </span>
-              <span />
-            </button>
+            {/* While choosing, the accounts above are the Kondor option; only the other wallet is offered. */}
+            {choosing && <div className="ks-group">Or use another wallet</div>}
+            {!choosing && (
+              <button type="button" className={row} onClick={() => connectWith("kondor")} disabled={busy}>
+                <span className="ks-mark">
+                  <Image src={kondorLogo} alt="" width={24} height={24} />
+                </span>
+                <span className="ks-what">
+                  <span className="ks-t">Kondor</span>
+                  <span className="ks-d">Browser extension</span>
+                </span>
+                <span />
+              </button>
+            )}
             <button type="button" className={row} onClick={() => connectWith("walletConnect")} disabled={busy}>
               <span className="ks-mark">
                 <Image src={walletConnectLogo} alt="" width={24} height={24} />

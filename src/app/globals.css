@@ -762,10 +762,15 @@ textarea.ks-input {
   margin: 14px 0 0;
   font-size: 14px;
   color: var(--sub);
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  flex-wrap: wrap;
+  line-height: 1.6;
+}
+.ks-status > .ks-dot {
+  margin-right: 9px;
+  vertical-align: 1px;
+}
+.ks-status .ks-progress {
+  margin-left: 8px;
+  vertical-align: 2px;
 }
 .ks-status a {
   color: var(--ink);

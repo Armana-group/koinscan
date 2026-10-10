@@ -53,7 +53,7 @@ export async function GET(request: Request) {
       headers: { "Cache-Control": "public, s-maxage=300, stale-while-revalidate=900" },
     });
   } catch (error) {
-    if (error instanceof RpcNodeUnreachableError) return NextResponse.json({ error: error.message, unreachable: true }, { status: 502 });
+    if (error instanceof RpcNodeUnreachableError) return NextResponse.json({ error: error.message, unreachable: true, busy: error.busy }, { status: 502 });
     console.error("[pool-stakers]", error);
     return NextResponse.json({ error: "Failed to load pool stakers" }, { status: 502 });
   }

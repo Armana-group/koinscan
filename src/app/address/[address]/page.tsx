@@ -14,6 +14,7 @@ import { ago, fmt, fmtRaw, plural, short } from "@/lib/format";
 import { buildHistoryItems, summarizeActivity, type HistoryItem, type TxRow } from "@/lib/history-rows";
 import { isKnownProducer } from "@/lib/names";
 import { formatUsdValue } from "@/lib/price";
+import { retry } from "@/lib/retry";
 import { CopyButton } from "@/components/ks/Advanced";
 import { Filters, Toggle } from "@/components/ks/Controls";
 import { Crumb, Empty, H2, Page, RowSkeleton, Section, Title } from "@/components/ks/Page";
@@ -138,7 +139,8 @@ export default function AddressPage() {
         const seq = parseInt(after.seq_num, 10);
         if (Number.isFinite(seq)) sequence = String(seq - 1);
       }
-      const entries = await getDetailedAccountHistory(rpcNode, address, PAGE_SIZE, false, true, sequence);
+      // The public REST host throttles bursts; one more try after a pause usually gets through.
+      const entries = await retry(() => getDetailedAccountHistory(rpcNode, address, PAGE_SIZE, false, true, sequence), 2, 1500);
       return { entries, formatted: formatDetailedTransactions(entries, address) };
     },
     [rpcNode, address],

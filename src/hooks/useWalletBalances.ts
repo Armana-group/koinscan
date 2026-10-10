@@ -16,8 +16,8 @@ async function loadFromProxy(address: string, rpcNode: string, signal: AbortSign
   const searchParams = new URLSearchParams({ address, rpcNode });
   const response = await fetch(`/api/account-balances?${searchParams.toString()}`, { signal });
   if (!response.ok) {
-    const body = (await response.json().catch(() => null)) as { unreachable?: boolean } | null;
-    if (body?.unreachable) throw new RpcNodeUnreachableError(rpcNode);
+    const body = (await response.json().catch(() => null)) as { unreachable?: boolean; busy?: boolean } | null;
+    if (body?.unreachable) throw new RpcNodeUnreachableError(rpcNode, undefined, Boolean(body.busy));
     throw new Error(`Balance request failed with status ${response.status}`);
   }
   return (await response.json()) as WalletBalanceLoadResult;
@@ -64,7 +64,12 @@ export function useWalletBalances(address: string | null | undefined): WalletBal
           key,
           balances: [],
           failures: [],
-          error: error instanceof RpcNodeUnreachableError ? `Could not reach the node at ${error.rpcNode}. Pick another one in the menu.` : "Balances could not be loaded.",
+          error:
+            error instanceof RpcNodeUnreachableError
+              ? error.busy
+                ? `The node at ${error.rpcNode} is busy right now. Try again in a moment, or pick another node in the menu.`
+                : `Could not reach the node at ${error.rpcNode}. Pick another one in the menu.`
+              : "Balances could not be loaded.",
         });
       }
     })();

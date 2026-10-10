@@ -1,4 +1,4 @@
-import toast, { Toast, ToastOptions } from 'react-hot-toast';
+import toast, { ToastOptions } from 'react-hot-toast';
 import { ReactNode } from 'react';
 
 // Default toast options for consistent positioning and behavior
@@ -47,7 +47,7 @@ export const promise = <T>(
   messages: {
     loading: string;
     success: string;
-    error: string | ((err: any) => string);
+    error: string | ((err: unknown) => string);
   },
   options?: ToastOptions
 ) => {

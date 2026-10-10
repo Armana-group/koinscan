@@ -32,8 +32,8 @@ const DEFAULT_REST_NODE = KNOWN_DEFAULT_REST_NODE; // REST API for account histo
 // Add kondor type declaration to make TypeScript happy
 declare global {
   interface Window {
-    kondor?: any;
-    ethereum?: any;
+    kondor?: { enable: () => Promise<unknown> };
+    ethereum?: unknown;
   }
 }
 

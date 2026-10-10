@@ -1,5 +1,3 @@
-import { Abi } from "koilib";
-
 export const abiFogata2Pool = {
   "methods": {
     "is_initialized": {

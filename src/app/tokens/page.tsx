@@ -9,7 +9,7 @@ import { compact, fmt } from "@/lib/format";
 import { getAllTokens, type KoinosToken } from "@/lib/tokens";
 import { Filters } from "@/components/ks/Controls";
 import { Empty, Lede, Page, RowSkeleton, Title } from "@/components/ks/Page";
-import { More, Row, TokenMark } from "@/components/ks/Row";
+import { ListMark, More, Row, TokenMark } from "@/components/ks/Row";
 
 type Category = "all" | "native" | "wrapped" | "meme" | "gaming" | "defi" | "other";
 
@@ -108,7 +108,12 @@ export default function TokensPage() {
               key={token.address}
               lead={<TokenMark symbol={token.symbol} address={token.address} logo={token.logoURI} />}
               title={token.name}
-              detail={`${token.symbol} · ${CATEGORIES.find((c) => c.value === categoryOf(token))?.label ?? "Other"}`}
+              detail={
+                <>
+                  {token.symbol}
+                  <ListMark listed /> · {CATEGORIES.find((c) => c.value === categoryOf(token))?.label ?? "Other"}
+                </>
+              }
               amount={amount}
               amountSub={sub}
               amountTone="out"

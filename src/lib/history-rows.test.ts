@@ -108,6 +108,7 @@ test("a swap shows what came in over what went out", () => {
   );
   if (row.kind !== "tx") throw new Error("expected a tx row");
   assert.equal(row.title, "Swapped VHP for KOIN");
+
   assert.equal(row.amount, "+4,310 KOIN");
   assert.equal(row.amountSub, "-5,000 VHP");
 });
@@ -125,4 +126,34 @@ test("summary counts what the page describes in one sentence", () => {
   assert.equal(summary.blocks, 1);
   assert.equal(summary.sent, 1);
   assert.equal(summary.received, 0);
+});
+
+
+test("a swap names the exchange, not the token it approved first", () => {
+  const [row] = buildHistoryItems(
+    [
+      {
+        id: "0xswap2",
+        timestamp: String(NOW - 60_000),
+        operations: [
+          { type: "Contract Call", contract: "1KOINcontract", method: "approve" },
+          { type: "Contract Call", contract: "1DEXrouter", method: "swap_tokens_in" },
+        ],
+        actions: [
+          {
+            type: "contract_interaction",
+            tokenTransfers: [
+              { token: KOIN, amount: "20000000", from: ME, to: "1pair", isPositive: false },
+              { token: VHP, amount: "213267344232", from: "1pair", to: ME, isPositive: true },
+            ],
+          },
+        ],
+      },
+    ],
+    ME,
+    NOW,
+  );
+  if (row.kind !== "tx") throw new Error("expected a tx row");
+  assert.equal(row.title, "Swapped KOIN for VHP");
+  assert.equal(row.counterparty, "1DEXrouter");
 });

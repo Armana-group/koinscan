@@ -139,3 +139,23 @@ export function More({ children, onClick, href, disabled }: { children: ReactNod
     </button>
   );
 }
+
+/** A tiny mark after a token symbol: a check when the token is on the KoinDX
+ *  list, a hollow dot when it is not. Hover for the words. */
+export function ListMark({ listed }: { listed: boolean }) {
+  const title = listed ? "On the KoinDX token list" : "Not on the KoinDX token list";
+  return (
+    <span className={`ks-listmark${listed ? " on" : ""}`} title={title} aria-label={title} role="img">
+      {listed ? (
+        <svg viewBox="0 0 12 12" aria-hidden="true">
+          <circle cx="6" cy="6" r="5.5" />
+          <path d="M3.5 6.2l1.8 1.7L8.6 4.5" fill="none" />
+        </svg>
+      ) : (
+        <svg viewBox="0 0 12 12" aria-hidden="true">
+          <circle cx="6" cy="6" r="4.75" fill="none" strokeDasharray="2 1.6" />
+        </svg>
+      )}
+    </span>
+  );
+}

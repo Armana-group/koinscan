@@ -120,8 +120,11 @@ function txRow(row: FormattedRow, address: string): TxRow {
   const mine = transfers.filter((t) => t.from === address || t.to === address);
   const incoming = mine.filter((t) => t.incoming);
   const outgoing = mine.filter((t) => !t.incoming);
-  const call = (row.operations ?? []).find((op) => op.type === "Contract Call");
+  const calls = (row.operations ?? []).filter((op) => op.type === "Contract Call");
+  const call = calls[0];
   const method = call?.method !== undefined ? String(call.method) : "";
+  // A swap usually starts with an approve on the token; the exchange is the call that swaps.
+  const swapCall = calls.find((op) => /swap/i.test(String(op.method ?? ""))) ?? calls[calls.length - 1];
   const mana = row.rc_used ?? null;
   const base = { kind: "tx" as const, id: row.id, seq: row.seq_num, timestamp: row.timestamp ? Number(row.timestamp) : null, transfers, mana };
 
@@ -131,7 +134,7 @@ function txRow(row: FormattedRow, address: string): TxRow {
       ...base,
       lead: { type: "token", token: incoming[0].token },
       title: `Swapped ${outgoing[0].token.symbol} for ${incoming[0].token.symbol}`,
-      counterparty: call?.contract,
+      counterparty: swapCall?.contract,
       amount: amountText(incoming[0], true),
       amountSub: amountText(outgoing[0], true),
       tone: "in",

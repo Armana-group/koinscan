@@ -3,6 +3,7 @@
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Contract, utils } from "koilib";
+import tokenAbi from "@/koinos/abi";
 import { useWallet } from "@/contexts/WalletContext";
 import { useNames } from "@/components/chrome/NamesProvider";
 import { useKoinPrice } from "@/hooks/useKoinPrice";
@@ -16,7 +17,8 @@ import { formatUsdValue } from "@/lib/price";
 import { CopyButton } from "@/components/ks/Advanced";
 import { Filters, Toggle } from "@/components/ks/Controls";
 import { Crumb, Empty, H2, Page, RowSkeleton, Section, Title } from "@/components/ks/Page";
-import { Avatar, GlyphMark, More, Row, TokenMark } from "@/components/ks/Row";
+import { Avatar, GlyphMark, ListMark, More, Row, TokenMark } from "@/components/ks/Row";
+import { applyTokenMeta, resolveTokenMeta, unknownTokenAddresses, type TokenMeta } from "@/lib/token-meta";
 import { useNameOf } from "@/components/ks/Named";
 
 const PAGE_SIZE = 25;
@@ -78,6 +80,39 @@ export default function AddressPage() {
   const [nickname, setNickname] = useState<string | null>(null);
   const [raw, setRaw] = useState<DetailedTransaction[]>([]);
   const [rows, setRows] = useState<unknown[]>([]);
+  // Tokens the history formatter could not name: ask their contracts.
+  const unknownTokens = useMemo(() => unknownTokenAddresses(rows as Parameters<typeof unknownTokenAddresses>[0]).sort(), [rows]);
+  const unknownKey = unknownTokens.join(",");
+  const [meta, setMeta] = useState<{ key: string; map: Map<string, TokenMeta | null> }>();
+  useEffect(() => {
+    if (!provider || !unknownKey) return;
+    let active = true;
+    resolveTokenMeta(provider, unknownKey.split(",")).then((map) => active && setMeta({ key: unknownKey, map }));
+    return () => {
+      active = false;
+    };
+  }, [provider, unknownKey]);
+  const namedRows = useMemo(() => (meta?.key === unknownKey ? applyTokenMeta(rows as Parameters<typeof applyTokenMeta>[0], meta.map) : rows), [rows, meta, unknownKey]);
+  // Balances of those off-list tokens, so Holds shows them too.
+  const offList = useMemo(() => (meta?.key === unknownKey ? [...meta.map.values()].filter((m): m is TokenMeta => Boolean(m)) : []), [meta, unknownKey]);
+  const offListKey = `${address}|${offList.map((m) => m.address).join(",")}`;
+  const [extra, setExtra] = useState<{ key: string; list: { meta: TokenMeta; value: number }[] }>();
+  useEffect(() => {
+    if (!provider || !offList.length) return;
+    let active = true;
+    Promise.all(
+      offList.map(async (m) => {
+        const contract = new Contract({ id: m.address, provider, abi: tokenAbi });
+        const { result } = await contract.functions.balanceOf({ owner: address }).catch(() => ({ result: undefined }));
+        return { meta: m, value: Number((result as { value?: string } | undefined)?.value ?? 0) / 10 ** m.decimals };
+      }),
+    ).then((list) => active && setExtra({ key: offListKey, list: list.filter((item) => item.value > 0) }));
+    return () => {
+      active = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [provider, address, offListKey]);
+  const extraBalances = extra?.key === offListKey ? extra.list : [];
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(false);
@@ -178,7 +213,7 @@ export default function AddressPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rows.length, rpcNode]);
 
-  const items = useMemo(() => buildHistoryItems(rows, address), [rows, address]);
+  const items = useMemo(() => buildHistoryItems(namedRows, address), [namedRows, address]);
   const summary = useMemo(() => summarizeActivity(items), [items]);
   const producer = summary.blocks > 0 || pools.has(address) || isKnownProducer(address);
   const visible = items.filter((item) => {
@@ -190,7 +225,10 @@ export default function AddressPage() {
   const name = nickname ? `@${nickname}` : nameOf(address);
   const koin = balances.balances.find((b) => b.token.symbol.toUpperCase() === "KOIN");
   const usd = koin && price ? koin.numericValue * price : null;
-  const holdings = balances.balances.map((b) => `${fmt(b.numericValue, b.numericValue < 1 ? 4 : 0)} ${b.token.symbol}`);
+  const holdings = [
+    ...balances.balances.map((b) => `${fmt(b.numericValue, b.numericValue < 1 ? 4 : 0)} ${b.token.symbol}`),
+    ...extraBalances.map((e) => `${fmt(e.value, e.value < 1 ? 4 : 0)} ${e.meta.symbol}`),
+  ];
   const holdingsText = holdings.length <= 1 ? holdings.join("") : `${holdings.slice(0, -1).join(", ")} and ${holdings[holdings.length - 1]}`;
 
   const filterOptions: { value: Filter; label: string }[] = [
@@ -239,11 +277,33 @@ export default function AddressPage() {
                   key={b.token.address}
                   lead={<TokenMark symbol={b.token.symbol} address={b.token.address} logo={b.token.logoURI} />}
                   title={b.token.name}
-                  detail={b.token.symbol}
+                  detail={
+                    <>
+                      {b.token.symbol}
+                      <ListMark listed />
+                    </>
+                  }
                   amount={fmt(b.numericValue, b.numericValue < 1 ? 6 : 2)}
                   amountSub={b.token.symbol.toUpperCase() === "KOIN" && price ? formatUsdValue(b.numericValue * price) : undefined}
                   amountTone="out"
                   href={`/contracts/${b.token.address}`}
+                  flat
+                />
+              ))}
+              {extraBalances.map((e) => (
+                <Row
+                  key={e.meta.address}
+                  lead={<TokenMark symbol={e.meta.symbol} address={e.meta.address} />}
+                  title={e.meta.name}
+                  detail={
+                    <>
+                      {e.meta.symbol}
+                      <ListMark listed={false} />
+                    </>
+                  }
+                  amount={fmt(e.value, e.value < 1 ? 6 : 2)}
+                  amountTone="out"
+                  href={`/contracts/${e.meta.address}`}
                   flat
                 />
               ))}

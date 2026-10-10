@@ -42,6 +42,7 @@ export const KNOWN_CONTRACTS: readonly KnownContract[] = [
   { address: FOGATA2_LIST_POOLS_CONTRACT_ID, name: "Fogata Pools v2", description: "Mining pools", group: "Community", glyph: "pool" },
   { address: FOGATA1_LIST_POOLS_CONTRACT_ID, name: "Fogata Pools v1", description: "The first generation of mining pools", group: "Community", glyph: "pool" },
   { address: KOIN_VHP_DEX_CONTRACT_ID, name: "Koin/VHP DEX", description: "Trade KOIN and VHP", group: "Community", glyph: "trade" },
+  { address: "17e1q6Fh5RgnuA8K7v4KvXXH4k9qHgsT5s", name: "KoinDX", description: "Swap any token for another", group: "Community", glyph: "trade" },
 ];
 
 export const CONTRACT_GROUPS: readonly ContractGroup[] = ["Core", "Governance", "Names and tools", "Community"];

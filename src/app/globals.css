@@ -119,9 +119,10 @@ strong {
   z-index: 0;
   will-change: transform;
 }
+/* Fixed like the others: the hero section clips its overflow and starts
+   under the header, so absolute glows left a seam across the header. */
 .ks-glow.home {
   opacity: 0.85;
-  position: absolute;
 }
 .ks-g1 {
   width: 70vw;
@@ -549,27 +550,33 @@ strong {
 }
 
 /* ------------------------------------------------------------------ veil + cards */
+/* Hidden outright when closed: a full-screen layer that keeps a backdrop
+   filter at rest, even blur(0), can leave stale tiles over the blurred glows
+   in Chrome, which showed as a hard-edged band under the header. The blur is
+   applied only while open; fading opacity fades the blur with it. */
 .ks-veil {
   position: fixed;
   inset: 0;
   z-index: 15;
   background: rgb(243 241 241 / 0.35);
-  backdrop-filter: blur(0px);
-  -webkit-backdrop-filter: blur(0px);
   opacity: 0;
+  visibility: hidden;
   pointer-events: none;
   transition:
     opacity 0.35s ease,
-    backdrop-filter 0.45s ease,
-    -webkit-backdrop-filter 0.45s ease;
+    visibility 0s linear 0.35s;
 }
 html.menu-open .ks-veil,
 html.search-open .ks-veil,
 html.sheet-open .ks-veil {
   opacity: 1;
+  visibility: visible;
   pointer-events: auto;
   backdrop-filter: blur(22px);
   -webkit-backdrop-filter: blur(22px);
+  transition:
+    opacity 0.35s ease,
+    visibility 0s;
 }
 html.menu-open .ks-page,
 html.search-open .ks-page,

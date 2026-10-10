@@ -971,6 +971,57 @@ textarea.ks-input {
   color: var(--faint);
 }
 
+/* contract function forms: labels on the sheet, hairline groups for nested messages */
+.ks-form > div + div {
+  margin-top: 4px;
+}
+.ks-field-label .ks-fmt {
+  color: var(--faint);
+  margin-left: 6px;
+}
+.ks-form select.ks-input {
+  padding-right: 36px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M2 4l4 4 4-4' fill='none' stroke='%235b5565' stroke-width='1.4'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  appearance: none;
+}
+.ks-form-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.ks-form-row .ks-input {
+  flex: 1;
+  min-width: 0;
+}
+.ks-form-group,
+.ks-form-item {
+  margin-top: 16px;
+  padding-left: 16px;
+  border-left: 1px solid var(--line);
+}
+.ks-form-item {
+  margin-top: 12px;
+}
+.ks-form-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 36px;
+  font-size: 14px;
+  color: var(--ink);
+}
+.ks-form-item > .ks-form-title {
+  font-size: 12px;
+  color: var(--sub);
+}
+.ks-form .ks-foot {
+  margin-top: 4px;
+}
+
 /* ------------------------------------------------------------------ page */
 .ks-main {
   flex: 1;

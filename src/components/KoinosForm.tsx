@@ -1,13 +1,10 @@
+"use client";
+
 import { useMemo, useState } from "react";
-import { Enum } from "protobufjs";
-import { Contract, Serializer } from "koilib";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Label } from "@/components/ui/label";
-import { Card } from "@/components/ui/card";
-import { cn } from "@/lib/utils";
-import { PlusCircle, Trash2 } from "lucide-react";
+import type { Enum } from "protobufjs";
+import type { Contract, Serializer } from "koilib";
+import { Segmented } from "@/components/ks/Controls";
+import { Note } from "@/components/ks/Page";
 
 const nativeTypes = [
   "double",
@@ -27,10 +24,12 @@ const nativeTypes = [
   "bytes",
 ];
 
-// Export the function so it can be used by other components
+/** "balance_of" and "getAllowances" both read as titles: "Balance Of", "Get Allowances". */
 export function prettyName(name: string): string {
   return name
-    .split("_")
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .split(/[_\s]+/)
+    .filter(Boolean)
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(" ");
 }
@@ -58,12 +57,46 @@ export interface KoinosFormProps {
   onChange?: (value: unknown) => void;
 }
 
-function buildInitialInputValues(
-  serializer: Serializer,
-  type: string,
-  nested: boolean,
-  repeated: boolean,
-): unknown {
+interface EnumOption {
+  name: string;
+  value: number;
+}
+
+/** Everything the form needs to know about one argument, resolved once from the ABI. */
+interface FieldSpec {
+  name: string;
+  label: string;
+  type: string;
+  format: string;
+  nested: boolean;
+  repeated: boolean;
+  isEnum: boolean;
+  enums?: EnumOption[];
+  protobufType?: INamespace2;
+}
+
+function describeField(serializer: Serializer, name: string, field: Field, norepeated = false): FieldSpec {
+  const nested = !nativeTypes.includes(field.type);
+  const repeated = field.rule === "repeated" && !norepeated;
+  const btype = field.options?.["(koinos.btype)"] || field.options?.["(btype)"];
+  const format = btype || field.type.toUpperCase();
+
+  let protobufType: INamespace2 | undefined;
+  let isEnum = false;
+  let enums: EnumOption[] | undefined;
+  if (nested) {
+    protobufType = serializer.root.lookupTypeOrEnum(field.type) as INamespace2;
+    if (!protobufType.fields) {
+      isEnum = true;
+      const values = (protobufType as unknown as Enum).values;
+      enums = Object.keys(values).map((key) => ({ name: key, value: values[key] }));
+    }
+  }
+
+  return { name, label: prettyName(name), type: field.type, format, nested, repeated, isEnum, enums, protobufType };
+}
+
+function buildInitialInputValues(serializer: Serializer, type: string, nested: boolean, repeated: boolean): unknown {
   if (repeated) {
     return [];
   }
@@ -89,340 +122,202 @@ function buildInitialInputValues(
   const value: Record<string, unknown> = {};
   Object.keys(protobufType.fields).forEach((name) => {
     const { type: fieldType, rule } = protobufType.fields[name];
-    const fieldNested = !nativeTypes.includes(fieldType);
-    const fieldRepeated = rule === "repeated";
-    value[name] = buildInitialInputValues(
-      serializer,
-      fieldType,
-      fieldNested,
-      fieldRepeated,
-    );
+    value[name] = buildInitialInputValues(serializer, fieldType, !nativeTypes.includes(fieldType), rule === "repeated");
   });
   return value;
 }
 
-interface RecursiveFormFieldProps {
-  name: string;
-  prettyName: string;
-  value: unknown;
-  type: string;
-  format: string;
-  isEnum: boolean;
-  enums?: { name: string; value: number }[];
-  nested: boolean;
-  repeated: boolean;
-  protobufType?: INamespace2;
-  error: string;
-  serializer: Serializer;
-  onChange: (value: unknown) => void;
-  level?: number;
+/** An empty value for every field of a message type. */
+function emptyMessage(serializer: Serializer, protobufType: INamespace2): Record<string, unknown> {
+  const item: Record<string, unknown> = {};
+  Object.entries(protobufType.fields).forEach(([fieldName, field]) => {
+    item[fieldName] = buildInitialInputValues(serializer, field.type, !nativeTypes.includes(field.type), field.rule === "repeated");
+  });
+  return item;
 }
 
-const RecursiveFormField = ({
-  name,
-  prettyName: fieldPrettyName,
-  value,
-  type,
-  format,
-  isEnum,
-  enums,
-  nested,
-  repeated,
-  protobufType,
-  error,
-  serializer,
-  onChange,
-  level = 0,
-}: RecursiveFormFieldProps) => {
-  // Handle array of objects (repeated nested type)
+/** "ADDRESS" becomes "address", "CONTRACT_ID" becomes "contract id". */
+function formatText(format: string): string {
+  return format.toLowerCase().replace(/_/g, " ");
+}
+
+function placeholderFor(format: string, type: string): string {
+  const f = format.toLowerCase();
+  if (f.includes("address") || f === "contract_id") return "Address";
+  if (f === "hex") return "0x…";
+  if (f === "base64") return "Base64";
+  if (f === "base58") return "Base58";
+  if (type === "string") return "Text";
+  if (type === "bytes") return "Bytes";
+  return "0";
+}
+
+function FieldLabel({ id, label, format }: { id?: string; label: string; format?: string }) {
+  return (
+    <label htmlFor={id} className="ks-field-label">
+      {label}
+      {format && <span className="ks-fmt">{formatText(format)}</span>}
+    </label>
+  );
+}
+
+const BOOL_OPTIONS = [
+  { value: "true", label: "True" },
+  { value: "false", label: "False" },
+] as const;
+
+interface FormFieldProps {
+  spec: FieldSpec;
+  path: string;
+  value: unknown;
+  serializer: Serializer;
+  onChange: (value: unknown) => void;
+}
+
+/** The fields of one message, laid out in order. */
+function MessageFields({ protobufType, path, value, serializer, onChange }: { protobufType: INamespace2; path: string; value: unknown; serializer: Serializer; onChange: (value: Record<string, unknown>) => void }) {
+  const record = (value ?? {}) as Record<string, unknown>;
+  return (
+    <>
+      {Object.entries(protobufType.fields).map(([fieldName, field]) => (
+        <FormField
+          key={fieldName}
+          spec={describeField(serializer, fieldName, field)}
+          path={`${path}.${fieldName}`}
+          value={record[fieldName]}
+          serializer={serializer}
+          onChange={(next) => onChange({ ...record, [fieldName]: next })}
+        />
+      ))}
+    </>
+  );
+}
+
+function FormField({ spec, path, value, serializer, onChange }: FormFieldProps) {
+  const { label, type, format, nested, repeated, isEnum, enums, protobufType } = spec;
+  const id = `kf-${path}`;
+
+  // A list of messages: each item gets its own hairline group with a Remove button.
   if (repeated && nested && !isEnum && protobufType?.fields) {
+    const items = Array.isArray(value) ? (value as unknown[]) : [];
+    const update = (next: unknown[]) => onChange(next);
     return (
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <Label>{fieldPrettyName}</Label>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="flex items-center gap-1"
-            onClick={() => {
-              const newArray = [...(Array.isArray(value) ? value : [])];
-              // Create a new empty object with the structure of the protobuf type
-              const newItem: Record<string, unknown> = {};
-              Object.entries(protobufType.fields).forEach(([fieldName, field]) => {
-                const fieldType = field.type;
-                const fieldNested = !nativeTypes.includes(fieldType);
-                const fieldRepeated = field.rule === "repeated";
-                newItem[fieldName] = buildInitialInputValues(
-                  serializer,
-                  fieldType,
-                  fieldNested,
-                  fieldRepeated
-                );
-              });
-              newArray.push(newItem);
-              onChange(newArray);
-            }}
-          >
-            <PlusCircle className="h-4 w-4" />
-            <span>Add Item</span>
-          </Button>
+      <div className="ks-form-group">
+        <div className="ks-form-title">
+          <span>{label}</span>
+          <button type="button" className="ks-btn ghost md" onClick={() => update([...items, emptyMessage(serializer, protobufType)])}>
+            Add
+          </button>
         </div>
-        
-        {Array.isArray(value) && value.length > 0 ? (
-          <div className="space-y-4">
-            {value.map((item, index) => (
-              <Card key={index} className="relative p-4 border-dashed">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="absolute top-2 right-2 h-8 w-8 text-destructive hover:text-destructive/80"
-                  onClick={() => {
-                    const newArray = [...(value as unknown[])];
-                    newArray.splice(index, 1);
-                    onChange(newArray);
-                  }}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-                
-                <div className="pt-4 space-y-4">
-                  {Object.entries(protobufType.fields).map(([fieldName, field]) => {
-                    const fieldType = field.type;
-                    const fieldNested = !nativeTypes.includes(fieldType);
-                    const fieldRepeated = field.rule === "repeated";
-                    const fieldFormat =
-                      field.options && (field.options["(koinos.btype)"] || field.options["(btype)"])
-                        ? field.options["(koinos.btype)"] || field.options["(btype)"]
-                        : fieldType.toUpperCase();
-
-                    let fieldProtobufType: INamespace2 | undefined;
-                    let fieldIsEnum = false;
-                    let fieldEnums: { name: string; value: number }[] | undefined;
-
-                    if (fieldNested) {
-                      fieldProtobufType = serializer.root.lookupTypeOrEnum(fieldType) as INamespace2;
-                      if (!fieldProtobufType.fields) {
-                        fieldIsEnum = true;
-                        fieldEnums = Object.keys((fieldProtobufType as unknown as Enum).values).map((v) => ({
-                          name: v,
-                          value: (fieldProtobufType as unknown as Enum).values[v],
-                        }));
-                      }
-                    }
-
-                    const itemValue = (item as Record<string, unknown>)?.[fieldName];
-
-                    return (
-                      <RecursiveFormField
-                        key={`${index}-${fieldName}`}
-                        name={fieldName}
-                        prettyName={prettyName(fieldName)}
-                        value={itemValue}
-                        type={fieldType}
-                        format={fieldFormat}
-                        isEnum={fieldIsEnum}
-                        enums={fieldEnums}
-                        nested={fieldNested}
-                        repeated={fieldRepeated}
-                        protobufType={fieldProtobufType}
-                        error=""
-                        serializer={serializer}
-                        onChange={(newValue) => {
-                          const newArray = [...(value as unknown[])];
-                          const newItem = { ...(newArray[index] as Record<string, unknown>) };
-                          newItem[fieldName] = newValue;
-                          newArray[index] = newItem;
-                          onChange(newArray);
-                        }}
-                        level={level + 1}
-                      />
-                    );
-                  })}
-                </div>
-              </Card>
-            ))}
+        {items.length === 0 && <p className="ks-foot">No items yet.</p>}
+        {items.map((item, index) => (
+          <div key={index} className="ks-form-item">
+            <div className="ks-form-title">
+              <span>Item {index + 1}</span>
+              <button type="button" className="ks-btn ghost md" onClick={() => update(items.filter((_, i) => i !== index))}>
+                Remove
+              </button>
+            </div>
+            <MessageFields
+              protobufType={protobufType}
+              path={`${path}.${index}`}
+              value={item}
+              serializer={serializer}
+              onChange={(next) => update(items.map((current, i) => (i === index ? next : current)))}
+            />
           </div>
-        ) : (
-          <div className="text-center p-4 border border-dashed rounded-md text-muted-foreground">
-            No items added. Click &quot;Add Item&quot; to add a new entry.
-          </div>
-        )}
+        ))}
       </div>
     );
   }
 
+  // One message: its fields indented under a small title.
   if (nested && !isEnum && protobufType?.fields) {
-    // Handle nested object
     return (
-      <Card className={cn("p-4", level > 0 && "border-dashed")}>
-        <div className="font-medium mb-2">{fieldPrettyName}</div>
-        <div className="space-y-4">
-          {Object.entries(protobufType.fields).map(([fieldName, field]) => {
-            const fieldType = field.type;
-            const fieldNested = !nativeTypes.includes(fieldType);
-            const fieldRepeated = field.rule === "repeated";
-            const fieldFormat =
-              field.options && (field.options["(koinos.btype)"] || field.options["(btype)"])
-                ? field.options["(koinos.btype)"] || field.options["(btype)"]
-                : fieldType.toUpperCase();
-
-            let fieldProtobufType: INamespace2 | undefined;
-            let fieldIsEnum = false;
-            let fieldEnums: { name: string; value: number }[] | undefined;
-
-            if (fieldNested) {
-              fieldProtobufType = serializer.root.lookupTypeOrEnum(fieldType) as INamespace2;
-              if (!fieldProtobufType.fields) {
-                fieldIsEnum = true;
-                fieldEnums = Object.keys((fieldProtobufType as unknown as Enum).values).map((v) => ({
-                  name: v,
-                  value: (fieldProtobufType as unknown as Enum).values[v],
-                }));
-              }
-            }
-
-            const nestedValue = (value as Record<string, unknown>)?.[fieldName];
-
-            return (
-              <RecursiveFormField
-                key={fieldName}
-                name={fieldName}
-                prettyName={prettyName(fieldName)}
-                value={nestedValue}
-                type={fieldType}
-                format={fieldFormat}
-                isEnum={fieldIsEnum}
-                enums={fieldEnums}
-                nested={fieldNested}
-                repeated={fieldRepeated}
-                protobufType={fieldProtobufType}
-                error=""
-                serializer={serializer}
-                onChange={(newValue) => {
-                  const newObj = { ...(value as Record<string, unknown>) };
-                  newObj[fieldName] = newValue;
-                  onChange(newObj);
-                }}
-                level={level + 1}
-              />
-            );
-          })}
+      <div className="ks-form-group">
+        <div className="ks-form-title">
+          <span>{label}</span>
         </div>
-      </Card>
+        <MessageFields protobufType={protobufType} path={path} value={value} serializer={serializer} onChange={onChange} />
+      </div>
     );
   }
 
   if (isEnum && enums) {
-    return (
-      <div className="space-y-2">
-        <Label>{fieldPrettyName}</Label>
-        <RadioGroup
-          value={String(value)}
-          onValueChange={(newValue) => {
-            const numValue = Number(newValue);
-            onChange(numValue);
-          }}
-          className="flex flex-col space-y-1"
-        >
-          {enums.map((enumValue) => (
-            <div key={enumValue.name} className="flex items-center space-x-2">
-              <RadioGroupItem value={String(enumValue.value)} id={`${name}-${enumValue.name}`} />
-              <Label htmlFor={`${name}-${enumValue.name}`}>{enumValue.name}</Label>
-            </div>
-          ))}
-        </RadioGroup>
-      </div>
-    );
-  }
-
-  if (repeated) {
-    return (
-      <div className="space-y-2">
-        <Label>{fieldPrettyName}</Label>
-        <div className="space-y-2">
-          {Array.isArray(value) &&
-            value.map((item, index) => (
-              <div key={index} className="flex gap-2">
-                <Input
-                  value={item as string}
-                  onChange={(e) => {
-                    const newArray = [...(value as unknown[])];
-                    newArray[index] = e.target.value;
-                    onChange(newArray);
-                  }}
-                />
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  onClick={() => {
-                    const newArray = [...(value as unknown[])];
-                    newArray.splice(index, 1);
-                    onChange(newArray);
-                  }}
-                >
-                  Remove
-                </Button>
-              </div>
-            ))}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              const newArray = [...(value as unknown[]), ""];
-              onChange(newArray);
-            }}
-          >
-            Add Item
-          </Button>
+    const current = String(value ?? enums[0]?.value ?? 0);
+    if (enums.length <= 4) {
+      return (
+        <div>
+          <FieldLabel label={label} />
+          <Segmented options={enums.map((option) => ({ value: String(option.value), label: prettyName(option.name.toLowerCase()) }))} value={current} onChange={(next) => onChange(Number(next))} />
         </div>
+      );
+    }
+    return (
+      <div>
+        <FieldLabel id={id} label={label} />
+        <select id={id} className="ks-input" value={current} onChange={(event) => onChange(Number(event.target.value))}>
+          {enums.map((option) => (
+            <option key={option.name} value={String(option.value)}>
+              {prettyName(option.name.toLowerCase())}
+            </option>
+          ))}
+        </select>
       </div>
     );
   }
 
-  // Handle boolean type
+  // A list of plain values: one input per row.
+  if (repeated) {
+    const items = Array.isArray(value) ? (value as unknown[]) : [];
+    return (
+      <div>
+        <FieldLabel label={label} format={format} />
+        {items.map((item, index) => (
+          <div key={index} className="ks-form-row">
+            <input
+              className="ks-input"
+              value={String(item ?? "")}
+              placeholder={placeholderFor(format, type)}
+              aria-label={`${label} ${index + 1}`}
+              onChange={(event) => onChange(items.map((current, i) => (i === index ? event.target.value : current)))}
+            />
+            <button type="button" className="ks-btn ghost md" onClick={() => onChange(items.filter((_, i) => i !== index))}>
+              Remove
+            </button>
+          </div>
+        ))}
+        <button type="button" className="ks-btn ghost md" onClick={() => onChange([...items, ""])}>
+          Add
+        </button>
+      </div>
+    );
+  }
+
   if (type === "bool") {
     return (
-      <div className="space-y-2">
-        <Label>
-          {fieldPrettyName}
-          <span className="ml-2 text-xs text-muted-foreground">({format})</span>
-        </Label>
-        <RadioGroup
-          value={String(value)}
-          onValueChange={(newValue) => onChange(newValue === "true")}
-          className="flex gap-4"
-        >
-          <div className="flex items-center space-x-2">
-            <RadioGroupItem value="true" id={`${name}-true`} />
-            <Label htmlFor={`${name}-true`}>True</Label>
-          </div>
-          <div className="flex items-center space-x-2">
-            <RadioGroupItem value="false" id={`${name}-false`} />
-            <Label htmlFor={`${name}-false`}>False</Label>
-          </div>
-        </RadioGroup>
+      <div>
+        <FieldLabel label={label} format={format} />
+        <Segmented options={BOOL_OPTIONS} value={value ? "true" : "false"} onChange={(next) => onChange(next === "true")} />
       </div>
     );
   }
 
-  // Handle basic types with format consideration
   return (
-    <div className="space-y-2">
-      <Label>
-        {fieldPrettyName}
-        <span className="ml-2 text-xs text-muted-foreground">({format})</span>
-      </Label>
-      <Input
-        value={value as string}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={`Enter ${format.toLowerCase()}`}
+    <div>
+      <FieldLabel id={id} label={label} format={format} />
+      <input
+        id={id}
+        className="ks-input"
+        value={String(value ?? "")}
+        placeholder={placeholderFor(format, type)}
+        autoComplete="off"
+        spellCheck={false}
+        onChange={(event) => onChange(event.target.value)}
       />
-      {error && <p className="text-sm text-destructive">{error}</p>}
     </div>
   );
-};
+}
 
 export const KoinosForm = (props: KoinosFormProps) => {
   const [value, setValue] = useState<Record<string, unknown>>({});
@@ -431,23 +326,18 @@ export const KoinosForm = (props: KoinosFormProps) => {
     return props.contract?.serializer || props.serializer || null;
   }, [props.contract?.serializer, props.serializer]);
 
-  const serializerError = serializer
-    ? null
-    : "No serializer available for this contract. Form input is disabled.";
-
   const fields = useMemo(() => {
     if (!serializer) {
       return {};
     }
 
     try {
-      const protobufType = props.contract && props.protobufType
-        ? serializer.root.lookupType(
-            props.contract.abi!.methods[props.protobufType].argument || "",
-          )
-        : props.protobufType
-        ? serializer.root.lookupType(props.protobufType)
-        : null;
+      const protobufType =
+        props.contract && props.protobufType
+          ? serializer.root.lookupType(props.contract.abi!.methods[props.protobufType].argument || "")
+          : props.protobufType
+            ? serializer.root.lookupType(props.protobufType)
+            : null;
 
       return protobufType?.fields || {};
     } catch (error) {
@@ -456,96 +346,28 @@ export const KoinosForm = (props: KoinosFormProps) => {
     }
   }, [props.contract, props.protobufType, serializer]);
 
-  const args = useMemo(() => {
-    if (!serializer) {
-      return [];
-    }
-
-    return Object.keys(fields).map((name) => {
-      const field = fields[name] as Field;
-      const { type, rule, options } = field;
-      const nested = !nativeTypes.includes(type);
-      const repeated = rule === "repeated" && !props.norepeated;
-      const format =
-        options && (options["(koinos.btype)"] || options["(btype)"])
-          ? options["(koinos.btype)"] || options["(btype)"]
-          : type.toUpperCase();
-
-      let protobufType: INamespace2 | undefined;
-      let isEnum = false;
-      let enums:
-        | {
-            name: string;
-            value: number;
-          }[]
-        | undefined;
-      if (nested) {
-        protobufType = serializer.root.lookupTypeOrEnum(type) as INamespace2;
-        if (!protobufType.fields) {
-          isEnum = true;
-          enums = Object.keys((protobufType as unknown as Enum).values).map(
-            (v) => ({
-              name: v,
-              value: (protobufType as unknown as Enum).values[v],
-            }),
-          );
-        }
-      }
-
-      let val: unknown;
-      if (value[name] === undefined) {
-        val = buildInitialInputValues(serializer, type, nested, repeated);
-      } else {
-        val = value[name];
-      }
-
-      return {
-        name,
-        prettyName: prettyName(name),
-        value: val,
-        type,
-        format,
-        isEnum,
-        enums,
-        nested,
-        repeated,
-        protobufType,
-        error: "",
-      };
-    });
-  }, [fields, props, serializer, value]);
+  const specs = useMemo(() => {
+    if (!serializer) return [];
+    return Object.keys(fields).map((name) => describeField(serializer, name, fields[name] as Field, props.norepeated));
+  }, [fields, props.norepeated, serializer]);
 
   if (!serializer) {
-    return (
-      <div className="px-4 py-3 rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-400">
-        <div className="flex items-start">
-          <svg className="h-5 w-5 mr-2 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-          </svg>
-          <div>
-            <p className="font-medium">Serializer Unavailable</p>
-            <p className="text-sm mt-1">{serializerError || "Cannot display form inputs because the contract has no valid serializer."}</p>
-            <p className="text-sm mt-2">You can still try to call the function with an empty arguments object.</p>
-          </div>
-        </div>
-      </div>
-    );
+    return <Note>This contract doesn&apos;t publish its argument types, so there is no form. You can still run it with no arguments.</Note>;
   }
 
   return (
-    <div className="space-y-6">
-      {args.map((arg) => (
-        <RecursiveFormField
-          key={arg.name}
-          {...arg}
+    <div className="ks-form">
+      {specs.map((spec) => (
+        <FormField
+          key={spec.name}
+          spec={spec}
+          path={spec.name}
+          value={value[spec.name] === undefined ? buildInitialInputValues(serializer, spec.type, spec.nested, spec.repeated) : value[spec.name]}
           serializer={serializer}
-          onChange={(newValue) => {
-            const newValues = { ...value };
-            newValues[arg.name] = newValue;
-            setValue(newValues);
-            if (props.onChange) {
-              props.onChange(newValues);
-            }
+          onChange={(next) => {
+            const nextValues = { ...value, [spec.name]: next };
+            setValue(nextValues);
+            props.onChange?.(nextValues);
           }}
         />
       ))}

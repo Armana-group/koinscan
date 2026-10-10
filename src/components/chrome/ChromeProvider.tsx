@@ -4,16 +4,22 @@
 // <html> that drive their CSS transitions, and the keyboard shortcuts.
 import { usePathname } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import { useWallet } from "@/contexts/WalletContext";
 
 interface ChromeState {
   menuOpen: boolean;
   searchOpen: boolean;
   walletOpen: boolean;
+  walletCardOpen: boolean;
   openMenu: () => void;
   openSearch: () => void;
-  /** The wallet sheet: connect, switch account, disconnect. */
+  /** Connected: the wallet card under the address chip. Otherwise the connect sheet. */
   openWallet: () => void;
+  /** The connect sheet, whatever the wallet state. */
+  openConnect: () => void;
   closeWallet: () => void;
+  toggleWalletCard: () => void;
+  closeWalletCard: () => void;
   closeAll: () => void;
   /** Sheets (dialogs) report themselves so the page steps back behind them. */
   setSheetOpen: (open: boolean) => void;
@@ -28,25 +34,45 @@ export function ChromeProvider({ children }: { children: ReactNode }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [walletOpen, setWalletOpen] = useState(false);
+  const [walletCardOpen, setWalletCardOpen] = useState(false);
   const sheets = useRef(0);
   const pathname = usePathname();
+  const { signer } = useWallet();
+  const connected = Boolean(signer);
 
   const closeAll = useCallback(() => {
     setMenuOpen(false);
     setSearchOpen(false);
+    setWalletCardOpen(false);
   }, []);
-  const openWallet = useCallback(() => {
+  const openConnect = useCallback(() => {
     setMenuOpen(false);
     setSearchOpen(false);
+    setWalletCardOpen(false);
     setWalletOpen(true);
   }, []);
+  const openWallet = useCallback(() => {
+    if (connected) {
+      setMenuOpen(false);
+      setSearchOpen(false);
+      setWalletCardOpen(true);
+    } else openConnect();
+  }, [connected, openConnect]);
   const closeWallet = useCallback(() => setWalletOpen(false), []);
+  const toggleWalletCard = useCallback(() => {
+    setMenuOpen(false);
+    setSearchOpen(false);
+    setWalletCardOpen((open) => !open);
+  }, []);
+  const closeWalletCard = useCallback(() => setWalletCardOpen(false), []);
   const openMenu = useCallback(() => {
     setSearchOpen(false);
+    setWalletCardOpen(false);
     setMenuOpen(true);
   }, []);
   const openSearch = useCallback(() => {
     setMenuOpen(false);
+    setWalletCardOpen(false);
     setSearchOpen(true);
   }, []);
   const setSheetOpen = useCallback((open: boolean) => {
@@ -67,6 +93,7 @@ export function ChromeProvider({ children }: { children: ReactNode }) {
     setSeenPath(pathname);
     if (menuOpen) setMenuOpen(false);
     if (searchOpen) setSearchOpen(false);
+    if (walletCardOpen) setWalletCardOpen(false);
   }
 
   useEffect(() => {
@@ -85,6 +112,7 @@ export function ChromeProvider({ children }: { children: ReactNode }) {
           return;
         }
         setMenuOpen(false);
+        setWalletCardOpen(false);
         setSearchOpen((open) => !open);
       }
     };
@@ -93,8 +121,8 @@ export function ChromeProvider({ children }: { children: ReactNode }) {
   }, [closeAll]);
 
   const value = useMemo(
-    () => ({ menuOpen, searchOpen, walletOpen, openMenu, openSearch, openWallet, closeWallet, closeAll, setSheetOpen }),
-    [menuOpen, searchOpen, walletOpen, openMenu, openSearch, openWallet, closeWallet, closeAll, setSheetOpen],
+    () => ({ menuOpen, searchOpen, walletOpen, walletCardOpen, openMenu, openSearch, openWallet, openConnect, closeWallet, toggleWalletCard, closeWalletCard, closeAll, setSheetOpen }),
+    [menuOpen, searchOpen, walletOpen, walletCardOpen, openMenu, openSearch, openWallet, openConnect, closeWallet, toggleWalletCard, closeWalletCard, closeAll, setSheetOpen],
   );
 
   return <ChromeContext.Provider value={value}>{children}</ChromeContext.Provider>;

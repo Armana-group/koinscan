@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation";
 import { useChrome, useShortcutLabel } from "./ChromeProvider";
 import { BurgerIcon, SearchIcon } from "./icons";
 import { Logo } from "./Logo";
+import { WalletChip } from "./WalletChip";
 
 export function Header() {
   const pathname = usePathname();
@@ -27,6 +28,7 @@ export function Header() {
             <SearchIcon />
           </button>
         )}
+        <WalletChip />
         <button type="button" className="ks-burger" onClick={openMenu} aria-label="Open menu" aria-expanded={menuOpen}>
           <BurgerIcon />
         </button>

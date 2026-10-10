@@ -131,7 +131,7 @@ export function MenuCard() {
 
       <footer className="ks-note">
         <b>KoinScan</b>
-        Koinos block explorer by Armana · beta
+        Explore, mine and trade on Koinos. By Armana · beta
         <span className="block">This is an early beta version. Some features may not work as expected.</span>
         <span className="mt-1 block text-faint">
           {build && <span>{build} · </span>}

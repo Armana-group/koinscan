@@ -17,7 +17,7 @@ const secondWarningStart = html.indexOf(warning, warningStart + warning.length);
 assert.notEqual(footerStart, -1, "the rendered page includes the menu card footer");
 assert.ok(warningStart > footerStart && warningStart < footerEnd, "the beta warning is rendered inside the footer");
 assert.equal(secondWarningStart, -1, "the beta warning is rendered exactly once");
-assert.match(html.slice(footerStart, footerEnd), /Koinos block explorer by Armana · beta/, "the footer names the product as a beta");
+assert.match(html.slice(footerStart, footerEnd), /Explore, mine and trade on Koinos\. By Armana · beta/, "the footer names the product as a beta");
 assert.match(html.slice(footerStart, footerEnd), /href="\/changelog"/, "the footer links to the changelog");
 
 const logoLabelStart = html.indexOf('aria-label="KoinScan home"');

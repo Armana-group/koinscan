@@ -4,7 +4,7 @@ import { changelogEntries } from "@/content/changelog";
 import { pageMetadata } from "@/lib/social-metadata";
 import { Lede, Page, Title } from "@/components/ks/Page";
 
-export const metadata: Metadata = pageMetadata("Changelog | KoinScan", "A public record of improvements to the KoinScan block explorer.");
+export const metadata: Metadata = pageMetadata("Changelog | KoinScan", "A public record of improvements to KoinScan.");
 
 export default function ChangelogPage() {
   return (

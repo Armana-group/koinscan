@@ -157,7 +157,7 @@ export default function ProducerPage() {
               <KV k="Effectiveness">
                 {stats.effectiveness !== undefined ? `${stats.effectiveness.toFixed(0)}%` : "—"} <span>· of expected blocks, over the last {stats.sample}</span>
               </KV>
-              <KV k="Staked">{fmt(stats.vhpBalance)} VHP</KV>
+              <KV k="Hash power">{fmt(stats.vhpBalance)} VHP</KV>
               <KV k="Activity">
                 <Link href={`/address/${address}`}>All blocks and transfers ›</Link>
               </KV>

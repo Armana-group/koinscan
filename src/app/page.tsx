@@ -53,7 +53,7 @@ export default function Home() {
       <Glow home />
       <div className="ks-stack">
         <h1>Hello, Koinos</h1>
-        <p className="ks-sub">Every block, account and transaction on Koinos.</p>
+        <p className="ks-sub">Explore, mine, trade.</p>
         <form
           className="ks-pill"
           onSubmit={(event) => {

@@ -156,7 +156,7 @@ export default function NetworkPage() {
             {fmt(data.totalKoin)} <span>in circulation</span>
           </KV>
           <KV k="VHP">
-            {fmt(data.totalVhp)} <span>staked as hash power</span>
+            {fmt(data.totalVhp)} <span>hash power, from burned KOIN</span>
           </KV>
           <KV k="Virtual supply">
             {fmt(data.totalKoin + data.totalVhp)} <span>KOIN and VHP together</span>

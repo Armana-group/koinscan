@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRef, useState } from "react";
 import { HOME_SEARCH_ATTRIBUTE, useShortcutLabel } from "@/components/chrome/ChromeProvider";
 import { Glow } from "@/components/chrome/Glow";
@@ -12,6 +13,13 @@ import { useNameOf } from "@/components/ks/Named";
 import { RollingNumber } from "@/components/ks/RollingNumber";
 import { useWallet } from "@/contexts/WalletContext";
 import { useEffect } from "react";
+
+// What KoinScan is for, one word each; the home line links them to their pages.
+const MODES = [
+  { word: "Explore", href: "/blocks", cta: "Open Blocks", detail: "Every block, transaction, account and contract on Koinos, told in plain words." },
+  { word: "Mine", href: "/fogata", cta: "Open Fogata", detail: "Join a Fogata pool. It runs the node and burns for you; you're paid in KOIN." },
+  { word: "Trade", href: "/fogata/trade", cta: "Open Trade", detail: "Sell VHP for KOIN, or buy VHP. Pools fill orders before they burn any KOIN." },
+];
 
 export default function Home() {
   const input = useRef<HTMLInputElement>(null);
@@ -54,7 +62,22 @@ export default function Home() {
       <Glow home />
       <div className="ks-stack">
         <h1>Hello, Koinos</h1>
-        <p className="ks-sub">Explore, mine, trade.</p>
+        <p className="ks-sub ks-modes">
+          {MODES.map((mode, index) => (
+            <span key={mode.href}>
+              <Link href={mode.href}>
+                {index === 0 ? mode.word : mode.word.toLowerCase()}
+                {/* A hover card on pointer devices; on touch the word is just a link. */}
+                <span className="ks-mode-card" aria-hidden>
+                  <span className="t">{mode.word}</span>
+                  <span className="d">{mode.detail}</span>
+                  <span className="go">{mode.cta} ›</span>
+                </span>
+              </Link>
+              {index < MODES.length - 1 ? ", " : "."}
+            </span>
+          ))}
+        </p>
         <form
           className="ks-pill"
           onSubmit={(event) => {

@@ -13,7 +13,7 @@ import { GOVERNANCE_CONTRACT_ID, KOIN_CONTRACT_ID, KOINOS_FUND_CONTRACT_ID, NICK
 import { knownContract } from "@/lib/names";
 import { short } from "@/lib/format";
 import * as toast from "@/lib/toast";
-import { KoinosForm, prettyName } from "@/components/KoinosForm";
+import { KoinosForm, argumentFields, prettyName } from "@/components/KoinosForm";
 import { TokenFacts } from "@/components/TokenFacts";
 import { CopyButton } from "@/components/ks/Advanced";
 import { Filters } from "@/components/ks/Controls";
@@ -123,7 +123,14 @@ export default function ContractPage() {
   const methods = useMemo(() => {
     if (!contract?.abi) return [];
     return Object.keys(contract.abi.methods)
-      .map((name) => ({ name, prettyName: prettyName(name), readOnly: Boolean(contract.abi!.methods[name].read_only), description: contract.abi!.methods[name].description }))
+      .map((name) => ({
+        name,
+        prettyName: prettyName(name),
+        readOnly: Boolean(contract.abi!.methods[name].read_only),
+        description: contract.abi!.methods[name].description,
+        // A method whose arguments cannot be encoded gets a note instead of a button.
+        callable: argumentFields(contract.serializer, contract.abi!.methods[name].argument) !== null,
+      }))
       .sort((a, b) => Number(b.readOnly) - Number(a.readOnly) || a.prettyName.localeCompare(b.prettyName));
   }, [contract]);
   const visible = methods.filter((m) => (group === "all" || (group === "read" ? m.readOnly : !m.readOnly)) && (!query.trim() || m.prettyName.toLowerCase().includes(query.toLowerCase()) || m.name.toLowerCase().includes(query.toLowerCase())));
@@ -229,21 +236,23 @@ export default function ContractPage() {
                     {open && (
                       <div style={{ padding: "4px 0 20px" }}>
                         <KoinosForm contract={contract} protobufType={method.name} onChange={(args) => setStates((prev) => ({ ...prev, [method.name]: { ...prev[method.name], args } }))} />
-                        <div className="ks-actions" style={{ marginTop: 16 }}>
-                          {method.readOnly ? (
-                            <button type="button" className="ks-btn ghost md" onClick={() => run(method.name, true)} disabled={state?.loading}>
-                              {state?.loading ? "Reading…" : "Read"}
-                            </button>
-                          ) : signer ? (
-                            <button type="button" className="ks-btn md" onClick={() => run(method.name, false)} disabled={state?.loading}>
-                              {state?.loading ? "Sending…" : `Send as ${short(signer.getAddress())}`}
-                            </button>
-                          ) : (
-                            <button type="button" className="ks-btn md" onClick={openWallet}>
-                              Connect wallet to send
-                            </button>
-                          )}
-                        </div>
+                        {method.callable && (
+                          <div className="ks-actions" style={{ marginTop: 16 }}>
+                            {method.readOnly ? (
+                              <button type="button" className="ks-btn ghost md" onClick={() => run(method.name, true)} disabled={state?.loading}>
+                                {state?.loading ? "Reading…" : "Read"}
+                              </button>
+                            ) : signer ? (
+                              <button type="button" className="ks-btn md" onClick={() => run(method.name, false)} disabled={state?.loading}>
+                                {state?.loading ? "Sending…" : `Send as ${short(signer.getAddress())}`}
+                              </button>
+                            ) : (
+                              <button type="button" className="ks-btn md" onClick={openWallet}>
+                                Connect wallet to send
+                              </button>
+                            )}
+                          </div>
+                        )}
                         {state?.results && <pre className="ks-raw">{state.results}</pre>}
                         {state?.error && (
                           <pre className="ks-raw" style={{ color: "var(--bad)" }}>

@@ -49,6 +49,21 @@ export interface INamespace2 {
   };
 }
 
+/**
+ * The argument fields of a method, `{}` when it takes none, or null when the
+ * arguments cannot be encoded: no serializer, or a type the ABI never defines
+ * (system hooks like pre_block_callback). koilib needs both to send a call.
+ */
+export function argumentFields(serializer: Serializer | null | undefined, typeName: string | undefined): Record<string, Field> | null {
+  if (!serializer) return null;
+  if (!typeName) return {};
+  try {
+    return (serializer.root.lookupType(typeName).fields as Record<string, Field>) ?? {};
+  } catch {
+    return null;
+  }
+}
+
 export interface KoinosFormProps {
   contract?: Contract;
   protobufType?: string;
@@ -326,33 +341,19 @@ export const KoinosForm = (props: KoinosFormProps) => {
     return props.contract?.serializer || props.serializer || null;
   }, [props.contract?.serializer, props.serializer]);
 
-  const fields = useMemo(() => {
-    if (!serializer) {
-      return {};
-    }
-
-    try {
-      const protobufType =
-        props.contract && props.protobufType
-          ? serializer.root.lookupType(props.contract.abi!.methods[props.protobufType].argument || "")
-          : props.protobufType
-            ? serializer.root.lookupType(props.protobufType)
-            : null;
-
-      return protobufType?.fields || {};
-    } catch (error) {
-      console.error("Error looking up protobuf type:", error);
-      return {};
-    }
-  }, [props.contract, props.protobufType, serializer]);
+  const typeName = props.contract && props.protobufType ? props.contract.abi?.methods[props.protobufType]?.argument || "" : props.protobufType || "";
+  const fields = useMemo(() => argumentFields(serializer, typeName), [serializer, typeName]);
 
   const specs = useMemo(() => {
-    if (!serializer) return [];
-    return Object.keys(fields).map((name) => describeField(serializer, name, fields[name] as Field, props.norepeated));
+    if (!serializer || !fields) return [];
+    return Object.keys(fields).map((name) => describeField(serializer, name, fields[name], props.norepeated));
   }, [fields, props.norepeated, serializer]);
 
   if (!serializer) {
-    return <Note>This contract doesn&apos;t publish its argument types, so there is no form. You can still run it with no arguments.</Note>;
+    return <Note>This contract doesn&apos;t publish its argument types, so its functions can&apos;t be called from here.</Note>;
+  }
+  if (!fields) {
+    return <Note>This function&apos;s arguments aren&apos;t described in the contract&apos;s ABI, so it can&apos;t be called from here.</Note>;
   }
 
   return (

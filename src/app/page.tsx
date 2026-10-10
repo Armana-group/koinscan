@@ -9,6 +9,7 @@ import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { useSearchNavigation } from "@/hooks/useSearchNavigation";
 import { fmt } from "@/lib/format";
 import { useNameOf } from "@/components/ks/Named";
+import { RollingNumber } from "@/components/ks/RollingNumber";
 import { useWallet } from "@/contexts/WalletContext";
 import { useEffect } from "react";
 
@@ -88,18 +89,31 @@ export default function Home() {
         </div>
       </div>
       <div className="ks-livebar">
-        <span className="ks-dot" />
-        {head ? (
-          <span>
-            Block <b>{fmt(head.height)}</b>, just now{producer && (
-              <>
-                , produced by <b>{nameOf(producer)}</b>
-              </>
-            )}
-          </span>
-        ) : (
-          <span>Connecting to the chain…</span>
-        )}
+        <div>
+          {/* Keyed on the height so the dot pings once per new block. */}
+          <span key={head?.height} className={head ? "ks-dot ks-ping" : "ks-dot"} />
+          {head ? (
+            <span>
+              Block{" "}
+              <b>
+                <RollingNumber value={fmt(head.height)} />
+              </b>
+              , just now
+            </span>
+          ) : (
+            <span>Connecting to the chain…</span>
+          )}
+        </div>
+        {/* The producer sits on its own line so a long or changing name never moves the block line. */}
+        <div className="ks-producer">
+          {producer ? (
+            <span key={producer}>
+              Produced by <b>{nameOf(producer)}</b>
+            </span>
+          ) : (
+            "\u00a0"
+          )}
+        </div>
       </div>
     </section>
   );

@@ -1974,11 +1974,66 @@ button.ks-row:hover .ks-t {
   color: var(--ink);
 }
 .ks-livebar .ks-dot {
+  position: relative;
   width: 7px;
   height: 7px;
   background: var(--warn);
   margin-right: 9px;
   vertical-align: 1px;
+}
+.ks-livebar .ks-ping::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: var(--warn);
+  animation: ks-ping 1.2s ease-out forwards;
+}
+@keyframes ks-ping {
+  from {
+    opacity: 0.7;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(3.2);
+  }
+}
+.ks-livebar .ks-producer {
+  margin-top: 4px;
+  font-size: 13px;
+  color: var(--faint);
+}
+.ks-livebar .ks-producer b {
+  color: var(--sub);
+}
+.ks-livebar .ks-producer > span {
+  animation: ks-fade-in 0.5s ease both;
+}
+@keyframes ks-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+/* digits that roll to a new value (RollingNumber) */
+.ks-roll {
+  display: inline-flex;
+}
+.ks-roll-d {
+  display: inline-block;
+  height: 1.5em;
+  line-height: 1.5em;
+  overflow: hidden;
+  vertical-align: bottom;
+}
+.ks-roll-d > span {
+  display: block;
+  transition: transform 0.6s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.ks-roll-d > span > span {
+  display: block;
+  text-align: center;
 }
 
 /* fogata */
@@ -2215,8 +2270,16 @@ button.ks-row:hover .ks-t {
 /* ------------------------------------------------------------------ motion + mobile */
 @media (prefers-reduced-motion: reduce) {
   .ks-glow,
-  .ks-row.new {
+  .ks-row.new,
+  .ks-livebar .ks-ping::after,
+  .ks-livebar .ks-producer > span {
     animation: none;
+  }
+  .ks-livebar .ks-ping::after {
+    content: none;
+  }
+  .ks-roll-d > span {
+    transition: none;
   }
   .ks-veil,
   .ks-page,

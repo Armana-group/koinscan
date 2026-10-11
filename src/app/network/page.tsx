@@ -19,6 +19,8 @@ import { Empty, Lede, Page, RowSkeleton, Title } from "@/components/ks/Page";
 import { Avatar, More, Row } from "@/components/ks/Row";
 import { KV, Lines } from "@/components/ks/Advanced";
 import { useNameOf } from "@/components/ks/Named";
+import { ProducerPie } from "@/components/ks/ProducerPie";
+import { pieColour } from "@/lib/pie";
 
 const SAMPLE = 100;
 const SHOW = 12;
@@ -122,8 +124,9 @@ export default function NetworkPage() {
 
       {data && view === "producers" && (
         <>
+          <ProducerPie producers={producers} sample={SAMPLE} nameOf={(address) => nameOf(address, "")} />
           <div className="ks-list">
-            {producers.slice(0, shown).map((producer) => {
+            {producers.slice(0, shown).map((producer, index) => {
               const name = nameOf(producer.address, "");
               return (
                 <Row
@@ -133,7 +136,7 @@ export default function NetworkPage() {
                     <>
                       {name || short(producer.address)}
                       <span className="ks-share">
-                        <i style={{ width: `${(producer.share / maxShare) * 100}%` }} />
+                        <i style={{ width: `${(producer.share / maxShare) * 100}%`, background: pieColour(index) }} />
                       </span>
                     </>
                   }

@@ -19,6 +19,18 @@ assert.match(
 );
 assert.match(
   changelog.html,
+  /A new look, and one place to explore, mine and trade/,
+  "the redesign release is documented",
+);
+for (const commit of ["f32f890", "18916b7", "fa278e6", "adc70aa"]) {
+  assert.match(
+    changelog.html,
+    new RegExp(commit),
+    `the October 11 release points to deployed commit ${commit}`,
+  );
+}
+assert.match(
+  changelog.html,
   /Custom RPC nodes, block producer history, and faster failures/,
   "the custom RPC node fix is documented",
 );

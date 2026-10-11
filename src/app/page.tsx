@@ -13,6 +13,9 @@ import { useNameOf } from "@/components/ks/Named";
 import { RollingNumber } from "@/components/ks/RollingNumber";
 import { useWallet } from "@/contexts/WalletContext";
 import { useEffect } from "react";
+import { useKoinQuote } from "@/hooks/useKoinPrice";
+import { KOIN_CONTRACT_ID } from "@/koinos/constants";
+import { formatChange, formatKoinUsd } from "@/lib/price";
 
 // What KoinScan is for, one word each; the home line links them to their pages.
 const MODES = [
@@ -55,6 +58,7 @@ export default function Home() {
     if (await go(text)) setValue("");
   };
 
+  const quote = useKoinQuote();
   const suggestions = ["@julian", head ? `Block ${fmt(head.height)}` : "Block 40,041,420", "KOIN"];
 
   return (
@@ -125,6 +129,12 @@ export default function Home() {
             </span>
           ) : (
             <span>Connecting to the chain…</span>
+          )}
+          {quote && (
+            <Link href={`/contracts/${KOIN_CONTRACT_ID}`} className="ks-home-price">
+              KOIN <b>{formatKoinUsd(quote.usd)}</b>
+              {quote.change !== null && <span className={quote.change >= 0 ? "up" : "down"}>{formatChange(quote.change)}</span>}
+            </Link>
           )}
         </div>
         {/* The producer sits on its own line so a long or changing name never moves the block line. */}

@@ -20,6 +20,8 @@ import { Avatar, More, Row } from "@/components/ks/Row";
 import { KV, Lines } from "@/components/ks/Advanced";
 import { useNameOf } from "@/components/ks/Named";
 import { ProducerPie } from "@/components/ks/ProducerPie";
+import { LineChart } from "@/components/ks/LineChart";
+import { StackBar } from "@/components/ks/StackBar";
 import { pieColour } from "@/lib/pie";
 
 const SAMPLE = 100;
@@ -29,6 +31,8 @@ type View = "producers" | "supply" | "yield";
 interface NetworkData {
   producers: { address: string; share: number; blocks: number }[];
   averageBlockTime: number;
+  /** Seconds since the block before, for each sampled block after the first. */
+  blockTimes: { height: number; seconds: number }[];
   totalVhp: number;
   totalKoin: number;
   vhpProducing: number;
@@ -48,6 +52,10 @@ async function getNetworkData(provider: ProviderInterface): Promise<NetworkData>
   const first = blocks[0];
   const last = blocks[blocks.length - 1];
   const averageBlockTime = (Number(last.block.header!.timestamp) - Number(first.block.header!.timestamp)) / (blocks.length - 1) / 1000;
+  const blockTimes = blocks.slice(1).map((block, i) => ({
+    height: Number(block.block.header!.height),
+    seconds: (Number(block.block.header!.timestamp) - Number(blocks[i].block.header!.timestamp)) / 1000,
+  }));
 
   const vhp = new Contract({ id: VHP_CONTRACT_ID, provider, abi: tokenAbi });
   const koin = new Contract({ id: KOIN_CONTRACT_ID, provider, abi: tokenAbi });
@@ -58,7 +66,7 @@ async function getNetworkData(provider: ProviderInterface): Promise<NetworkData>
   const difficulty = Number("0x" + utils.toHexString(utils.decodeBase64url(metadata!.value.difficulty)));
   const vhpProducing = (10 * difficulty) / 3000 / 1e8;
   const apy = (2 * (totalVhp + totalKoin)) / vhpProducing;
-  return { producers, averageBlockTime, totalVhp, totalKoin, vhpProducing, apy, difficulty };
+  return { producers, averageBlockTime, blockTimes, totalVhp, totalKoin, vhpProducing, apy, difficulty };
 }
 
 export default function NetworkPage() {
@@ -90,6 +98,7 @@ export default function NetworkPage() {
   const error = current?.error ?? false;
   const producers = useMemo(() => data?.producers ?? [], [data]);
   const maxShare = producers[0]?.share ?? 1;
+  const blockLine = useMemo(() => (data?.blockTimes ?? []).map((b) => ({ x: b.height, y: b.seconds })), [data]);
 
   return (
     <Page list>
@@ -103,6 +112,21 @@ export default function NetworkPage() {
           "A block every 3 seconds."
         )}
       </Lede>
+      {data && blockLine.length > 1 && (
+        <LineChart
+          points={blockLine}
+          height={56}
+          colour="var(--faint)"
+          reference={3}
+          label={`Seconds between each of the last ${SAMPLE} blocks`}
+          idle={<>Seconds between each of the last {SAMPLE} blocks · dashed line is the 3 second target</>}
+          readout={(p) => (
+            <>
+              Block {fmt(p.x)} · <b>{p.y.toFixed(1)} s</b> after the one before
+            </>
+          )}
+        />
+      )}
       <Filters
         top
         options={[
@@ -154,20 +178,30 @@ export default function NetworkPage() {
       )}
 
       {data && view === "supply" && (
-        <Lines className="mt-4">
-          <KV k="KOIN">
-            {fmt(data.totalKoin)} <span>in circulation</span>
-          </KV>
-          <KV k="VHP">
-            {fmt(data.totalVhp)} <span>hash power, from burned KOIN</span>
-          </KV>
-          <KV k="Virtual supply">
-            {fmt(data.totalKoin + data.totalVhp)} <span>KOIN and VHP together</span>
-          </KV>
-          <KV k="Producing">
-            {fmt(data.vhpProducing)} VHP <span>· {((100 * data.vhpProducing) / data.totalVhp).toFixed(1)}% of all VHP is producing blocks</span>
-          </KV>
-        </Lines>
+        <>
+          <StackBar
+            label="Where all KOIN and VHP sits"
+            parts={[
+              { label: "KOIN in circulation", value: data.totalKoin, colour: "#522fe3" },
+              { label: "VHP producing blocks", value: data.vhpProducing, colour: "#e4b80c" },
+              { label: "VHP not producing", value: Math.max(0, data.totalVhp - data.vhpProducing), colour: "rgb(228 184 12 / 0.35)" },
+            ]}
+          />
+          <Lines className="mt-4">
+            <KV k="KOIN">
+              {fmt(data.totalKoin)} <span>in circulation</span>
+            </KV>
+            <KV k="VHP">
+              {fmt(data.totalVhp)} <span>hash power, from burned KOIN</span>
+            </KV>
+            <KV k="Virtual supply">
+              {fmt(data.totalKoin + data.totalVhp)} <span>KOIN and VHP together</span>
+            </KV>
+            <KV k="Producing">
+              {fmt(data.vhpProducing)} VHP <span>· {((100 * data.vhpProducing) / data.totalVhp).toFixed(1)}% of all VHP is producing blocks</span>
+            </KV>
+          </Lines>
+        </>
       )}
 
       {data && view === "yield" && (

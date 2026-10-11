@@ -15,6 +15,7 @@ import { short } from "@/lib/format";
 import * as toast from "@/lib/toast";
 import { KoinosForm, argumentFields, prettyName } from "@/components/KoinosForm";
 import { TokenFacts } from "@/components/TokenFacts";
+import { KoinPriceChart } from "@/components/ks/KoinPriceChart";
 import { CopyButton } from "@/components/ks/Advanced";
 import { Filters } from "@/components/ks/Controls";
 import { Crumb, Empty, H2, Lede, Page, Section, Skeleton, Title } from "@/components/ks/Page";
@@ -202,6 +203,7 @@ export default function ContractPage() {
           </section>
           {(known?.description || info.description) && <Lede>{known?.description ?? info.description}</Lede>}
 
+          {info.address === KOIN_CONTRACT_ID && <KoinPriceChart />}
           <TokenFacts address={info.address} provider={provider} account={account} />
 
           <Section label="Functions" className="ks-list">

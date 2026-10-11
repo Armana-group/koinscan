@@ -32,3 +32,35 @@ export function parseArmanaPrice(value: unknown): KoinPrice | null {
     source: "armana",
   };
 }
+
+export const PRICE_RANGES = ["24h", "7d", "30d"] as const;
+export type PriceRange = (typeof PRICE_RANGES)[number];
+
+export function isPriceRange(value: unknown): value is PriceRange {
+  return typeof value === "string" && (PRICE_RANGES as readonly string[]).includes(value);
+}
+
+export function armanaHistoryUrl(range: PriceRange): string {
+  return `${ARMANA_PRICE_URL}/history?range=${range}`;
+}
+
+export interface PricePoint {
+  /** Milliseconds since the epoch at the start of the interval. */
+  t: number;
+  usd: number;
+}
+
+/** The service's history answer as points in milliseconds, oldest first; null when it is not usable. */
+export function parseArmanaHistory(value: unknown): PricePoint[] | null {
+  if (!value || typeof value !== "object") return null;
+  const { asset, points } = value as { asset?: unknown; points?: unknown };
+  if (asset !== "KOIN" || !Array.isArray(points)) return null;
+  const out: PricePoint[] = [];
+  for (const point of points) {
+    const { t, usd } = (point ?? {}) as { t?: unknown; usd?: unknown };
+    if (typeof t !== "number" || !Number.isFinite(t)) continue;
+    if (typeof usd !== "number" || !Number.isFinite(usd) || usd <= 0) continue;
+    out.push({ t: t * 1000, usd });
+  }
+  return out.sort((a, b) => a.t - b.t);
+}

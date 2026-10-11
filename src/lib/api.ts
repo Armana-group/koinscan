@@ -559,8 +559,10 @@ export function extractTransactionActions(tx: FormattedHistoryRow, userAddress?:
 }
 
 // Add a helper function to decode entry points to human-readable method names
-function decodeEntryPoint(entryPoint: string | number): string {
+export function decodeEntryPoint(entryPoint: string | number): string {
   const entryPointValue = entryPoint.toString();
+  // With decode_operations the node already sends the method's name ("transfer"); only numbers need a lookup.
+  if (!/^(0x[0-9a-f]+|\d+)$/i.test(entryPointValue)) return entryPointValue;
 
   // Convert the entry point to a more consistent format for comparison
   const entryPointHex = entryPointValue.startsWith('0x')

@@ -11,7 +11,7 @@ import { useWalletBalances } from "@/hooks/useWalletBalances";
 import { NICKNAMES_CONTRACT_ID } from "@/koinos/constants";
 import { formatDetailedTransactions, getDetailedAccountHistory, getTransactionDetails, type DetailedTransaction } from "@/lib/api";
 import { ago, fmt, fmtRaw, plural, short } from "@/lib/format";
-import { buildHistoryItems, summarizeActivity, type HistoryItem, type TxRow } from "@/lib/history-rows";
+import { buildHistoryItems, flowOf, summarizeActivity, type HistoryItem, type TxRow } from "@/lib/history-rows";
 import { isKnownProducer } from "@/lib/names";
 import { formatUsdValue } from "@/lib/price";
 import { retry } from "@/lib/retry";
@@ -21,6 +21,7 @@ import { Crumb, Empty, H2, Page, RowSkeleton, Section, Title } from "@/component
 import { Avatar, GlyphMark, ListMark, More, Row, TokenMark } from "@/components/ks/Row";
 import { applyTokenMeta, resolveTokenMeta, unknownTokenAddresses, type TokenMeta } from "@/lib/token-meta";
 import { useNameOf } from "@/components/ks/Named";
+import { SpikeChart, type SpikeEntry } from "@/components/ks/SpikeChart";
 
 const PAGE_SIZE = 25;
 type Filter = "all" | "received" | "sent" | "contracts" | "blocks";
@@ -224,6 +225,26 @@ export default function AddressPage() {
     return item.filter === filter;
   });
 
+  // Oldest on the left, like reading a timeline.
+  const spikes = useMemo<SpikeEntry[]>(() => {
+    const entries: SpikeEntry[] = [];
+    for (const item of [...visible].reverse()) {
+      const flow = flowOf(item, address);
+      if (!flow) continue;
+      const size = Math.abs(flow.value);
+      const main = `${flow.value > 0 ? "+" : "−"}${fmt(size, size < 1 ? 4 : size < 100 ? 2 : 0)} ${flow.symbol}`;
+      // KOIN and VHP trade about one for one, so they share a scale; other tokens get their own.
+      const group = flow.symbol === "VHP" ? "KOIN" : flow.symbol;
+      if (item.kind === "run") {
+        entries.push({ key: item.key, value: flow.value, group, overline: `Produced ${plural(item.blocks.length, "block")} · ${item.day}`, main });
+      } else {
+        const who = item.counterparty ? `${item.title} ${nameFor(item.counterparty)}` : item.title;
+        entries.push({ key: item.id, value: flow.value, group, overline: item.timestamp ? `${who} · ${ago(item.timestamp)}` : who, main, href: `/tx/${item.id}` });
+      }
+    }
+    return entries;
+  }, [visible, address, nameFor]);
+
   const name = nickname ? `@${nickname}` : nameOf(address);
   const koin = balances.balances.find((b) => b.token.symbol.toUpperCase() === "KOIN");
   const usd = koin && price ? koin.numericValue * price : null;
@@ -332,6 +353,7 @@ export default function AddressPage() {
             )}
           </p>
         )}
+        {!loading && !error && spikes.length >= 3 && <SpikeChart key={spikes.map((spike) => spike.key).join("|")} entries={spikes} label="Money in and out of this address, oldest first" />}
         <div className="ks-controls">
           <Filters options={filterOptions} value={filter} onChange={setFilter} />
           <Toggle label="Advanced" on={advanced} onChange={setAdvanced} />

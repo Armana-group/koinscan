@@ -121,7 +121,8 @@ function txRow(row: FormattedRow, address: string): TxRow {
   const incoming = mine.filter((t) => t.incoming);
   const outgoing = mine.filter((t) => !t.incoming);
   const calls = (row.operations ?? []).filter((op) => op.type === "Contract Call");
-  const call = calls[0];
+  // A deposit approves the tokens first; the call that does the work names the row.
+  const call = calls.find((op) => String(op.method ?? "") !== "approve") ?? calls[0];
   const method = call?.method !== undefined ? String(call.method) : "";
   // A swap usually starts with an approve on the token; the exchange is the call that swaps.
   const swapCall = calls.find((op) => /swap/i.test(String(op.method ?? ""))) ?? calls[calls.length - 1];
@@ -215,4 +216,26 @@ export function summarizeActivity(items: HistoryItem[]): ActivitySummary {
     else summary.contracts += 1;
   }
   return summary;
+}
+
+export interface Flow {
+  /** Positive when value came in, negative when it went out. */
+  value: number;
+  symbol: string;
+}
+
+/**
+ * How much one history entry moved, and which way, for the activity chart.
+ * Produced blocks count as KOIN earned. Swaps and calls that move nothing of
+ * this account's have no direction, so they have no flow.
+ */
+export function flowOf(item: HistoryItem, address: string): Flow | null {
+  if (item.kind === "run") return item.koinTotal > 0 ? { value: item.koinTotal, symbol: "KOIN" } : null;
+  if (item.tone === "plain" || item.title.startsWith("Swapped ")) return null;
+  const incoming = item.tone === "in";
+  const transfer = item.transfers.find((t) => (incoming ? t.to === address : t.from === address));
+  if (!transfer) return null;
+  const amount = rawToNumber(transfer.value, transfer.token.decimals);
+  if (!(amount > 0)) return null;
+  return { value: incoming ? amount : -amount, symbol: transfer.token.symbol };
 }

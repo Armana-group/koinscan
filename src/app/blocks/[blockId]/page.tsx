@@ -1,392 +1,260 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useRouter, useParams } from "next/navigation";
-import { blockByHeight as getBlockByHeight, headBlockInfo as getHeadBlockInfo } from "@/lib/api";
-import { Navbar } from "@/components/Navbar";
-import { 
-  Card, 
-  CardContent, 
-  CardDescription, 
-  CardHeader, 
-  CardTitle 
-} from "@/components/ui/card";
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
-} from "@/components/ui/table";
-import { 
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
-import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { formatDistanceToNow } from "date-fns";
-import { Clock, Hash, Layers, ArrowUpDown, Cpu, ChevronLeft, ChevronRight, ArrowRight, ExternalLink } from "lucide-react";
 import Link from "next/link";
+import { useParams } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
 import { useWallet } from "@/contexts/WalletContext";
+import { useHead } from "@/hooks/useHead";
+import { decodeTokenAmountEventData, getBlockByHeight, getTokenInfoSync } from "@/lib/api";
+import { ago, fmt, fmtRaw, plural, short, when } from "@/lib/format";
+import { buildTxStory } from "@/lib/tx-story";
+import { KOIN_CONTRACT_ID, VHP_CONTRACT_ID } from "@/koinos/constants";
+import { Advanced, CopyButton, KV, Mono, RawJson } from "@/components/ks/Advanced";
+import { Crumb, Empty, H2, Lede, Page, Section, Skeleton, Status, Title } from "@/components/ks/Page";
+import { Avatar, Row } from "@/components/ks/Row";
+import { Named, useNameOf } from "@/components/ks/Named";
+
+const FINAL_DEPTH = 60;
+
+interface RewardEvent {
+  name: string;
+  source: string;
+  address: string;
+  value: string;
+}
+
+function readRewardEvents(events: { name?: string; source?: string; data?: unknown }[] | undefined): RewardEvent[] {
+  return (events ?? []).flatMap((event) => {
+    const name = event.name ?? "";
+    const mint = /mint_event$/i.test(name);
+    const burn = /burn_event$/i.test(name);
+    if (!mint && !burn) return [];
+    let address: string | undefined;
+    let value: string | undefined;
+    if (typeof event.data === "string") {
+      const decoded = decodeTokenAmountEventData(event.data);
+      address = decoded?.address;
+      value = decoded?.value;
+    } else if (event.data && typeof event.data === "object") {
+      const data = event.data as { to?: string; from?: string; value?: string };
+      address = mint ? data.to : data.from;
+      value = data.value;
+    }
+    if (!address || !value) return [];
+    return [{ name: name.replace(/^koinos\.contracts\./, ""), source: event.source ?? "", address, value }];
+  });
+}
+
+const lookup = (id: string) => {
+  const info = getTokenInfoSync(id);
+  return info ? { symbol: info.symbol, decimals: info.decimals } : null;
+};
 
 export default function BlockPage() {
-  const params = useParams();
-  const blockId = params.blockId as string;
-  const router = useRouter();
-  const [block, setBlock] = useState<any>(null);
-  const [headBlock, setHeadBlock] = useState<any>(null);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
+  const { blockId } = useParams<{ blockId: string }>();
   const { rpcNode } = useWallet();
+  const head = useHead(3000);
+  const nameOf = useNameOf();
+  const key = `${rpcNode}|${blockId}`;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [loaded, setLoaded] = useState<{ key: string; status: "ready" | "missing" | "error"; block: any } | null>(null);
 
   useEffect(() => {
-    async function fetchBlockData() {
-      if (!rpcNode) return;
+    if (!rpcNode || !blockId) return;
+    let active = true;
+    getBlockByHeight(rpcNode, blockId)
+      .then((data) => {
+        if (!active) return;
+        setLoaded(data?.block?.header ? { key, status: "ready", block: data } : { key, status: "missing", block: null });
+      })
+      .catch((error) => {
+        console.error("[block]", error);
+        if (active) setLoaded({ key, status: "error", block: null });
+      });
+    return () => {
+      active = false;
+    };
+  }, [rpcNode, blockId, key]);
 
-      try {
-        setLoading(true);
-        setError(null);
+  const current = loaded?.key === key ? loaded : null;
+  const state = current?.status ?? "loading";
+  const block = current?.block ?? null;
+  const height = Number(block?.block_height ?? block?.block?.header?.height ?? blockId);
+  const producer: string = block?.block?.header?.signer ?? "";
+  const timestamp = Number(block?.block?.header?.timestamp);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const transactions: any[] = useMemo(() => block?.block?.transactions ?? [], [block]);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const receipts: any[] = useMemo(() => block?.receipt?.transaction_receipts ?? [], [block]);
+  const rewards = useMemo(() => readRewardEvents(block?.receipt?.events), [block]);
+  const koinReward = rewards.find((e) => /mint/i.test(e.name) && e.address === producer && (e.source === KOIN_CONTRACT_ID || lookup(e.source)?.symbol === "KOIN"));
+  const vhpBurned = rewards.find((e) => /burn/i.test(e.name) && e.address === producer && (e.source === VHP_CONTRACT_ID || lookup(e.source)?.symbol === "VHP"));
 
-        // Get head block info to know the latest block height
-        const headData = await getHeadBlockInfo(rpcNode);
-        setHeadBlock(headData);
+  const headHeight = head?.height ?? null;
+  const lastIrreversible = head?.lastIrreversible ?? null;
+  const depth = headHeight !== null && Number.isFinite(height) ? headHeight - height : null;
+  const final = lastIrreversible !== null && Number.isFinite(height) ? height <= lastIrreversible : depth !== null ? depth >= FINAL_DEPTH : null;
+  const isHead = headHeight !== null && height >= headHeight;
 
-        // Get the specified block data
-        const blockData = await getBlockByHeight(rpcNode, blockId);
-        setBlock(blockData);
-
-        setLoading(false);
-      } catch (err) {
-        console.error("Error fetching block data:", err);
-        setError("Failed to fetch block data. Please try again later.");
-        setLoading(false);
-      }
-    }
-
-    fetchBlockData();
-  }, [blockId, rpcNode]);
-
-  function formatTimestamp(timestamp: string) {
-    if (!timestamp) return "Unknown";
-    
-    // Convert timestamp to date if it's a number (assumes milliseconds)
-    const date = new Date(parseInt(timestamp));
-    
-    return `${date.toLocaleString()} (${formatDistanceToNow(date, { addSuffix: true })})`;
-  }
-
-  function truncateAddress(address: string) {
-    if (!address) return "";
-    if (address.length <= 12) return address;
-    return `${address.slice(0, 6)}...${address.slice(-4)}`;
-  }
+  const stories = useMemo(
+    () =>
+      transactions.map((tx, index) => {
+        const receipt = receipts.find((r) => r.id === tx.id) ?? receipts[index];
+        return { tx, receipt, story: buildTxStory({ transaction: tx, receipt }, lookup) };
+      }),
+    [transactions, receipts],
+  );
 
   return (
-    <>
-      <Navbar />
-      <main className="container mx-auto px-4 py-8">
-        <div className="flex flex-col space-y-8">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <h1 className="text-3xl font-bold">
-              <div className="flex items-center gap-2">
-                <Layers className="h-8 w-8" />
-                <span>Block {block?.block_height || blockId}</span>
-              </div>
-            </h1>
-            <div className="flex gap-2">
-              <Button 
-                variant="outline" 
-                onClick={() => router.push(`/blocks/${Number(blockId) - 1}`)}
-              >
-                <ChevronLeft className="h-4 w-4 mr-2" />
-                Previous Block
-              </Button>
-              <Button 
-                variant="outline"
-                onClick={() => router.push(`/blocks/${Number(blockId) + 1}`)}
-                disabled={headBlock && Number(blockId) >= Number(headBlock?.head_topology?.height)}
-              >
-                Next Block
-                <ChevronRight className="h-4 w-4 ml-2" />
-              </Button>
-              <Button 
-                variant="outline"
-                onClick={() => router.push('/blocks')}
-              >
-                Latest Block
-              </Button>
-            </div>
-          </div>
+    <Page>
+      <Crumb
+        back="Blocks"
+        backHref="/blocks"
+        right={
+          Number.isFinite(height) ? (
+            <nav className="ks-step" aria-label="Neighbouring blocks">
+              <Link href={`/blocks/${height - 1}`} className={height <= 1 ? "off" : undefined}>
+                ‹ {fmt(height - 1)}
+              </Link>
+              <Link href={`/blocks/${height + 1}`} className={isHead ? "off" : undefined}>
+                {fmt(height + 1)} ›
+              </Link>
+            </nav>
+          ) : undefined
+        }
+      />
 
-          {loading ? (
-            <div className="space-y-4">
-              <Skeleton className="h-12 w-full" />
-              <Skeleton className="h-64 w-full" />
-            </div>
-          ) : error ? (
-            <Card>
-              <CardContent className="pt-6">
-                <div className="text-red-500">{error}</div>
-              </CardContent>
-            </Card>
+      {state === "loading" && <Skeleton lines={3} />}
+      {state === "missing" && (
+        <>
+          <Title>Not yet</Title>
+          <Lede>
+            There is no block {fmt(blockId)} yet.{headHeight !== null && <> The chain is at block {fmt(headHeight)}.</>}
+          </Lede>
+        </>
+      )}
+      {state === "error" && (
+        <>
+          <Title>Could not load</Title>
+          <Lede>The node did not answer. Try again in a moment, or pick another node in the menu.</Lede>
+        </>
+      )}
+
+      {state === "ready" && (
+        <>
+          <Title>Block {fmt(height)}</Title>
+          <Lede>
+            Produced by <Named address={producer} /> {ago(timestamp)}
+            {transactions.length ? (
+              <>
+                , carrying <b>{plural(transactions.length, "transaction")}</b>
+              </>
+            ) : (
+              ", with no transactions"
+            )}
+            .
+          </Lede>
+          {final === null ? (
+            <Status tone="quiet">Confirmed.</Status>
+          ) : final ? (
+            <Status>
+              Final.{depth !== null && depth > 0 && <> {plural(depth, "block")} deep,</>} it can no longer change.
+            </Status>
           ) : (
-            <div className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Layers className="h-5 w-5" />
-                    Block Information
-                  </CardTitle>
-                  <CardDescription>
-                    Details for block {block?.block_height}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <dl className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-1">
-                      <dt className="text-sm font-medium text-muted-foreground">Height</dt>
-                      <dd className="text-lg font-semibold">
-                        {block?.block_height || "Unknown"}
-                      </dd>
-                    </div>
-                    <div className="space-y-1">
-                      <dt className="text-sm font-medium text-muted-foreground">Timestamp</dt>
-                      <dd>{formatTimestamp(block?.block?.header?.timestamp)}</dd>
-                    </div>
-                    <div className="space-y-1">
-                      <dt className="text-sm font-medium text-muted-foreground">Block ID</dt>
-                      <dd className="font-mono text-xs break-all">
-                        {block?.block_id || "Unknown"}
-                      </dd>
-                    </div>
-                    <div className="space-y-1">
-                      <dt className="text-sm font-medium text-muted-foreground">Previous Block</dt>
-                      <dd className="font-mono text-xs break-all">
-                        <Link 
-                          href={`/blocks/${Number(block?.block_height) - 1}`}
-                          className="hover:text-primary hover:underline flex items-center"
-                        >
-                          <ChevronLeft className="h-4 w-4 mr-1" />
-                          {block?.block?.header?.previous || "Unknown"}
-                        </Link>
-                      </dd>
-                    </div>
-                    <div className="space-y-1">
-                      <dt className="text-sm font-medium text-muted-foreground">Block Signer</dt>
-                      <dd className="font-mono text-sm break-all">
-                        <Link 
-                          href={`/address/${block?.block?.header?.signer}`}
-                          className="hover:text-primary hover:underline"
-                        >
-                          {block?.block?.header?.signer || "Unknown"}
-                        </Link>
-                      </dd>
-                    </div>
-                    <div className="space-y-1">
-                      <dt className="text-sm font-medium text-muted-foreground">Merkle Root</dt>
-                      <dd className="font-mono text-xs break-all">
-                        {block?.block?.header?.transaction_merkle_root || "Unknown"}
-                      </dd>
-                    </div>
-                  </dl>
-                </CardContent>
-              </Card>
-
-              <Tabs defaultValue="events" className="w-full">
-                <TabsList className="grid w-full grid-cols-3">
-                  <TabsTrigger value="events">Events</TabsTrigger>
-                  <TabsTrigger value="resources">Resource Usage</TabsTrigger>
-                  <TabsTrigger value="state">State Changes</TabsTrigger>
-                </TabsList>
-                <TabsContent value="events" className="mt-4">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Block Events</CardTitle>
-                      <CardDescription>
-                        {block?.receipt?.events?.length || 0} event{(block?.receipt?.events?.length || 0) !== 1 ? 's' : ''} recorded in this block
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      {!block?.receipt?.events || block?.receipt?.events.length === 0 ? (
-                        <div className="text-muted-foreground text-center py-4">
-                          No events in this block
-                        </div>
-                      ) : (
-                        <Accordion type="single" collapsible className="w-full">
-                          {block.receipt.events.map((event: any, index: number) => (
-                            <AccordionItem key={`${event.source}-${event.name}-${index}`} value={`${event.source}-${event.name}-${index}`}>
-                              <AccordionTrigger className="hover:bg-muted/50 px-4 py-2 rounded-md">
-                                <div className="flex flex-col items-start text-left">
-                                  <div className="font-medium">{event.name}</div>
-                                  <div className="text-sm text-muted-foreground">
-                                    From: {truncateAddress(event.source)}
-                                    {event.sequence !== undefined && ` (Sequence: ${event.sequence})`}
-                                  </div>
-                                </div>
-                              </AccordionTrigger>
-                              <AccordionContent className="px-4 pt-2 pb-4">
-                                <div className="space-y-4">
-                                  <div>
-                                    <h4 className="text-sm font-medium mb-1">Data:</h4>
-                                    <pre className="bg-muted p-2 rounded-md overflow-x-auto text-xs">
-                                      {JSON.stringify(event.data, null, 2)}
-                                    </pre>
-                                  </div>
-                                  {event.impacted && event.impacted.length > 0 && (
-                                    <div>
-                                      <h4 className="text-sm font-medium mb-1">Impacted Addresses:</h4>
-                                      <ul className="list-disc list-inside">
-                                        {event.impacted.map((address: string, i: number) => (
-                                          <li key={i} className="font-mono text-xs">
-                                            <Link 
-                                              href={`/address/${address}`} 
-                                              className="hover:text-primary hover:underline"
-                                            >
-                                              {address}
-                                            </Link>
-                                          </li>
-                                        ))}
-                                      </ul>
-                                    </div>
-                                  )}
-                                  <div>
-                                    <Link 
-                                      href={`/address/${event.source}`}
-                                      className="text-primary hover:underline text-sm flex items-center"
-                                    >
-                                      View Contract
-                                      <ArrowRight className="h-3 w-3 ml-1" />
-                                    </Link>
-                                  </div>
-                                </div>
-                              </AccordionContent>
-                            </AccordionItem>
-                          ))}
-                        </Accordion>
-                      )}
-                    </CardContent>
-                  </Card>
-                </TabsContent>
-                <TabsContent value="resources" className="mt-4">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Resource Usage</CardTitle>
-                      <CardDescription>
-                        Resources consumed by this block
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-4">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div className="space-y-1">
-                            <dt className="text-sm font-medium text-muted-foreground">Network Bandwidth Used</dt>
-                            <dd className="font-mono">
-                              {block?.receipt?.network_bandwidth_used || "0"}
-                            </dd>
-                          </div>
-                          <div className="space-y-1">
-                            <dt className="text-sm font-medium text-muted-foreground">Network Bandwidth Charged</dt>
-                            <dd className="font-mono">
-                              {block?.receipt?.network_bandwidth_charged || "0"}
-                            </dd>
-                          </div>
-                          <div className="space-y-1">
-                            <dt className="text-sm font-medium text-muted-foreground">Compute Bandwidth Used</dt>
-                            <dd className="font-mono">
-                              {block?.receipt?.compute_bandwidth_used || "0"}
-                            </dd>
-                          </div>
-                          <div className="space-y-1">
-                            <dt className="text-sm font-medium text-muted-foreground">Compute Bandwidth Charged</dt>
-                            <dd className="font-mono">
-                              {block?.receipt?.compute_bandwidth_charged || "0"}
-                            </dd>
-                          </div>
-                          <div className="space-y-1">
-                            <dt className="text-sm font-medium text-muted-foreground">Disk Storage Used</dt>
-                            <dd className="font-mono">
-                              {block?.receipt?.disk_storage_used || "0"}
-                            </dd>
-                          </div>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </TabsContent>
-                <TabsContent value="state" className="mt-4">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>State Changes</CardTitle>
-                      <CardDescription>
-                        State delta entries in this block
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      {!block?.receipt?.state_delta_entries || block?.receipt?.state_delta_entries.length === 0 ? (
-                        <div className="text-muted-foreground text-center py-4">
-                          No state changes in this block
-                        </div>
-                      ) : (
-                        <div className="overflow-x-auto">
-                          <Table>
-                            <TableHeader>
-                              <TableRow>
-                                <TableHead>Object Space</TableHead>
-                                <TableHead>Key</TableHead>
-                                <TableHead>Value</TableHead>
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                              {block.receipt.state_delta_entries.map((entry: any, index: number) => (
-                                <TableRow key={index}>
-                                  <TableCell className="font-mono text-xs">
-                                    {entry.object_space ? 
-                                      JSON.stringify(entry.object_space).substring(0, 30) + (JSON.stringify(entry.object_space).length > 30 ? '...' : '') 
-                                      : 'N/A'}
-                                  </TableCell>
-                                  <TableCell className="font-mono text-xs">
-                                    {entry.key ? entry.key.substring(0, 20) + (entry.key.length > 20 ? '...' : '') : 'N/A'}
-                                  </TableCell>
-                                  <TableCell className="font-mono text-xs">
-                                    {entry.value ? entry.value.substring(0, 20) + (entry.value.length > 20 ? '...' : '') : 'N/A'}
-                                  </TableCell>
-                                </TableRow>
-                              ))}
-                            </TableBody>
-                          </Table>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                </TabsContent>
-              </Tabs>
-
-              <div className="flex justify-between">
-                <Button 
-                  variant="outline" 
-                  onClick={() => router.push(`/blocks/${Number(blockId) - 1}`)}
-                >
-                  <ChevronLeft className="h-4 w-4 mr-2" />
-                  Previous Block
-                </Button>
-                <Button 
-                  variant="outline" 
-                  onClick={() => router.push(`/blocks/${Number(blockId) + 1}`)}
-                  disabled={headBlock && Number(blockId) >= Number(headBlock?.head_topology?.height)}
-                >
-                  Next Block
-                  <ChevronRight className="h-4 w-4 ml-2" />
-                </Button>
-              </div>
-            </div>
+            <Status tone="pending">
+              Confirmed, {depth ?? 0} of {FINAL_DEPTH} blocks to final{" "}
+              <span className="ks-progress">
+                <i style={{ width: `${Math.round(((depth ?? 0) / FINAL_DEPTH) * 100)}%` }} />
+              </span>
+            </Status>
           )}
-        </div>
-      </main>
-    </>
+
+          <Section label="Block reward" className="ks-list">
+            <H2>Reward</H2>
+            <Row
+              lead={<Avatar address={producer} name={nameOf(producer, "") || null} />}
+              title={nameOf(producer)}
+              detail="Earned for producing this block"
+              amount={koinReward ? `+${fmtRaw(koinReward.value, 8, 2)} KOIN` : "—"}
+              amountSub={vhpBurned ? `burned ${fmtRaw(vhpBurned.value, 8, 2)} VHP` : undefined}
+              amountTone="in"
+              href={`/address/${producer}`}
+              last
+            />
+          </Section>
+
+          <Section label="Transactions" className="ks-list">
+            <H2 count={transactions.length}>Transactions</H2>
+            {stories.length === 0 && (
+              <Empty>Nothing was sent in this block. Most Koinos blocks are empty; the chain keeps a steady 3-second beat whether or not anyone is transacting.</Empty>
+            )}
+            {stories.map(({ tx, receipt, story }) => {
+              const transfer = story?.transfers[0];
+              const payer = tx.header?.payer ?? "";
+              const title = transfer
+                ? `${nameOf(transfer.from)} sent ${transfer.amount} ${transfer.token.symbol} to ${nameOf(transfer.to)}`
+                : story?.operations[0]?.contract
+                  ? `${story.headline} on ${nameOf(story.operations[0].contract)}`
+                  : story?.headline ?? "Transaction";
+              return (
+                <Row
+                  key={tx.id}
+                  lead={<Avatar address={payer} name={nameOf(payer, "") || null} />}
+                  title={story?.failed ? `${title} (reverted)` : title}
+                  detail={short(tx.id, 10, 5)}
+                  amount={transfer ? `${transfer.amount} ${transfer.token.symbol}` : ""}
+                  amountSub={receipt?.rc_used ? `${fmtRaw(receipt.rc_used, 8, 2)} mana` : undefined}
+                  amountTone="out"
+                  href={`/tx/${tx.id}`}
+                />
+              );
+            })}
+          </Section>
+
+          <Advanced>
+            <KV k="Block ID">
+              <Mono>{block.block_id ?? block.receipt?.id}</Mono> <CopyButton value={block.block_id ?? block.receipt?.id ?? ""} what="Block id" />
+            </KV>
+            <KV k="Previous block">
+              <Link href={`/blocks/${height - 1}`}>
+                <Mono>{block.block?.header?.previous}</Mono>
+              </Link>
+            </KV>
+            <KV k="Produced">{when(timestamp)}</KV>
+            <KV k="Producer address">
+              <Link href={`/address/${producer}`}>
+                <Mono>{producer}</Mono>
+              </Link>{" "}
+              <CopyButton value={producer} what="Address" />
+            </KV>
+            <KV k="Resources">
+              {fmt(block.receipt?.network_bandwidth_used)} bytes network, {(Number(block.receipt?.compute_bandwidth_used ?? 0) / 1e6).toFixed(2)}M compute, {fmt(block.receipt?.disk_storage_used)} bytes disk
+            </KV>
+            <KV k="State changes">{plural(block.receipt?.state_delta_entries?.length ?? 0, "entry", "entries")}</KV>
+            <KV k="Block events">
+              {rewards.length === 0 && <span className="text-sub">None</span>}
+              {rewards.map((event, index) => (
+                <div key={index} className="ks-event">
+                  <div>
+                    {event.name} <span className="text-sub">from </span>
+                    <Named address={event.source} bold={false} />
+                  </div>
+                  <div className="ks-mono">
+                    {short(event.address)}, {fmtRaw(event.value, 8, 8)}
+                  </div>
+                </div>
+              ))}
+            </KV>
+            <KV k="Merkle root">
+              <Mono>{block.block?.header?.transaction_merkle_root}</Mono>
+            </KV>
+            <KV k="Signature">
+              <Mono>{short(block.block?.signature, 40, 0)}</Mono>
+            </KV>
+            <RawJson data={block} />
+          </Advanced>
+        </>
+      )}
+    </Page>
   );
-} 
+}

@@ -90,14 +90,14 @@ async function ensureKondorConnection() {
       reject(new Error("Kondor connection timeout"));
     }, 30000); // 30 second timeout
 
-    (window as any).kondor?.enable()
+    window.kondor?.enable()
       .then(() => {
         clearTimeout(timeout);
         isKondorConnecting = false;
         kondorConnectionPromise = null;
         resolve();
       })
-      .catch((error: any) => {
+      .catch((error: unknown) => {
         clearTimeout(timeout);
         isKondorConnecting = false;
         kondorConnectionPromise = null;
@@ -231,7 +231,7 @@ export function getWalletSigner(
 ): SignerInterface {
   switch (walletName) {
     case "kondor": {
-      return kondor.getSigner(address) as any as SignerInterface;
+      return kondor.getSigner(address) as unknown as SignerInterface;
     }
     case "walletConnect": {
       return getWalletConnectKoinos().getSigner(address) as unknown as SignerInterface;

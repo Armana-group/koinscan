@@ -71,7 +71,7 @@ export async function GET(request: Request) {
   } catch (error) {
     if (error instanceof RpcNodeUnreachableError) {
       console.warn(error.message);
-      return NextResponse.json({ error: error.message, unreachable: true }, { status: 502 });
+      return NextResponse.json({ error: error.message, unreachable: true, busy: error.busy }, { status: 502 });
     }
     console.error("Error loading account balances:", error);
     return NextResponse.json({ error: "Failed to load account balances" }, { status: 502 });

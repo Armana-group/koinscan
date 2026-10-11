@@ -1,15 +1,9 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
+import { useState } from "react";
+import { Field } from "@/components/ks/Controls";
+import { Empty, Lede, Page, Section, H2, Title } from "@/components/ks/Page";
+import { Row } from "@/components/ks/Row";
 
 interface WhitelistData {
   whitelisted: string[];
@@ -17,206 +11,96 @@ interface WhitelistData {
 }
 
 export default function WhitelistAdmin() {
-  const [whitelistData, setWhitelistData] = useState<WhitelistData>({ whitelisted: [], dev: [] });
-  const [newWallet, setNewWallet] = useState('');
-  const [adminToken, setAdminToken] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [data, setData] = useState<WhitelistData>({ whitelisted: [], dev: [] });
+  const [loaded, setLoaded] = useState(false);
+  const [newWallet, setNewWallet] = useState("");
+  const [adminToken, setAdminToken] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [confirming, setConfirming] = useState<string | null>(null);
 
-  const adminHeaders = () => ({
-    'Content-Type': 'application/json',
-    'Authorization': `Bearer ${adminToken}`,
-  });
+  const headers = () => ({ "Content-Type": "application/json", Authorization: `Bearer ${adminToken}` });
 
-  const fetchWhitelist = async () => {
+  const call = async (init?: RequestInit) => {
     if (!adminToken) {
-      setError('Enter the admin token to load the whitelist');
+      setError("Enter the admin token first.");
       return;
     }
-
+    setBusy(true);
+    setError("");
     try {
-      setIsLoading(true);
-      setError('');
-      const response = await fetch('/api/admin/whitelist', {
-        headers: adminHeaders(),
-      });
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to fetch whitelist');
-      }
-
-      setWhitelistData(data);
+      const response = await fetch("/api/admin/whitelist", { headers: headers(), ...init });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.error || "Request failed");
+      setData(body);
+      setLoaded(true);
     } catch (err) {
-      console.error('Error fetching whitelist:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load whitelist');
+      setError(err instanceof Error ? err.message : "Request failed");
     } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const addWallet = async () => {
-    if (!newWallet) return;
-    if (!adminToken) {
-      setError('Enter the admin token first');
-      return;
-    }
-
-    setIsLoading(true);
-    setError('');
-
-    try {
-      const response = await fetch('/api/admin/whitelist', {
-        method: 'POST',
-        headers: adminHeaders(),
-        body: JSON.stringify({ wallet: newWallet, action: 'add' }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to add wallet');
-      }
-
-      setWhitelistData(data);
-      setNewWallet('');
-    } catch (err) {
-      console.error('Error adding wallet:', err);
-      setError(err instanceof Error ? err.message : 'Failed to add wallet');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const removeWallet = async (wallet: string) => {
-    if (!adminToken) {
-      setError('Enter the admin token first');
-      return;
-    }
-
-    setIsLoading(true);
-    setError('');
-
-    try {
-      const response = await fetch('/api/admin/whitelist', {
-        method: 'POST',
-        headers: adminHeaders(),
-        body: JSON.stringify({ wallet, action: 'remove' }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to remove wallet');
-      }
-
-      setWhitelistData(data);
-    } catch (err) {
-      console.error('Error removing wallet:', err);
-      setError(err instanceof Error ? err.message : 'Failed to remove wallet');
-    } finally {
-      setIsLoading(false);
+      setBusy(false);
     }
   };
 
   return (
-    <div className="container mx-auto py-8">
-      <h1 className="text-2xl font-bold mb-6">Whitelist Management</h1>
-
-      {!adminToken && (
-        <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded mb-4">
-          Enter the server admin token to manage the whitelist.
-        </div>
-      )}
-
-      <div className="flex gap-4 mb-6">
-        <Input
-          type="password"
-          placeholder="Admin token"
-          value={adminToken}
-          onChange={(e) => setAdminToken(e.target.value)}
-          className="max-w-md"
-          disabled={isLoading}
-        />
-        <Button
-          onClick={fetchWhitelist}
-          disabled={isLoading || !adminToken}
-          variant="outline"
-        >
-          {isLoading ? 'Loading...' : 'Load Whitelist'}
-        </Button>
+    <Page>
+      <Title>Whitelist</Title>
+      <Lede>Wallets allowed into the closed beta. Needs the server admin token.</Lede>
+      <Field id="admin-token" label="Admin token">
+        <input id="admin-token" type="password" className="ks-input" value={adminToken} onChange={(e) => setAdminToken(e.target.value)} disabled={busy} />
+      </Field>
+      <div className="ks-actions" style={{ marginTop: 14 }}>
+        <button type="button" className="ks-btn ghost md" onClick={() => call()} disabled={busy || !adminToken}>
+          {busy ? "Loading…" : "Load whitelist"}
+        </button>
       </div>
+      {error && <p className="ks-foot text-bad">{error}</p>}
 
-      <div className="flex gap-4 mb-6">
-        <Input
-          placeholder="Enter wallet address"
-          value={newWallet}
-          onChange={(e) => setNewWallet(e.target.value)}
-          className="max-w-md"
-          disabled={isLoading || !adminToken}
-        />
-        <Button
-          onClick={addWallet}
-          disabled={isLoading || !adminToken || !newWallet}
-        >
-          {isLoading ? 'Adding...' : 'Add Wallet'}
-        </Button>
-      </div>
-
-      {error && (
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-          {error}
+      <Section label="Add">
+        <H2>Add a wallet</H2>
+        <div className="flex items-center gap-2" style={{ marginTop: 8 }}>
+          <input className="ks-input" placeholder="Wallet address" value={newWallet} onChange={(e) => setNewWallet(e.target.value)} disabled={busy || !adminToken} aria-label="Wallet address" />
+          <button
+            type="button"
+            className="ks-btn md"
+            onClick={async () => {
+              await call({ method: "POST", body: JSON.stringify({ wallet: newWallet, action: "add" }) });
+              setNewWallet("");
+            }}
+            disabled={busy || !adminToken || !newWallet}
+          >
+            Add
+          </button>
         </div>
-      )}
+      </Section>
 
-      <div className="bg-white rounded-lg shadow">
-        <div className="p-6">
-          <h2 className="text-xl font-semibold mb-4">Whitelisted Wallets</h2>
-          {isLoading && whitelistData.whitelisted.length === 0 ? (
-            <div className="text-gray-500">Loading...</div>
-          ) : whitelistData.whitelisted.length === 0 ? (
-            <div className="text-gray-500">No wallets whitelisted yet</div>
-          ) : (
-            <div className="space-y-2">
-              {whitelistData.whitelisted.map((wallet) => (
-                <div key={wallet} className="flex items-center justify-between p-3 bg-gray-50 rounded">
-                  <span className="font-mono">{wallet}</span>
-                  <Dialog>
-                    <DialogTrigger asChild>
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        disabled={isLoading || !adminToken}
-                      >
-                        Remove
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                      <DialogHeader>
-                        <DialogTitle>Confirm Removal</DialogTitle>
-                      </DialogHeader>
-                      <div className="py-4">
-                        <p>Are you sure you want to remove this wallet from the whitelist?</p>
-                        <p className="font-mono mt-2">{wallet}</p>
-                      </div>
-                      <div className="flex justify-end gap-4">
-                        <Button variant="outline" onClick={() => {}}>Cancel</Button>
-                        <Button
-                          variant="destructive"
-                          onClick={() => removeWallet(wallet)}
-                          disabled={isLoading}
-                        >
-                          {isLoading ? 'Removing...' : 'Remove'}
-                        </Button>
-                      </div>
-                    </DialogContent>
-                  </Dialog>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
+      <Section label="Whitelisted" className="ks-list">
+        <H2 count={loaded ? data.whitelisted.length : undefined}>Whitelisted wallets</H2>
+        {!loaded && <Empty>Load the whitelist to see it.</Empty>}
+        {loaded && data.whitelisted.length === 0 && <Empty>No wallets whitelisted yet.</Empty>}
+        {data.whitelisted.map((wallet) => (
+          <Row
+            key={wallet}
+            title={<span className="ks-mono">{wallet}</span>}
+            right={
+              confirming === wallet ? (
+                <span className="flex items-center gap-2">
+                  <button type="button" className="ks-btn danger md" onClick={() => call({ method: "POST", body: JSON.stringify({ wallet, action: "remove" }) }).then(() => setConfirming(null))} disabled={busy}>
+                    Confirm remove
+                  </button>
+                  <button type="button" className="ks-btn ghost md" onClick={() => setConfirming(null)} disabled={busy}>
+                    Keep
+                  </button>
+                </span>
+              ) : (
+                <button type="button" className="ks-btn ghost md" onClick={() => setConfirming(wallet)} disabled={busy || !adminToken}>
+                  Remove
+                </button>
+              )
+            }
+            flat
+          />
+        ))}
+      </Section>
+    </Page>
   );
 }

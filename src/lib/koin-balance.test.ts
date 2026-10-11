@@ -30,12 +30,13 @@ test("invalid balances fail instead of displaying zero", () => {
 test("balance lookup reads only KOIN for the requested account", async () => {
   const provider = new Provider(["https://unused.invalid"]);
   const contract = new Contract({ id: KOIN_CONTRACT_ID, abi: tokenAbi });
+  const serializer = contract.serializer!;
   const owner = "1GGxRhLN7Ek54xycG5XaZBE4bCgwV2xtvk";
-  const encoded = utils.encodeBase64url(await contract.serializer.serialize({ value: "250000000" }, "balance_of_result"));
+  const encoded = utils.encodeBase64url(await serializer.serialize({ value: "250000000" }, "balance_of_result"));
   provider.readContract = async (operation) => {
     assert.equal(operation.contract_id, KOIN_CONTRACT_ID);
-    assert.deepEqual(await contract.serializer.deserialize(operation.args!, "balance_of_arguments"), { owner });
-    return { result: encoded };
+    assert.deepEqual(await serializer.deserialize(operation.args!, "balance_of_arguments"), { owner });
+    return { result: encoded, logs: "" };
   };
   assert.equal(await readKoinBalance(provider, owner), "2.5");
 });

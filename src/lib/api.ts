@@ -1,47 +1,12 @@
-import { Provider, ProviderInterface, Transaction, utils } from 'koilib';
-import { getTokenByAddress, formatTokenAmount, getTokenBySymbol } from '@/lib/tokens';
-
-export interface FormattedOperation {
-  type: string;
-  contract?: string;
-  method?: string;
-  args?: Record<string, any>;
-  data?: any;
-}
-
-// Define the blockchain transaction interface
-export interface BlockchainTransaction {
-  id: string;
-  payer: string;
-  timestamp: string;
-  operations: Array<{
-    upload_contract?: {
-      contract_id: string;
-      [key: string]: any;
-    };
-    call?: {
-      contract_id: string;
-      entry_point: number;
-      args: Record<string, any>;
-    };
-    set_system_call?: Record<string, any>;
-    set_system_contract?: {
-      contract_id: string;
-      [key: string]: any;
-    };
-  }>;
-}
-
-export interface FormattedTransaction extends BlockchainTransaction {
-  formattedOperations: FormattedOperation[];
-}
+import { Provider, utils } from 'koilib';
+import { formatTokenAmount } from '@/lib/tokens';
 
 // New interfaces for the detailed transaction history endpoint
 export interface TransactionEvent {
   sequence: number;
   source: string;
   name: string;
-  data: Record<string, any> | string;
+  data: Record<string, unknown> | string;
   impacted: string[];
 }
 
@@ -161,7 +126,7 @@ function normalizeTransactionEvent(event: TransactionEvent): TransactionEvent {
   }
 
   const data = decodeTokenTransferEventData(event.data);
-  return data ? { ...event, data } : event;
+  return data ? { ...event, data: { ...data } } : event;
 }
 
 function formatExactTokenAmount(amount: string, decimals: number): string {
@@ -200,18 +165,18 @@ export interface TransactionReceipt {
   network_bandwidth_used: string;
   compute_bandwidth_used: string;
   events: TransactionEvent[];
-  state_delta_entries?: any[];
+  state_delta_entries?: unknown[];
 }
 
 export interface TransactionOperation {
   call_contract?: {
     contract_id: string;
     entry_point: string | number;
-    args: Record<string, any>;
+    args: Record<string, unknown>;
   };
-  upload_contract?: any;
-  set_system_call?: any;
-  set_system_contract?: any;
+  upload_contract?: Record<string, unknown>;
+  set_system_call?: Record<string, unknown>;
+  set_system_contract?: Record<string, unknown>;
 }
 
 export interface TransactionHeader {
@@ -281,60 +246,58 @@ export interface TransactionAction {
     to: string;
     isPositive?: boolean;
   }>;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
-export async function getAddressHistory(
-  provider: ProviderInterface,
-  address: string,
-  limit: number = 10,
-  includeIncoming: boolean = false,
-  includeOutgoing: boolean = true
-): Promise<BlockchainTransaction[]> {
-  try {
-    // Get transactions where the address is the payer (outgoing)
-    const outgoingPromise = includeOutgoing
-      ? provider.call('transaction_store.get_account_transactions', {
-          account: address,
-          ascending: false,
-          limit,
-        })
-      : Promise.resolve({ transactions: [] });
+interface PendingTransfer {
+  from: string;
+  to: string;
+  value: string;
+  decimals: number;
+  symbol: string;
+  address: string;
+  logoURI: string;
+  name: string;
+}
 
-    // Get transactions where the address is involved (incoming)
-    const incomingPromise = includeIncoming
-      ? provider.call('transaction_store.get_account_rc_transactions', {
-          account: address,
-          ascending: false,
-          limit,
-        })
-      : Promise.resolve({ transactions: [] });
+export interface FormattedOperationSummary {
+  type: string;
+  contract?: string;
+  method?: string;
+  args?: Record<string, unknown>;
+}
 
-    const [outgoingResult, incomingResult] = await Promise.all([outgoingPromise, incomingPromise]);
-    const outgoing = outgoingResult as { transactions: BlockchainTransaction[] };
-    const incoming = incomingResult as { transactions: BlockchainTransaction[] };
+// One row of formatted account history: a transaction or a produced block.
+export interface FormattedHistoryRow {
+  id: string;
+  seq_num?: string;
+  payer: string;
+  operations: FormattedOperationSummary[];
+  events: TransactionEvent[];
+  rc_used?: string;
+  signatures: string[];
+  totalValueTransferred: string;
+  tokenSymbol: string;
+  tokenDecimals?: string;
+  tokenTransfers: Record<string, string>;
+  tags: string[];
+  primaryTag?: string;
+  associatedAddress: string;
+  actions?: TransactionAction[];
+  userFriendlyInfo?: UserFriendlyTransactionInfo;
+  timestamp?: string;
+  blockId?: string;
+  blockHeight?: string;
+  isBlockProduction?: boolean;
+}
 
-    // Combine and sort transactions
-    const allTransactions = [
-      ...(outgoing.transactions || []),
-      ...(incoming.transactions || []),
-    ];
-
-    // Remove duplicates based on transaction ID
-    const uniqueTransactions = Array.from(
-      new Map(allTransactions.map(tx => [tx.id, tx])).values()
-    );
-
-    // Sort by timestamp descending
-    return uniqueTransactions.sort((a, b) => {
-      const timestampA = parseInt(a.timestamp || '0');
-      const timestampB = parseInt(b.timestamp || '0');
-      return timestampB - timestampA;
-    }).slice(0, limit);
-  } catch (error) {
-    console.error('Error fetching address history:', error);
-    throw error;
-  }
+// Reads one string field from a decoded event payload.
+function eventField(data: TransactionEvent['data'] | undefined, key: string): string | undefined {
+  if (!data || typeof data === 'string') return undefined;
+  const value = data[key];
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' || typeof value === 'bigint') return value.toString();
+  return undefined;
 }
 
 /**
@@ -343,9 +306,9 @@ export async function getAddressHistory(
  * @param userAddress Optional user address to determine direction of transfers
  * @returns Array of transaction actions
  */
-export function extractTransactionActions(tx: any, userAddress?: string): TransactionAction[] {
+export function extractTransactionActions(tx: FormattedHistoryRow, userAddress?: string): TransactionAction[] {
   const actions: TransactionAction[] = [];
-  const tokenTransfers = new Map<string, any[]>();
+  const tokenTransfers = new Map<string, PendingTransfer[]>();
 
   // Debug: log event structure
   console.log('[extractTransactionActions] tx.events count:', tx.events?.length || 0);
@@ -410,8 +373,7 @@ export function extractTransactionActions(tx: any, userAddress?: string): Transa
           return;
         }
 
-        const decimalPlaces = typeof decimals === 'number' ? decimals : parseInt(decimals.toString());
-        const formattedAmount = formatExactTokenAmount(value, decimalPlaces);
+        const formattedAmount = formatExactTokenAmount(value, decimals);
 
         actions.push({
           type: 'token_transfer',
@@ -438,13 +400,13 @@ export function extractTransactionActions(tx: any, userAddress?: string): Transa
   }
   
   // Handle mint events
-  const mintEvents = tx.events?.filter((event: any) =>
+  const mintEvents = tx.events?.filter((event) =>
     event.name?.toLowerCase().includes('mint_event') || event.name?.toLowerCase().includes('mint.')
   ) || [];
 
   for (const mint of mintEvents) {
-    const eventData = mint.data || {};
-    const { to, value } = eventData;
+    const to = eventField(mint.data, 'to');
+    const value = eventField(mint.data, 'value');
 
     if (to && value) {
       // Identify the token - get full info from KoinDX list
@@ -479,13 +441,13 @@ export function extractTransactionActions(tx: any, userAddress?: string): Transa
   }
 
   // Handle burn events
-  const burnEvents = tx.events?.filter((event: any) =>
+  const burnEvents = tx.events?.filter((event) =>
     event.name?.toLowerCase().includes('burn_event') || event.name?.toLowerCase().includes('burn.')
   ) || [];
 
   for (const burn of burnEvents) {
-    const eventData = burn.data || {};
-    const { from, value } = eventData;
+    const from = eventField(burn.data, 'from');
+    const value = eventField(burn.data, 'value');
 
     if (from && value) {
       // Identify the token - get full info from KoinDX list
@@ -520,7 +482,7 @@ export function extractTransactionActions(tx: any, userAddress?: string): Transa
   }
   
   // Handle contract uploads
-  if (tx.operations?.some((op: any) => op.type === 'Upload Contract')) {
+  if (tx.operations?.some((op) => op.type === 'Upload Contract')) {
     actions.push({
       type: 'contract_upload',
       description: 'Contract Uploaded'
@@ -528,7 +490,7 @@ export function extractTransactionActions(tx: any, userAddress?: string): Transa
   }
   
   // Handle governance actions
-  const governanceEvents = tx.events?.filter((event: any) => 
+  const governanceEvents = tx.events?.filter((event) =>
     event.name?.toLowerCase().includes('governance.') || 
     event.name?.toLowerCase().includes('vote.') || 
     event.name?.toLowerCase().includes('proposal.')
@@ -545,7 +507,7 @@ export function extractTransactionActions(tx: any, userAddress?: string): Transa
   }
   
   // Handle specific dApp interactions by checking for known contracts
-  const dappInteractions = tx.operations?.filter((op: any) => 
+  const dappInteractions = tx.operations?.filter((op) =>
     op.type === 'Contract Call' && op.contract
   ) || [];
   
@@ -558,7 +520,7 @@ export function extractTransactionActions(tx: any, userAddress?: string): Transa
     };
     
     let dappName = '';
-    let methodName = dappOp.method?.toString() || 'Unknown Method';
+    const methodName = dappOp.method?.toString() || 'Unknown Method';
     
     // Try to find a match for the contract
     for (const [dappAddress, name] of Object.entries(knownDapps)) {
@@ -594,53 +556,6 @@ export function extractTransactionActions(tx: any, userAddress?: string): Transa
   }
 
   return actions;
-}
-
-export function formatTransactions(transactions: BlockchainTransaction[]): FormattedTransaction[] {
-  return transactions.map(tx => {
-    const formattedOperations = tx.operations?.map((op: any) => {
-      let formattedOp: FormattedOperation = {
-        type: 'Unknown Operation'
-      };
-
-      if ('upload_contract' in op) {
-        formattedOp = {
-          type: 'Upload Contract',
-          contract: op.upload_contract?.contract_id,
-          data: op.upload_contract
-        };
-      } else if ('call' in op) {
-        formattedOp = {
-          type: 'Contract Call',
-          contract: op.call?.contract_id,
-          method: op.call?.entry_point.toString(),
-          args: op.call?.args
-        };
-      } else if ('set_system_call' in op) {
-        formattedOp = {
-          type: 'System Call',
-          data: op.set_system_call
-        };
-      } else if ('set_system_contract' in op) {
-        formattedOp = {
-          type: 'Set System Contract',
-          contract: op.set_system_contract?.contract_id,
-          data: op.set_system_contract
-        };
-      }
-
-      return formattedOp;
-    }) || [];
-
-    // Extract actions using the new approach
-    const actions = extractTransactionActions(tx);
-
-    return {
-      ...tx,
-      formattedOperations,
-      actions
-    };
-  });
 }
 
 // Add a helper function to decode entry points to human-readable method names
@@ -740,7 +655,7 @@ const methodCategories: Record<string, MethodCategory> = {
  * @param tx The formatted transaction to analyze
  * @returns An array of tags for the transaction
  */
-function analyzeAndTagTransaction(tx: any): { tags: string[], primaryTag: string } {
+function analyzeAndTagTransaction(tx: FormattedHistoryRow): { tags: string[], primaryTag: string } {
   const tags = new Set<string>();
   let primaryTag = '';
   
@@ -768,7 +683,7 @@ function analyzeAndTagTransaction(tx: any): { tags: string[], primaryTag: string
       }
       
       // Check method category
-      const methodCategory = methodCategories[op.method as string];
+      const methodCategory = methodCategories[op.method];
       if (methodCategory) {
         methodCategory.tags.forEach(tag => tags.add(tag));
         
@@ -862,7 +777,7 @@ export interface UserFriendlyTransactionInfo {
  * @param tx The formatted transaction
  * @returns An object containing user-friendly information about the transaction
  */
-export function generateUserFriendlyInfo(tx: any): UserFriendlyTransactionInfo {
+export function generateUserFriendlyInfo(tx: FormattedHistoryRow): UserFriendlyTransactionInfo {
   // Default to a generic description
   const defaultInfo: UserFriendlyTransactionInfo = {
     actionType: 'other',
@@ -878,7 +793,7 @@ export function generateUserFriendlyInfo(tx: any): UserFriendlyTransactionInfo {
   // Look for transfer events first - they're most user-relevant
   if (tx.events && tx.events.length > 0) {
     // Check for token transfers
-    const transferEvents = tx.events.filter((event: any) => 
+    const transferEvents = tx.events.filter((event) =>
       event.name.includes('transfer_event')
     );
     
@@ -918,9 +833,9 @@ export function generateUserFriendlyInfo(tx: any): UserFriendlyTransactionInfo {
       return {
         actionType: userIsRecipient ? 'received' : 'sent',
         description: userIsRecipient 
-          ? `Received ${formatTokenAmount(value, parseInt(tx.tokenDecimals))} ${tx.tokenSymbol}` 
-          : `Sent ${formatTokenAmount(value, parseInt(tx.tokenDecimals))} ${tx.tokenSymbol}`,
-        amount: formatTokenAmount(value, parseInt(tx.tokenDecimals)),
+          ? `Received ${formatTokenAmount(value, parseInt(tx.tokenDecimals ?? ''))} ${tx.tokenSymbol}` 
+          : `Sent ${formatTokenAmount(value, parseInt(tx.tokenDecimals ?? ''))} ${tx.tokenSymbol}`,
+        amount: formatTokenAmount(value, parseInt(tx.tokenDecimals ?? '')),
         tokenSymbol: tx.tokenSymbol,
         counterparty: shortenAddress(counterparty),
         isPositive: userIsRecipient
@@ -928,19 +843,20 @@ export function generateUserFriendlyInfo(tx: any): UserFriendlyTransactionInfo {
     }
     
     // Check for mint events
-    const mintEvents = tx.events.filter((event: any) => 
+    const mintEvents = tx.events.filter((event) =>
       event.name.includes('mint_event')
     );
     
     if (mintEvents.length > 0) {
       const mint = mintEvents[0];
-      const { to, value } = mint.data || {};
+      const to = eventField(mint.data, 'to');
+      const value = eventField(mint.data, 'value');
       
       if (to && value) {
         return {
           actionType: 'minted',
-          description: `Minted ${formatTokenAmount(value, parseInt(tx.tokenDecimals))} ${tx.tokenSymbol}`,
-          amount: formatTokenAmount(value, parseInt(tx.tokenDecimals)),
+          description: `Minted ${formatTokenAmount(value, parseInt(tx.tokenDecimals ?? ''))} ${tx.tokenSymbol}`,
+          amount: formatTokenAmount(value, parseInt(tx.tokenDecimals ?? '')),
           tokenSymbol: tx.tokenSymbol,
           counterparty: shortenAddress(to),
           isPositive: true
@@ -949,19 +865,20 @@ export function generateUserFriendlyInfo(tx: any): UserFriendlyTransactionInfo {
     }
     
     // Check for burn events
-    const burnEvents = tx.events.filter((event: any) => 
+    const burnEvents = tx.events.filter((event) =>
       event.name.includes('burn_event')
     );
     
     if (burnEvents.length > 0) {
       const burn = burnEvents[0];
-      const { from, value } = burn.data || {};
+      const from = eventField(burn.data, 'from');
+      const value = eventField(burn.data, 'value');
       
       if (from && value) {
         return {
           actionType: 'burned',
-          description: `Burned ${formatTokenAmount(value, parseInt(tx.tokenDecimals))} ${tx.tokenSymbol}`,
-          amount: formatTokenAmount(value, parseInt(tx.tokenDecimals)),
+          description: `Burned ${formatTokenAmount(value, parseInt(tx.tokenDecimals ?? ''))} ${tx.tokenSymbol}`,
+          amount: formatTokenAmount(value, parseInt(tx.tokenDecimals ?? '')),
           tokenSymbol: tx.tokenSymbol,
           counterparty: shortenAddress(from),
           isPositive: false
@@ -1105,15 +1022,15 @@ function summarizeTokenEvents(events: TransactionEvent[]): TokenEventSummary {
     const mintEvents = events.filter(event => event.name.includes('mint_event'));
     if (mintEvents.length > 0) {
       mintEvents.forEach(event => {
-        const eventData = typeof event.data === 'string' ? null : event.data;
-        if (event.source && eventData?.value) {
+        const mintValue = eventField(event.data, 'value');
+        if (event.source && mintValue) {
           try {
             // Identify the token
             let eventTokenSymbol = 'Unknown';
             eventTokenSymbol = getTokenSymbolSync(event.source);
             
             // Add to the token's total
-            const value = BigInt(eventData.value);
+            const value = BigInt(mintValue);
             if (tokenTransfers[eventTokenSymbol]) {
               // Convert existing value to BigInt, add the new value, and store back as string
               const currentTotal = BigInt(tokenTransfers[eventTokenSymbol]);
@@ -1207,15 +1124,13 @@ function formatBlockHeight(height: string): string {
 
 // Formats a block the account produced as a history row. Block rows carry
 // their own timestamp and height, so the timestamp enricher leaves them alone.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function formatBlockProductionEntry(block: ProducedBlock, seqNum: string | undefined, userAddress?: string): any {
+function formatBlockProductionEntry(block: ProducedBlock, seqNum: string | undefined, userAddress?: string): FormattedHistoryRow {
   const events = (block.receipt.events || []).map(normalizeBlockEvent);
   const { tokenSymbol, totalValueTransferred, tokenTransfers } = summarizeTokenEvents(events);
   const height = block.header.height;
   const description = `Produced block ${formatBlockHeight(height)}`;
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const row: any = {
+  const row: FormattedHistoryRow = {
     id: block.receipt.id,
     seq_num: seqNum,
     payer: block.header.signer,
@@ -1261,7 +1176,7 @@ function formatBlockProductionEntry(block: ProducedBlock, seqNum: string | undef
   return { ...row, userFriendlyInfo };
 }
 
-export function formatDetailedTransactions(transactions: DetailedTransaction[], userAddress?: string): any[] {
+export function formatDetailedTransactions(transactions: DetailedTransaction[], userAddress?: string): FormattedHistoryRow[] {
   // Guard against non-array input
   if (!Array.isArray(transactions)) {
     console.warn('formatDetailedTransactions received non-array input:', transactions);
@@ -1282,7 +1197,7 @@ export function formatDetailedTransactions(transactions: DetailedTransaction[], 
     const { tokenSymbol, totalValueTransferred, tokenTransfers } = summarizeTokenEvents(events);
 
     // Create a base formatted transaction with empty tags array
-    const formattedTx: any = {
+    const formattedTx: FormattedHistoryRow = {
       id: tx.trx.transaction.id,
       payer: tx.trx.transaction.header.payer,
       operations: [],
@@ -1292,13 +1207,13 @@ export function formatDetailedTransactions(transactions: DetailedTransaction[], 
       totalValueTransferred,
       tokenSymbol,
       tokenTransfers, // Add the multi-token transfer information
-      tags: [] as string[],  // Explicitly type as string array
-      primaryTag: undefined as string | undefined,
+      tags: [],
+      primaryTag: undefined,
       associatedAddress: userAddress || tx.trx.transaction.header.payer
     };
     
     // Extract operation details
-    const operations = tx.trx.transaction.operations.map(op => {
+    const operations: FormattedOperationSummary[] = tx.trx.transaction.operations.map(op => {
       if (op.call_contract) {
         // Decode the entry point to a human-readable method name
         const methodName = decodeEntryPoint(op.call_contract.entry_point);
@@ -1520,12 +1435,42 @@ export async function getDetailedAccountHistory(
   }
 }
 
+export interface TransactionDetailsResponse {
+  transaction?: Partial<TransactionData> & { timestamp?: string };
+  receipt?: Partial<TransactionReceipt>;
+  containing_blocks?: string[];
+  [key: string]: unknown;
+}
+
+export interface BlockHeaderResponse {
+  height?: string;
+  signer?: string;
+  timestamp?: string;
+  previous?: string;
+  [key: string]: unknown;
+}
+
+export interface BlockResponse {
+  block_id?: string;
+  block_height?: string;
+  block?: { header?: BlockHeaderResponse; transactions?: unknown[]; [key: string]: unknown };
+  receipt?: { events?: TransactionEvent[]; transaction_receipts?: unknown[]; [key: string]: unknown };
+  [key: string]: unknown;
+}
+
+export interface HeadInfoResponse {
+  head_topology?: { id?: string; height?: string; previous?: string };
+  last_irreversible_block?: string;
+  head_block_time?: string;
+  [key: string]: unknown;
+}
+
 /**
  * Fetches transaction details by transaction ID
  * @param transactionId The ID of the transaction to fetch
  * @returns Transaction details including timestamp
  */
-export async function getTransactionDetails(restNode: string, transactionId: string): Promise<any> {
+export async function getTransactionDetails(restNode: string, transactionId: string): Promise<TransactionDetailsResponse | null> {
   try {
     const url = buildRestApiUrl(
       restNode,
@@ -1555,33 +1500,10 @@ export async function getTransactionDetails(restNode: string, transactionId: str
 }
 
 /**
- * Fetches block information by block ID
- * @param blockId The ID of the block to fetch
- * @returns Block information including height
- */
-export async function getBlockInfo(restNode: string, blockId: string): Promise<any> {
-  try {
-    const url = buildRestApiUrl(restNode, `/v1/chain/blocks/${encodePathSegment(blockId)}`);
-    
-    const response = await fetch(url);
-    
-    if (!response.ok) {
-      throw new Error(`API request failed with status ${response.status}`);
-    }
-    
-    const data = await response.json();
-    return data;
-  } catch (error) {
-    console.error('Error fetching block info:', error);
-    return null;
-  }
-}
-
-/**
  * Fetches information about the head (latest) block on the blockchain
  * @returns Head block information including ID, height, and timestamp
  */
-export async function getHeadBlockInfo(restNode: string): Promise<any> {
+export async function getHeadBlockInfo(restNode: string): Promise<HeadInfoResponse | null> {
   try {
     const url = buildRestApiUrl(restNode, '/v1/chain/head_info');
     
@@ -1598,15 +1520,12 @@ export async function getHeadBlockInfo(restNode: string): Promise<any> {
   }
 }
 
-// Temporary export to help debug
-export const headBlockInfo = getHeadBlockInfo;
-
 /**
  * Fetches detailed block information by block height
  * @param height The height of the block to fetch
  * @returns Detailed block information including transactions and events
  */
-export async function getBlockByHeight(restNode: string, height: string): Promise<any> {
+export async function getBlockByHeight(restNode: string, height: string): Promise<BlockResponse | null> {
   try {
     const url = buildRestApiUrl(
       restNode,
@@ -1633,110 +1552,6 @@ export async function getBlockByHeight(restNode: string, height: string): Promis
   }
 }
 
-// Temporary export to help debug
-export const blockByHeight = getBlockByHeight;
-
-/**
- * Enriches transaction data with timestamp information from direct transaction API
- * @param transactions Array of formatted transactions
- * @returns Promise resolving to transactions with timestamp information
- */
-export async function enrichTransactionsWithTimestamps(restNode: string, transactions: any[]): Promise<any[]> {
-  const enrichedTransactions: any[] = [];
-
-  for (let index = 0; index < transactions.length; index += 2) {
-    const batch = transactions.slice(index, index + 2);
-    const enrichedBatch = await Promise.all(
-      batch.map(async (tx) => {
-      if (tx.timestamp) return tx;
-      try {
-        const txDetails = await getTransactionDetails(restNode, tx.id);
-        
-        if (txDetails && txDetails.transaction && txDetails.transaction.timestamp) {
-          let blockHeight = '';
-          
-          // Comment out block info fetching to avoid 404 errors
-          /*
-          // If we have containing blocks, fetch the block height
-          if (txDetails.containing_blocks && txDetails.containing_blocks.length > 0) {
-            const blockId = txDetails.containing_blocks[0];
-            const blockInfo = await getBlockInfo(restNode, blockId);
-            
-            if (blockInfo && blockInfo.header && blockInfo.header.height) {
-              blockHeight = blockInfo.header.height;
-            }
-          }
-          */
-          
-          return {
-            ...tx,
-            timestamp: txDetails.transaction.timestamp,
-            blockId: txDetails.containing_blocks ? txDetails.containing_blocks[0] : '',
-            blockHeight: blockHeight
-          };
-        }
-        
-        return tx;
-      } catch (error) {
-        console.error('Error enriching transaction:', error);
-        return tx;
-      }
-      })
-    );
-
-    enrichedTransactions.push(...enrichedBatch);
-  }
-  
-  return enrichedTransactions;
-}
-
-// Contract address to REST API token name mapping
-// The REST API uses short names like 'koin', 'vhp' instead of full addresses
-const CONTRACT_TO_API_NAME: Record<string, string> = {
-  '15DJN4a8SgrbGhhGksSBASiSYjGnMU8dGL': 'koin',
-  '1FaSvLjQJsCJKq5ybmGsMMQs8RQYyVv8ju': 'vhp',
-};
-
-/**
- * Fetches the token balance for a specific account and token
- * @param address The account address to fetch the balance for
- * @param tokenContract The token contract address or token name (koin, vhp, etc.)
- * @returns Promise resolving to the token balance as a string (in whole units, not satoshis)
- */
-export async function getTokenBalance(restNode: string, address: string, tokenContract: string): Promise<string> {
-  try {
-    // The REST API expects short names like 'koin', 'vhp' - not full contract addresses
-    // If given a full address, try to convert it to the API name
-    let apiTokenName = tokenContract.toLowerCase();
-    if (CONTRACT_TO_API_NAME[tokenContract]) {
-      apiTokenName = CONTRACT_TO_API_NAME[tokenContract];
-    }
-    const url = buildRestApiUrl(
-      restNode,
-      `/v1/account/${encodePathSegment(address)}/balance/${encodePathSegment(apiTokenName)}`
-    );
-    
-    const response = await fetch(url);
-
-    // 400/404 are expected when account has no balance for a token
-    if (!response.ok) {
-      if (response.status === 400 || response.status === 404) {
-        return '0';
-      }
-      throw new Error(`API request failed with status ${response.status}`);
-    }
-
-    const data = await response.json();
-    return data.value || '0';
-  } catch (error) {
-    // Only log unexpected errors
-    if (error instanceof Error && !error.message.includes('400') && !error.message.includes('404')) {
-      console.error(`Error fetching token balance:`, error);
-    }
-    return '0';
-  }
-}
-
 /**
  * Helper function to shorten addresses
  */
@@ -1744,6 +1559,14 @@ export function shortenAddress(address: string): string {
   if (!address) return '';
   if (address.length < 16) return address;
   return `${address.substring(0, 6)}...${address.substring(address.length - 4)}`;
+}
+
+interface TokenListEntry {
+  address?: string;
+  symbol?: string;
+  name?: string;
+  decimals?: string | number;
+  logoURI?: string;
 }
 
 // Token cache for dynamically loaded tokens - stores full token info
@@ -1755,7 +1578,7 @@ interface CachedToken {
   address: string;
 }
 
-let tokenCache: Record<string, CachedToken> = {};
+const tokenCache: Record<string, CachedToken> = {};
 let tokenCacheInitialized = false;
 
 // Map short token names to full contract addresses
@@ -1773,12 +1596,12 @@ async function initializeTokenCache() {
     if (response.ok) {
       const data = await response.json();
       if (data?.tokens && Array.isArray(data.tokens)) {
-        data.tokens.forEach((token: any) => {
+        (data.tokens as TokenListEntry[]).forEach((token) => {
           if (token.address && token.symbol) {
             const tokenInfo: CachedToken = {
               symbol: token.symbol,
               name: token.name || token.symbol,
-              decimals: parseInt(token.decimals) || 8,
+              decimals: parseInt(String(token.decimals)) || 8,
               logoURI: token.logoURI || '',
               address: token.address
             };

@@ -1,11 +1,11 @@
 /**
  * KOIN Price Service
- * Fetches and caches KOIN price from the Kondor price service
+ * Fetches and caches the KOIN price from KoinScan's /api/koin-price (Armana's price service)
  */
 
 interface KoinPriceResponse {
   usd: number;
-  change: number;
+  change: number | null;
   timestamp: number;
   source: string;
 }

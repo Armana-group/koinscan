@@ -54,12 +54,14 @@ test("block production entries format without throwing and keep their place in t
   assert.equal(block.timestamp, "1791485448120");
   assert.equal(block.payer, PRODUCER);
   assert.ok(block.tags.includes("block_production"));
-  assert.equal(block.actions[0].type, "block_production");
-  assert.match(block.actions[0].description, /40,040,058|40040058/);
-  assert.equal(block.userFriendlyInfo.isPositive, true);
+  const action = block.actions?.[0];
+  assert.ok(action, "the block row carries an action");
+  assert.equal(action.type, "block_production");
+  assert.match(action.description, /40,040,058|40040058/);
+  assert.equal(block.userFriendlyInfo?.isPositive, true);
 
   // The block receipt's mint event is the producer reward; the burn is the VHP spent.
-  const transfers = block.actions[0].tokenTransfers;
+  const transfers = action.tokenTransfers ?? [];
   assert.equal(transfers.length, 2, "only the producer's own reward and burn are listed");
   assert.equal(transfers[0].isPositive, true, "the reward leads the list");
   const reward = transfers.find((transfer: { isPositive?: boolean }) => transfer.isPositive);
@@ -68,7 +70,7 @@ test("block production entries format without throwing and keep their place in t
   assert.equal(reward?.to, PRODUCER);
   assert.equal(burned?.amount, "407439205");
   assert.equal(burned?.from, PRODUCER);
-  assert.equal(block.userFriendlyInfo.amount, reward?.formattedAmount);
+  assert.equal(block.userFriendlyInfo?.amount, reward?.formattedAmount);
 
   assert.equal(tx.id, "0x1220aaaa");
   assert.equal(tx.rc_used, "123");

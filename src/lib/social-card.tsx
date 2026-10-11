@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { ImageResponse } from "next/og";
+import { SITE_URL } from "@/lib/site-url";
 
 // Draws the 1200x630 link-preview images used by the opengraph-image routes.
 
@@ -40,6 +41,78 @@ function LogoBars({ height }: { height: number }) {
         <div key={color} style={{ width: unit * [4, 2, 1][i], height, marginRight: unit * 0.4, background: color }} />
       ))}
     </div>
+  );
+}
+
+// The home page as a card: the same light sheet, logo-coloured glow, greeting
+// and search pill, so a shared link looks like the site it opens.
+export async function renderSiteCard() {
+  const [medium, light] = await Promise.all([
+    readFile(join(process.cwd(), "src/assets/fonts/Poppins-Medium.ttf")),
+    readFile(join(process.cwd(), "src/assets/fonts/Poppins-Light.ttf")),
+  ]);
+  return new ImageResponse(
+    (
+      <div
+        style={{
+          width: "100%",
+          height: "100%",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          position: "relative",
+          background: "#F3F1F1",
+          backgroundImage: [
+            "radial-gradient(circle at 8% 0%, rgba(240,150,150,0.55), rgba(240,150,150,0) 42%)",
+            "radial-gradient(circle at 96% 100%, rgba(180,160,250,0.55), rgba(180,160,250,0) 45%)",
+            "radial-gradient(circle at 50% 120%, rgba(250,220,140,0.5), rgba(250,220,140,0) 40%)",
+          ].join(", "),
+          color: "#16121C",
+          fontFamily: "Poppins",
+        }}
+      >
+        <div style={{ position: "absolute", top: 56, left: 64, display: "flex", alignItems: "center" }}>
+          <LogoBars height={34} />
+          <div style={{ display: "flex", marginLeft: 12, fontSize: 32, fontWeight: 500, letterSpacing: -0.5 }}>KoinScan</div>
+        </div>
+        <div style={{ display: "flex", fontSize: 136, fontWeight: 500, letterSpacing: -5.5, lineHeight: 1, marginTop: 24 }}>Hello, Koinos</div>
+        <div style={{ display: "flex", marginTop: 28, fontSize: 38, fontWeight: 300, color: "#5B5565", letterSpacing: -0.4 }}>Explore, mine, trade.</div>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            marginTop: 52,
+            width: 800,
+            height: 84,
+            padding: "0 16px 0 36px",
+            borderRadius: 42,
+            background: "#FFFFFF",
+            boxShadow: "0 24px 60px rgba(22,18,28,0.12)",
+            fontSize: 24,
+            fontWeight: 300,
+            color: "#6B6475",
+            whiteSpace: "nowrap",
+          }}
+        >
+          <div style={{ display: "flex" }}>Search an address, @nickname, transaction or block</div>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 52, height: 52, borderRadius: 26, background: "#E05252", opacity: 0.85 }}>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M5 12h14M13 6l6 6-6 6" />
+            </svg>
+          </div>
+        </div>
+        <div style={{ position: "absolute", bottom: 48, display: "flex", fontSize: 24, fontWeight: 300, color: "#8F8A97" }}>{SITE_URL.host}</div>
+      </div>
+    ),
+    {
+      ...cardSize,
+      fonts: [
+        { name: "Poppins", data: medium, weight: 500, style: "normal" },
+        { name: "Poppins", data: light, weight: 300, style: "normal" },
+      ],
+    },
   );
 }
 
@@ -101,7 +174,7 @@ export async function renderCard({ eyebrow, headline, headlineSize = 112, detail
 
         <div style={{ display: "flex", justifyContent: "space-between", fontSize: 28, color: SUBTLE }}>
           <div style={{ display: "flex" }}>{footer}</div>
-          <div style={{ display: "flex", color: INK, fontWeight: 600 }}>koinscan.com</div>
+          <div style={{ display: "flex", color: INK, fontWeight: 600 }}>{SITE_URL.host}</div>
         </div>
       </div>
     ),

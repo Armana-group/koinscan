@@ -90,7 +90,7 @@ assert.equal(home.status, 200, "the home page remains reachable");
 assert.match(
   home.html,
   /href="\/changelog"[^>]*>Changelog</,
-  "the global footer links to the public changelog",
+  "the menu card links to the public changelog",
 );
 
 console.log("public changelog regression passed");

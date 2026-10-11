@@ -12,7 +12,7 @@ export async function generateMetadata({ params }: { params: Promise<{ txid: str
 
   const status = summary.failed ? "Failed transaction" : summary.kind;
   const description = [`${status}: ${summary.headline}`, summary.detail].filter(Boolean).join(", ");
-  return pageMetadata(title, `${description}. View it on KoinScan, the Koinos block explorer.`);
+  return pageMetadata(title, `${description}. View it on KoinScan.`);
 }
 
 export default function TransactionLayout({ children }: { children: React.ReactNode }) {

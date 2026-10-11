@@ -103,6 +103,16 @@ test("Forget then reconnect offers shared accounts without silently restoring th
   } finally { await app.close(); }
 });
 
+test("a first connection with one shared account connects without a second choice", async () => {
+  const app = await mountWallet();
+  try {
+    app.setReply(async () => [bob]);
+    await act(async () => { assert.equal(await app.wallet.connect("kondor"), "connected"); });
+    assert.equal(app.displayedAddress, bob.address);
+    assert.equal(localStorage.getItem(CHOSEN_ADDRESS_KEY), bob.address);
+  } finally { await app.close(); }
+});
+
 test("a single shared account also needs an explicit choice after Forget", async () => {
   const app = await mountWallet(true);
   try {

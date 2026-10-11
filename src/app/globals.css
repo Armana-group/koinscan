@@ -1664,6 +1664,113 @@ button.ks-row:hover .ks-t {
   background: var(--gold);
   border-radius: 2px;
 }
+.ks-pie {
+  display: flex;
+  align-items: center;
+  gap: 48px;
+  margin: 8px 0 28px;
+}
+.ks-pie-ring {
+  position: relative;
+  width: 220px;
+  height: 220px;
+  flex: none;
+}
+.ks-pie-ring svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.ks-pie-ring path {
+  cursor: pointer;
+  stroke: #fff;
+  stroke-width: 1.5;
+  transition: opacity 0.15s;
+}
+.ks-pie .dim {
+  opacity: 0.3;
+}
+.ks-pie-mid {
+  position: absolute;
+  inset: 44px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  pointer-events: none;
+}
+.ks-pie-mid b {
+  font-size: 34px;
+  font-weight: 500;
+  letter-spacing: -0.035em;
+  line-height: 1.1;
+}
+.ks-pie-mid span {
+  font-size: 12px;
+  color: var(--sub);
+  line-height: 1.35;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ks-pie-key {
+  flex: 1;
+  min-width: 0;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 2px;
+  transition: opacity 0.15s;
+}
+.ks-pie-key li {
+  transition: opacity 0.15s;
+}
+.ks-pie-key a,
+.ks-pie-rest {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 0;
+  font-size: 14px;
+  color: var(--ink);
+}
+.ks-pie-key a:hover span {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.ks-pie-key i {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex: none;
+}
+.ks-pie-key span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ks-pie-key em {
+  font-style: normal;
+  font-variant-numeric: tabular-nums;
+  color: var(--sub);
+}
+.ks-pie-rest {
+  color: var(--sub);
+}
+@media (max-width: 760px) {
+  .ks-pie {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 24px;
+  }
+  .ks-pie-ring {
+    align-self: center;
+  }
+}
 .ks-docs {
   margin: 22px 0 0;
   display: flex;

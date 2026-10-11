@@ -12,7 +12,14 @@ interface KoinPriceResponse {
 
 interface CachedPrice {
   price: number;
+  change: number | null;
   fetchedAt: number;
+}
+
+export interface KoinQuote {
+  usd: number;
+  /** Percent change over 24 hours, or null when unknown. */
+  change: number | null;
 }
 
 let cachedPrice: CachedPrice | null = null;
@@ -26,9 +33,16 @@ const PRICE_API_URL = '/api/koin-price';
  * Returns null if price cannot be fetched
  */
 export async function getKoinPrice(): Promise<number | null> {
+  return (await getKoinQuote())?.usd ?? null;
+}
+
+const quoteOf = (cached: CachedPrice | null): KoinQuote | null => (cached ? { usd: cached.price, change: cached.change } : null);
+
+/** The KOIN price with its 24 hour change, cached like getKoinPrice. */
+export async function getKoinQuote(): Promise<KoinQuote | null> {
   // Return cached price if fresh
   if (cachedPrice && Date.now() - cachedPrice.fetchedAt < CACHE_TTL) {
-    return cachedPrice.price;
+    return quoteOf(cachedPrice);
   }
 
   try {
@@ -43,7 +57,7 @@ export async function getKoinPrice(): Promise<number | null> {
 
     if (!response.ok) {
       // Return stale cache if available
-      return cachedPrice?.price ?? null;
+      return quoteOf(cachedPrice);
     }
 
     const data: KoinPriceResponse = await response.json();
@@ -51,13 +65,14 @@ export async function getKoinPrice(): Promise<number | null> {
     // Update cache
     cachedPrice = {
       price: data.usd,
+      change: typeof data.change === "number" ? data.change : null,
       fetchedAt: Date.now(),
     };
 
-    return data.usd;
+    return quoteOf(cachedPrice);
   } catch {
     // Return stale cache if available
-    return cachedPrice?.price ?? null;
+    return quoteOf(cachedPrice);
   }
 }
 
@@ -80,4 +95,14 @@ export function formatUsdValue(value: number): string {
     return `$${(value / 1000).toFixed(2)}K`;
   }
   return `$${(value / 1000000).toFixed(2)}M`;
+}
+
+/** A KOIN price to four significant figures: "$0.01864". */
+export function formatKoinUsd(value: number): string {
+  return `$${value < 1 ? value.toPrecision(4) : value.toFixed(2)}`;
+}
+
+/** A signed percent change: "+2.0%", "−1.4%". */
+export function formatChange(value: number): string {
+  return `${value >= 0 ? "+" : "−"}${Math.abs(value).toFixed(1)}%`;
 }

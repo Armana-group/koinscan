@@ -13,6 +13,9 @@ import { useNameOf } from "@/components/ks/Named";
 import { RollingNumber } from "@/components/ks/RollingNumber";
 import { useWallet } from "@/contexts/WalletContext";
 import { useEffect } from "react";
+import { useKoinQuote } from "@/hooks/useKoinPrice";
+import { KOIN_CONTRACT_ID } from "@/koinos/constants";
+import { formatChange, formatKoinUsd } from "@/lib/price";
 
 // What KoinScan is for, one word each; the home line links them to their pages.
 const MODES = [
@@ -55,6 +58,7 @@ export default function Home() {
     if (await go(text)) setValue("");
   };
 
+  const quote = useKoinQuote();
   const suggestions = ["@julian", head ? `Block ${fmt(head.height)}` : "Block 40,041,420", "KOIN"];
 
   return (
@@ -112,30 +116,42 @@ export default function Home() {
         </div>
       </div>
       <div className="ks-livebar">
-        <div>
-          {/* Keyed on the height so the dot pings once per new block. */}
-          <span key={head?.height} className={head ? "ks-dot ks-ping" : "ks-dot"} />
-          {head ? (
-            <span>
-              Block{" "}
-              <b>
-                <RollingNumber value={fmt(head.height)} />
-              </b>
-              , just now
-            </span>
-          ) : (
-            <span>Connecting to the chain…</span>
-          )}
-        </div>
-        {/* The producer sits on its own line so a long or changing name never moves the block line. */}
-        <div className="ks-producer">
-          {producer ? (
-            <span key={producer}>
-              Produced by <b>{nameOf(producer)}</b>
-            </span>
+        <div className="ks-home-price">
+          {quote ? (
+            <Link href={`/contracts/${KOIN_CONTRACT_ID}`}>
+              KOIN <b>{formatKoinUsd(quote.usd)}</b>
+              {quote.change !== null && <span className={quote.change >= 0 ? "up" : "down"}>{formatChange(quote.change)}</span>}
+            </Link>
           ) : (
             "\u00a0"
           )}
+        </div>
+        {/* Block and producer share a line split at the centre, so a long or changing name never moves the block number. */}
+        <div className="ks-blockline">
+          <span className="ks-block">
+            {/* Keyed on the height so the dot pings once per new block. */}
+            <span key={head?.height} className={head ? "ks-dot ks-ping" : "ks-dot"} />
+            {head ? (
+              <span>
+                Block{" "}
+                <b>
+                  <RollingNumber value={fmt(head.height)} />
+                </b>
+                , just now
+              </span>
+            ) : (
+              <span>Connecting to the chain…</span>
+            )}
+          </span>
+          <span className="ks-producer">
+            {producer ? (
+              <span key={producer}>
+                Produced by <b>{nameOf(producer)}</b>
+              </span>
+            ) : (
+              "\u00a0"
+            )}
+          </span>
         </div>
       </div>
     </section>

@@ -1761,6 +1761,89 @@ button.ks-row:hover .ks-t {
 .ks-pie-rest {
   color: var(--sub);
 }
+.ks-line {
+  margin: 4px 0 24px;
+}
+.ks-line-read {
+  font-size: 13px;
+  color: var(--faint);
+  min-height: 20px;
+  margin-bottom: 6px;
+  font-variant-numeric: tabular-nums;
+}
+.ks-line-read b {
+  font-weight: 500;
+  color: var(--ink);
+}
+.ks-line-plot {
+  position: relative;
+  touch-action: pan-y;
+  cursor: crosshair;
+}
+.ks-line-plot svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.ks-line-plot .ref {
+  stroke: var(--faint);
+  stroke-width: 1;
+  stroke-dasharray: 3 4;
+  vector-effect: non-scaling-stroke;
+}
+.ks-line-plot .cursor {
+  stroke: var(--line);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+.ks-line-plot > i {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  margin: -4px 0 0 -4px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 3px #fff;
+  pointer-events: none;
+}
+.ks-stack-bar {
+  margin: 16px 0 8px;
+}
+.ks-stack-bar .bar {
+  display: flex;
+  gap: 2px;
+  height: 14px;
+  border-radius: 7px;
+  overflow: hidden;
+}
+.ks-stack-bar .bar i {
+  flex-basis: 0;
+  min-width: 2px;
+}
+.ks-stack-bar ul {
+  list-style: none;
+  margin: 14px 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 28px;
+  font-size: 14px;
+}
+.ks-stack-bar li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.ks-stack-bar li i {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+.ks-stack-bar li em {
+  font-style: normal;
+  font-variant-numeric: tabular-nums;
+  color: var(--sub);
+}
 @media (max-width: 760px) {
   .ks-pie {
     flex-direction: column;
@@ -2187,8 +2270,95 @@ button.ks-row:hover .ks-t {
     transform: scale(3.2);
   }
 }
+.ks-home-price {
+  margin-bottom: 8px;
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+}
+.ks-home-price a {
+  color: var(--sub);
+}
+.ks-home-price a:hover b {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.ks-home-price span,
+.ks-price-now span {
+  margin-left: 6px;
+}
+.ks-home-price .up,
+.ks-price-now .up {
+  color: var(--ok);
+}
+.ks-home-price .down,
+.ks-price-now .down {
+  color: var(--bad);
+}
+.ks-blockline {
+  display: flex;
+  justify-content: center;
+  align-items: baseline;
+}
+.ks-blockline > .ks-block,
+.ks-blockline > .ks-producer {
+  flex: 1 1 0;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ks-blockline > .ks-block {
+  text-align: right;
+  padding-right: 14px;
+}
+.ks-blockline > .ks-producer {
+  text-align: left;
+  padding-left: 14px;
+  border-left: 1px solid var(--line);
+}
+@media (max-width: 520px) {
+  .ks-blockline {
+    flex-direction: column;
+    align-items: center;
+  }
+  .ks-blockline > .ks-block,
+  .ks-blockline > .ks-producer {
+    flex: none;
+    text-align: center;
+    padding: 0;
+    border: 0;
+  }
+  .ks-blockline > .ks-producer {
+    margin-top: 4px;
+  }
+}
+.ks-price {
+  margin: 20px 0 8px;
+}
+.ks-price-now {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 6px;
+  margin-bottom: 14px;
+}
+.ks-price-now b {
+  font-size: 34px;
+  font-weight: 500;
+  letter-spacing: -0.035em;
+  font-variant-numeric: tabular-nums;
+}
+.ks-price-now span {
+  font-size: 15px;
+}
+.ks-price-now em {
+  font-style: normal;
+  color: var(--faint);
+}
+.ks-price .ks-line {
+  margin-bottom: 14px;
+}
 .ks-livebar .ks-producer {
-  margin-top: 4px;
   font-size: 13px;
   color: var(--faint);
 }

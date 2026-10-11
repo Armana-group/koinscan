@@ -7,8 +7,10 @@
  * The same formulas as src/lib/fogata.ts and the Koinos block producer.
  */
 import { Contract, type ProviderInterface, utils } from "koilib";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useWallet } from "@/contexts/WalletContext";
+import { useHead } from "@/hooks/useHead";
+import { slide, summarise, type SampledBlock, type WindowSummary } from "@/lib/block-window";
 import tokenAbi from "@/koinos/abi";
 import { abiPob } from "@/koinos/abis";
 import { KOIN_CONTRACT_ID, POB_CONTRACT_ID, VHP_CONTRACT_ID } from "@/koinos/constants";
@@ -28,11 +30,7 @@ const SAMPLE = 100;
 const SHOW = 12;
 type View = "producers" | "supply" | "yield";
 
-interface NetworkData {
-  producers: { address: string; share: number; blocks: number }[];
-  averageBlockTime: number;
-  /** Seconds since the block before, for each sampled block after the first. */
-  blockTimes: { height: number; seconds: number }[];
+interface ChainStats {
   totalVhp: number;
   totalKoin: number;
   vhpProducing: number;
@@ -40,23 +38,22 @@ interface NetworkData {
   difficulty: number;
 }
 
-async function getNetworkData(provider: ProviderInterface): Promise<NetworkData> {
-  const head = await provider.getHeadInfo();
-  const blocks = await provider.getBlocks(Number(head.head_topology.height) - SAMPLE, SAMPLE, "", { returnBlock: true, returnReceipt: false });
-  const counts = new Map<string, number>();
-  for (const block of blocks) {
-    const signer = block.block.header!.signer!;
-    counts.set(signer, (counts.get(signer) ?? 0) + 1);
-  }
-  const producers = [...counts.entries()].map(([address, n]) => ({ address, blocks: n, share: (100 * n) / blocks.length })).sort((a, b) => b.share - a.share);
-  const first = blocks[0];
-  const last = blocks[blocks.length - 1];
-  const averageBlockTime = (Number(last.block.header!.timestamp) - Number(first.block.header!.timestamp)) / (blocks.length - 1) / 1000;
-  const blockTimes = blocks.slice(1).map((block, i) => ({
-    height: Number(block.block.header!.height),
-    seconds: (Number(block.block.header!.timestamp) - Number(blocks[i].block.header!.timestamp)) / 1000,
-  }));
+type NetworkData = ChainStats & WindowSummary;
 
+// Supply and difficulty barely move; the block window updates on every new block.
+const STATS_EVERY_MS = 60_000;
+
+async function readBlocks(provider: ProviderInterface, from: number, count: number): Promise<SampledBlock[]> {
+  const blocks = await provider.getBlocks(from, count, "", { returnBlock: true, returnReceipt: false });
+  return blocks.map((b) => ({ height: Number(b.block.header!.height), timestamp: Number(b.block.header!.timestamp), signer: b.block.header!.signer! }));
+}
+
+async function readRecentBlocks(provider: ProviderInterface): Promise<SampledBlock[]> {
+  const head = await provider.getHeadInfo();
+  return readBlocks(provider, Number(head.head_topology.height) - SAMPLE, SAMPLE);
+}
+
+async function readStats(provider: ProviderInterface): Promise<ChainStats> {
   const vhp = new Contract({ id: VHP_CONTRACT_ID, provider, abi: tokenAbi });
   const koin = new Contract({ id: KOIN_CONTRACT_ID, provider, abi: tokenAbi });
   const pob = new Contract({ id: POB_CONTRACT_ID, provider, abi: abiPob });
@@ -66,39 +63,79 @@ async function getNetworkData(provider: ProviderInterface): Promise<NetworkData>
   const difficulty = Number("0x" + utils.toHexString(utils.decodeBase64url(metadata!.value.difficulty)));
   const vhpProducing = (10 * difficulty) / 3000 / 1e8;
   const apy = (2 * (totalVhp + totalKoin)) / vhpProducing;
-  return { producers, averageBlockTime, blockTimes, totalVhp, totalKoin, vhpProducing, apy, difficulty };
+  return { totalVhp, totalKoin, vhpProducing, apy, difficulty };
+}
+
+interface Live {
+  key: string;
+  blocks: SampledBlock[];
+  stats: ChainStats | null;
+  error: boolean;
 }
 
 export default function NetworkPage() {
   const { provider, jsonRpcNode } = useWallet();
   const nameOf = useNameOf();
-  const [loaded, setLoaded] = useState<{ key: string; data: NetworkData | null; error: boolean } | null>(null);
+  const head = useHead(3000);
+  const [live, setLive] = useState<Live | null>(null);
   const [view, setView] = useState<View>("producers");
   const [shown, setShown] = useState(SHOW);
   const [attempt, setAttempt] = useState(0);
+  const key = `${jsonRpcNode}|${attempt}`;
+  const fetching = useRef(false);
 
+  // The first full read: the last hundred blocks and the chain's supply figures.
   useEffect(() => {
     if (!provider) return;
     let active = true;
     // A hundred blocks in one request is what public nodes throttle first after
     // a burst of page loads; two more tries a couple of seconds apart usually get through.
-    retry(() => getNetworkData(provider), 3, 2000)
-      .then((result) => active && setLoaded({ key: `${jsonRpcNode}|${attempt}`, data: result, error: false }))
+    retry(() => Promise.all([readRecentBlocks(provider), readStats(provider)]), 3, 2000)
+      .then(([blocks, stats]) => active && setLive({ key, blocks, stats, error: false }))
       .catch((err) => {
         console.error("[network]", err);
-        if (active) setLoaded({ key: `${jsonRpcNode}|${attempt}`, data: null, error: true });
+        if (active) setLive({ key, blocks: [], stats: null, error: true });
       });
     return () => {
       active = false;
     };
-  }, [provider, jsonRpcNode, attempt]);
+  }, [provider, key]);
 
-  const current = loaded?.key === `${jsonRpcNode}|${attempt}` ? loaded : null;
-  const data = current?.data ?? null;
+  // Each new head: read only the blocks since the last one we have and slide them in.
+  const lastHeight = live?.key === key && !live.error ? live.blocks[live.blocks.length - 1]?.height : undefined;
+  useEffect(() => {
+    if (!provider || !head || lastHeight === undefined || head.height <= lastHeight || fetching.current) return;
+    const count = Math.min(head.height - lastHeight, SAMPLE);
+    fetching.current = true;
+    readBlocks(provider, head.height - count + 1, count)
+      .then((incoming) => setLive((previous) => (previous && previous.key === key ? { ...previous, blocks: slide(previous.blocks, incoming, SAMPLE) } : previous)))
+      // A missed update is fine: the next block asks again from the same place.
+      .catch((err) => console.info("[network] new blocks unavailable:", err))
+      .finally(() => {
+        fetching.current = false;
+      });
+  }, [provider, head, lastHeight, key]);
+
+  // Supply and yield, refreshed now and then while the tab is in view.
+  const loaded = live?.key === key && !live.error;
+  useEffect(() => {
+    if (!provider || !loaded) return;
+    const timer = setInterval(() => {
+      if (document.visibilityState === "hidden") return;
+      readStats(provider)
+        .then((stats) => setLive((previous) => (previous && previous.key === key ? { ...previous, stats } : previous)))
+        .catch((err) => console.info("[network] supply unavailable:", err));
+    }, STATS_EVERY_MS);
+    return () => clearInterval(timer);
+  }, [provider, loaded, key]);
+
+  const current = live?.key === key ? live : null;
   const error = current?.error ?? false;
-  const producers = useMemo(() => data?.producers ?? [], [data]);
+  const summary = useMemo(() => (current && !current.error ? summarise(current.blocks) : null), [current]);
+  const data: NetworkData | null = summary && current?.stats ? { ...summary, ...current.stats } : null;
+  const producers = useMemo(() => summary?.producers ?? [], [summary]);
   const maxShare = producers[0]?.share ?? 1;
-  const blockLine = useMemo(() => (data?.blockTimes ?? []).map((b) => ({ x: b.height, y: b.seconds })), [data]);
+  const blockLine = useMemo(() => (summary?.blockTimes ?? []).map((b) => ({ x: b.height, y: b.seconds })), [summary]);
 
   return (
     <Page list>

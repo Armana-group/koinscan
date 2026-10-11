@@ -10,6 +10,25 @@ export interface ChangelogEntry {
 
 export const changelogEntries = [
   {
+    date: "2026-10-11",
+    displayDate: "October 11, 2026",
+    title: "A new look, and one place to explore, mine and trade",
+    summary:
+      "Every page is rebuilt in a lighter, simpler design, the wallet lives in a single chip in the header, and the KOIN price now comes from Armana's own price service.",
+    changes: [
+      "Redesign every page in one light style with a shared header, menu and footer.",
+      "Show the connected wallet as an address chip that opens a card with its balance, VHP, mana and account actions.",
+      "Connect Kondor in one step, and explain what Forget keeps when you remove a remembered address.",
+      "List a Fogata pool's stakers, and link straight to Trade from a pool.",
+      "Name tokens that are not on the token list from their own contracts, and mark the listed ones.",
+      "Load transactions and blocks faster, and say when a public node is busy instead of failing silently.",
+      "Show contract functions whose arguments cannot be encoded with a clear message, and read contracts that embed Google's descriptor types.",
+      "Read the KOIN price from Armana's price service, which combines CoinMarketCap and the KoinDX pools, instead of CoinMarketCap alone.",
+    ],
+    contributors: ["Ron Hamenahem"],
+    commits: ["f32f890", "18916b7", "fa278e6", "adc70aa"],
+  },
+  {
     date: "2026-10-08",
     displayDate: "October 8, 2026",
     title: "Custom RPC nodes, block producer history, and faster failures",

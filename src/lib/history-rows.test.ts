@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { buildHistoryItems, summarizeActivity } from "./history-rows";
+import { buildHistoryItems, flowOf, summarizeActivity } from "./history-rows";
 
 const ME = "1GGxRhLN7Ek54xycG5XaZBE4bCgwV2xtvk";
 const YOU = "1JVrBsKt8zkiUGBDY1Tk4DPiE9AkzKmhz2";
@@ -156,4 +156,64 @@ test("a swap names the exchange, not the token it approved first", () => {
   if (row.kind !== "tx") throw new Error("expected a tx row");
   assert.equal(row.title, "Swapped KOIN for VHP");
   assert.equal(row.counterparty, "1DEXrouter");
+});
+
+test("each entry's flow: received up, sent down, blocks as KOIN earned", () => {
+  const items = buildHistoryItems(
+    [
+      { id: "in", operations: [{ type: "Contract Call", method: "transfer" }], actions: [{ type: "token_transfer", tokenTransfers: [{ token: KOIN, amount: "250000000", from: YOU, to: ME }] }] },
+      { id: "out", operations: [{ type: "Contract Call", method: "transfer" }], actions: [{ type: "token_transfer", tokenTransfers: [{ token: VHP, amount: "100000000", from: ME, to: YOU }] }] },
+      block("b1", "100", 5),
+    ],
+    ME,
+    NOW,
+  );
+  assert.deepEqual(
+    items.map((item) => flowOf(item, ME)),
+    [
+      { value: 2.5, symbol: "KOIN" },
+      { value: -1, symbol: "VHP" },
+      { value: 4.23444547, symbol: "KOIN" },
+    ],
+  );
+});
+
+test("swaps and calls that move nothing have no flow", () => {
+  const items = buildHistoryItems(
+    [
+      {
+        id: "swap",
+        operations: [{ type: "Contract Call", contract: "1DEXrouter", method: "swap_tokens_in" }],
+        actions: [{ type: "swap", tokenTransfers: [{ token: KOIN, amount: "100", from: ME, to: "1DEXrouter" }, { token: VHP, amount: "90", from: "1DEXrouter", to: ME }] }],
+      },
+      { id: "call", operations: [{ type: "Contract Call", contract: YOU, method: "vote" }], actions: [{ type: "contract_call" }] },
+    ],
+    ME,
+    NOW,
+  );
+  assert.deepEqual(
+    items.map((item) => flowOf(item, ME)),
+    [null, null],
+  );
+});
+
+test("a stake that approves first is named by the stake, not the approval", () => {
+  const POOL = "15NZhQoewzsbVUcSVsZ8BEBEKgaBNPLLgZ";
+  const [row] = buildHistoryItems(
+    [
+      {
+        id: "stake",
+        operations: [
+          { type: "Contract Call", contract: KOIN.address, method: "approve" },
+          { type: "Contract Call", contract: VHP.address, method: "approve" },
+          { type: "Contract Call", contract: POOL, method: "stake" },
+        ],
+        actions: [{ type: "token_transfer", tokenTransfers: [{ token: VHP, amount: "2500000000000", from: ME, to: POOL }] }],
+      },
+    ],
+    ME,
+    NOW,
+  );
+  assert.equal(row.kind === "tx" && row.title, "Stake");
+  assert.equal(row.kind === "tx" && row.counterparty, POOL);
 });

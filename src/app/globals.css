@@ -2271,11 +2271,14 @@ button.ks-row:hover .ks-t {
   }
 }
 .ks-home-price {
-  margin-left: 22px;
-  color: var(--sub);
+  margin-bottom: 8px;
+  font-size: 15px;
   font-variant-numeric: tabular-nums;
 }
-.ks-home-price:hover b {
+.ks-home-price a {
+  color: var(--sub);
+}
+.ks-home-price a:hover b {
   text-decoration: underline;
   text-underline-offset: 3px;
 }
@@ -2291,10 +2294,42 @@ button.ks-row:hover .ks-t {
 .ks-price-now .down {
   color: var(--bad);
 }
+.ks-blockline {
+  display: flex;
+  justify-content: center;
+  align-items: baseline;
+}
+.ks-blockline > .ks-block,
+.ks-blockline > .ks-producer {
+  flex: 1 1 0;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ks-blockline > .ks-block {
+  text-align: right;
+  padding-right: 14px;
+}
+.ks-blockline > .ks-producer {
+  text-align: left;
+  padding-left: 14px;
+  border-left: 1px solid var(--line);
+}
 @media (max-width: 520px) {
-  .ks-home-price {
-    display: block;
-    margin: 4px 0 0;
+  .ks-blockline {
+    flex-direction: column;
+    align-items: center;
+  }
+  .ks-blockline > .ks-block,
+  .ks-blockline > .ks-producer {
+    flex: none;
+    text-align: center;
+    padding: 0;
+    border: 0;
+  }
+  .ks-blockline > .ks-producer {
+    margin-top: 4px;
   }
 }
 .ks-price {
@@ -2324,7 +2359,6 @@ button.ks-row:hover .ks-t {
   margin-bottom: 14px;
 }
 .ks-livebar .ks-producer {
-  margin-top: 4px;
   font-size: 13px;
   color: var(--faint);
 }

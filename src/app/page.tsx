@@ -116,36 +116,42 @@ export default function Home() {
         </div>
       </div>
       <div className="ks-livebar">
-        <div>
-          {/* Keyed on the height so the dot pings once per new block. */}
-          <span key={head?.height} className={head ? "ks-dot ks-ping" : "ks-dot"} />
-          {head ? (
-            <span>
-              Block{" "}
-              <b>
-                <RollingNumber value={fmt(head.height)} />
-              </b>
-              , just now
-            </span>
-          ) : (
-            <span>Connecting to the chain…</span>
-          )}
-          {quote && (
-            <Link href={`/contracts/${KOIN_CONTRACT_ID}`} className="ks-home-price">
+        <div className="ks-home-price">
+          {quote ? (
+            <Link href={`/contracts/${KOIN_CONTRACT_ID}`}>
               KOIN <b>{formatKoinUsd(quote.usd)}</b>
               {quote.change !== null && <span className={quote.change >= 0 ? "up" : "down"}>{formatChange(quote.change)}</span>}
             </Link>
-          )}
-        </div>
-        {/* The producer sits on its own line so a long or changing name never moves the block line. */}
-        <div className="ks-producer">
-          {producer ? (
-            <span key={producer}>
-              Produced by <b>{nameOf(producer)}</b>
-            </span>
           ) : (
             "\u00a0"
           )}
+        </div>
+        {/* Block and producer share a line split at the centre, so a long or changing name never moves the block number. */}
+        <div className="ks-blockline">
+          <span className="ks-block">
+            {/* Keyed on the height so the dot pings once per new block. */}
+            <span key={head?.height} className={head ? "ks-dot ks-ping" : "ks-dot"} />
+            {head ? (
+              <span>
+                Block{" "}
+                <b>
+                  <RollingNumber value={fmt(head.height)} />
+                </b>
+                , just now
+              </span>
+            ) : (
+              <span>Connecting to the chain…</span>
+            )}
+          </span>
+          <span className="ks-producer">
+            {producer ? (
+              <span key={producer}>
+                Produced by <b>{nameOf(producer)}</b>
+              </span>
+            ) : (
+              "\u00a0"
+            )}
+          </span>
         </div>
       </div>
     </section>

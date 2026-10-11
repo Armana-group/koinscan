@@ -1905,6 +1905,56 @@ button.ks-row:hover .ks-t {
   font-weight: 500;
   color: var(--ink);
 }
+.ks-ribbon {
+  margin: 4px 0 26px;
+}
+.ks-ribbon .row {
+  display: flex;
+  gap: 2px;
+  height: 14px;
+  margin-top: 8px;
+}
+.ks-ribbon .row a {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 0;
+  border-radius: 2px;
+  /* Softened so a hundred colours read calmly; the hovered block shows its full colour. */
+  opacity: 0.45;
+  transition: opacity 0.15s;
+}
+.ks-ribbon .row a.on {
+  opacity: 1;
+}
+.ks-ribbon .row a.dim {
+  opacity: 0.15;
+}
+.ks-ribbon .row a.tx::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: -7px;
+  width: 4px;
+  height: 4px;
+  margin-left: -2px;
+  border-radius: 50%;
+  background: var(--ink);
+}
+.ks-ribbon .row a:last-child {
+  animation: ks-ribbon-in 0.6s ease both;
+}
+@keyframes ks-ribbon-in {
+  from {
+    transform: scaleY(0.2);
+    opacity: 0;
+  }
+}
+@media (max-width: 520px) {
+  /* Fifty squares fit a phone; the older half is left out. */
+  .ks-ribbon .row a:nth-last-child(n + 51) {
+    display: none;
+  }
+}
 .ks-stack-bar {
   margin: 16px 0 8px;
 }

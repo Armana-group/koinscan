@@ -7,6 +7,8 @@ export interface SampledBlock {
   /** Milliseconds since the epoch. */
   timestamp: number;
   signer: string;
+  /** Transactions the block carried. */
+  txs?: number;
 }
 
 export interface WindowSummary {
@@ -36,3 +38,4 @@ export function summarise(blocks: readonly SampledBlock[]): WindowSummary {
   const blockTimes = blocks.slice(1).map((block, i) => ({ height: block.height, seconds: (block.timestamp - blocks[i].timestamp) / 1000 }));
   return { producers, averageBlockTime, blockTimes };
 }
+

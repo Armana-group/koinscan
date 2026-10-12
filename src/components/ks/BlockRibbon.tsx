@@ -35,6 +35,8 @@ export function BlockRibbon({ blocks, colourOf, nameOf }: { blocks: readonly Sam
           <Link
             key={block.height}
             href={`/blocks/${block.height}`}
+            // A hundred links that change every block: load a block's page on hover, not on sight.
+            prefetch={false}
             aria-label={`Block ${fmt(block.height)} by ${nameOf(block.signer)}`}
             style={{ background: colourOf(block.signer) }}
             className={[(block.txs ?? 0) > 0 ? "tx" : "", hover === i ? "on" : hover !== null ? "dim" : ""].filter(Boolean).join(" ") || undefined}

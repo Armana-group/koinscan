@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useWallet } from "@/contexts/WalletContext";
 import { useHead } from "@/hooks/useHead";
+import { fetchChain } from "@/koinos/chain-client";
 import { isKnownRpcNode } from "@/koinos/known-nodes";
 import { BusyBlockIndex, readBlockItems, spanText, type BlockItem, type BlockSummary, type BusyPage } from "@/lib/busy-blocks";
 import { ago, fmt, plural } from "@/lib/format";
@@ -76,6 +77,19 @@ export default function BlocksPage() {
     [provider, getBlocks],
   );
 
+  // The newest blocks at or above `from`, newest first: from the server's shared
+  // window for a trusted node, or read here from a custom node.
+  const fetchNewest = useCallback(
+    async (from: number, to: number): Promise<BlockSummary[]> => {
+      if (isKnownRpcNode(jsonRpcNode)) {
+        const items = await fetchChain<BlockSummary[]>("blocks", jsonRpcNode, { count: String(PAGE) });
+        return items.filter((block) => block.height >= from);
+      }
+      return fetchRange(from, Math.min(to - from + 1, PAGE));
+    },
+    [jsonRpcNode, fetchRange],
+  );
+
   // One page of busy blocks below `before`: from the server's index for a
   // trusted node, or by sweeping a custom node from here.
   const fetchBusy = useCallback(
@@ -108,7 +122,7 @@ export default function BlocksPage() {
     if (!provider || !head || newest.current !== null) return;
     let active = true;
     const start = Math.max(1, head.height - PAGE + 1);
-    fetchRange(start, head.height - start + 1)
+    fetchNewest(start, head.height)
       .then((items) => {
         if (!active) return;
         setBlocks(items);
@@ -126,7 +140,7 @@ export default function BlocksPage() {
     return () => {
       active = false;
     };
-  }, [provider, head, fetchRange]);
+  }, [provider, head, fetchNewest]);
 
   // The busy list loads the first time the filter asks for it. A result from a
   // node the visitor has since switched away from is dropped.
@@ -151,7 +165,7 @@ export default function BlocksPage() {
     if (!provider || !head || newest.current === null || head.height <= newest.current) return;
     let active = true;
     const from = newest.current + 1;
-    fetchRange(from, Math.min(head.height - newest.current, PAGE))
+    fetchNewest(from, head.height)
       .then((items) => {
         if (!active || !items.length) return;
         newest.current = items[0].height;
@@ -163,7 +177,7 @@ export default function BlocksPage() {
     return () => {
       active = false;
     };
-  }, [provider, head, fetchRange]);
+  }, [provider, head, fetchNewest]);
 
   // Relative times keep moving.
   useEffect(() => {

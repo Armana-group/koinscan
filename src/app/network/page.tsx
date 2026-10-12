@@ -1,19 +1,16 @@
 "use client";
 
-/**
- * VHP producing = difficulty / 300 (the PoB contract targets one block per
- * 300 ten-millisecond attempts), APY = 2% * virtual supply / VHP producing,
- * and a producer's expected block time is 10 * difficulty / VHP balance ms.
- * The same formulas as src/lib/fogata.ts and the Koinos block producer.
- */
-import { Contract, type ProviderInterface, utils } from "koilib";
+// The last hundred blocks and the chain's supply figures. For a trusted node
+// they come from /api/chain/network, shared by every visitor; a custom node is
+// read directly. The formulas behind the figures are in src/koinos/chain-reads.ts.
+import { type ProviderInterface } from "koilib";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useWallet } from "@/contexts/WalletContext";
 import { useHead } from "@/hooks/useHead";
 import { slide, summarise, type SampledBlock, type WindowSummary } from "@/lib/block-window";
-import tokenAbi from "@/koinos/abi";
-import { abiPob } from "@/koinos/abis";
-import { KOIN_CONTRACT_ID, POB_CONTRACT_ID, VHP_CONTRACT_ID } from "@/koinos/constants";
+import { fetchChain } from "@/koinos/chain-client";
+import { NETWORK_SAMPLE, readBlocks, readHead, readRecentBlocks, readStats, type ChainStats, type NetworkSnapshot } from "@/koinos/chain-reads";
+import { isKnownRpcNode } from "@/koinos/known-nodes";
 import { compact, fmt, short } from "@/lib/format";
 import { retry } from "@/lib/retry";
 import { Filters } from "@/components/ks/Controls";
@@ -26,44 +23,19 @@ import { BlockRibbon } from "@/components/ks/BlockRibbon";
 import { StackBar } from "@/components/ks/StackBar";
 import { pieColour } from "@/lib/pie";
 
-const SAMPLE = 100;
+const SAMPLE = NETWORK_SAMPLE;
 const SHOW = 12;
 type View = "producers" | "supply" | "yield";
-
-interface ChainStats {
-  totalVhp: number;
-  totalKoin: number;
-  vhpProducing: number;
-  apy: number;
-  difficulty: number;
-}
 
 type NetworkData = ChainStats & WindowSummary;
 
 // Supply and difficulty barely move; the block window updates on every new block.
 const STATS_EVERY_MS = 60_000;
 
-async function readBlocks(provider: ProviderInterface, from: number, count: number): Promise<SampledBlock[]> {
-  const blocks = await provider.getBlocks(from, count, "", { returnBlock: true, returnReceipt: false });
-  return blocks.map((b) => ({ height: Number(b.block.header!.height), timestamp: Number(b.block.header!.timestamp), signer: b.block.header!.signer!, txs: b.block.transactions?.length ?? 0 }));
-}
-
-async function readRecentBlocks(provider: ProviderInterface): Promise<SampledBlock[]> {
-  const head = await provider.getHeadInfo();
-  return readBlocks(provider, Number(head.head_topology.height) - SAMPLE, SAMPLE);
-}
-
-async function readStats(provider: ProviderInterface): Promise<ChainStats> {
-  const vhp = new Contract({ id: VHP_CONTRACT_ID, provider, abi: tokenAbi });
-  const koin = new Contract({ id: KOIN_CONTRACT_ID, provider, abi: tokenAbi });
-  const pob = new Contract({ id: POB_CONTRACT_ID, provider, abi: abiPob });
-  const [{ result: vhpSupply }, { result: koinSupply }, { result: metadata }] = await Promise.all([vhp.functions.totalSupply(), koin.functions.totalSupply(), pob.functions.get_metadata()]);
-  const totalVhp = Number(vhpSupply!.value) / 1e8;
-  const totalKoin = Number(koinSupply!.value) / 1e8;
-  const difficulty = Number("0x" + utils.toHexString(utils.decodeBase64url(metadata!.value.difficulty)));
-  const vhpProducing = (10 * difficulty) / 3000 / 1e8;
-  const apy = (2 * (totalVhp + totalKoin)) / vhpProducing;
-  return { totalVhp, totalKoin, vhpProducing, apy, difficulty };
+async function readSnapshot(provider: ProviderInterface): Promise<NetworkSnapshot> {
+  const head = await readHead(provider);
+  const [blocks, stats] = await Promise.all([readRecentBlocks(provider, head.height), readStats(provider)]);
+  return { blocks, stats };
 }
 
 interface Live {
@@ -82,16 +54,17 @@ export default function NetworkPage() {
   const [shown, setShown] = useState(SHOW);
   const [attempt, setAttempt] = useState(0);
   const key = `${jsonRpcNode}|${attempt}`;
+  const shared = isKnownRpcNode(jsonRpcNode);
   const fetching = useRef(false);
 
   // The first full read: the last hundred blocks and the chain's supply figures.
   useEffect(() => {
     if (!provider) return;
     let active = true;
-    // A hundred blocks in one request is what public nodes throttle first after
-    // a burst of page loads; two more tries a couple of seconds apart usually get through.
-    retry(() => Promise.all([readRecentBlocks(provider), readStats(provider)]), 3, 2000)
-      .then(([blocks, stats]) => active && setLive({ key, blocks, stats, error: false }))
+    const read = shared ? () => fetchChain<NetworkSnapshot>("network", jsonRpcNode) : () => readSnapshot(provider);
+    // A node can turn away a burst; two more tries a couple of seconds apart usually get through.
+    retry(read, 3, 2000)
+      .then(({ blocks, stats }) => active && setLive({ key, blocks, stats, error: false }))
       .catch((err) => {
         console.error("[network]", err);
         if (active) setLive({ key, blocks: [], stats: null, error: true });
@@ -99,27 +72,32 @@ export default function NetworkPage() {
     return () => {
       active = false;
     };
-  }, [provider, key]);
+  }, [provider, key, shared, jsonRpcNode]);
 
-  // Each new head: read only the blocks since the last one we have and slide them in.
+  // Each new head: the shared snapshot again (it is cached for everyone), or
+  // from a custom node only the blocks since the last one we have. Either way they slide in.
   const lastHeight = live?.key === key && !live.error ? live.blocks[live.blocks.length - 1]?.height : undefined;
   useEffect(() => {
     if (!provider || !head || lastHeight === undefined || head.height <= lastHeight || fetching.current) return;
     const count = Math.min(head.height - lastHeight, SAMPLE);
     fetching.current = true;
-    readBlocks(provider, head.height - count + 1, count)
-      .then((incoming) => setLive((previous) => (previous && previous.key === key ? { ...previous, blocks: slide(previous.blocks, incoming, SAMPLE) } : previous)))
+    const next: Promise<{ blocks: SampledBlock[]; stats?: ChainStats }> = shared
+      ? fetchChain<NetworkSnapshot>("network", jsonRpcNode)
+      : readBlocks(provider, head.height - count + 1, count).then((blocks) => ({ blocks }));
+    next
+      .then(({ blocks, stats }) => setLive((previous) => (previous && previous.key === key ? { ...previous, blocks: slide(previous.blocks, blocks, SAMPLE), stats: stats ?? previous.stats } : previous)))
       // A missed update is fine: the next block asks again from the same place.
       .catch((err) => console.info("[network] new blocks unavailable:", err))
       .finally(() => {
         fetching.current = false;
       });
-  }, [provider, head, lastHeight, key]);
+  }, [provider, head, lastHeight, key, shared, jsonRpcNode]);
 
-  // Supply and yield, refreshed now and then while the tab is in view.
+  // Supply and yield from a custom node, refreshed now and then while the tab
+  // is in view. The shared snapshot already carries fresh figures.
   const loaded = live?.key === key && !live.error;
   useEffect(() => {
-    if (!provider || !loaded) return;
+    if (!provider || !loaded || shared) return;
     const timer = setInterval(() => {
       if (document.visibilityState === "hidden") return;
       readStats(provider)
@@ -127,7 +105,7 @@ export default function NetworkPage() {
         .catch((err) => console.info("[network] supply unavailable:", err));
     }, STATS_EVERY_MS);
     return () => clearInterval(timer);
-  }, [provider, loaded, key]);
+  }, [provider, loaded, key, shared]);
 
   const current = live?.key === key ? live : null;
   const error = current?.error ?? false;

@@ -266,6 +266,7 @@ strong {
   line-height: 1.4;
   font-weight: 400;
   font-family: inherit;
+  animation: ks-appear 0.3s ease-out backwards;
 }
 .ks-burger {
   width: 44px;
@@ -2774,8 +2775,79 @@ button.ks-row:hover .ks-t {
   text-underline-offset: 3px;
 }
 
+/* ------------------------------------------------------------------ entrances
+   Quiet by design: short fades with a few pixels of rise, nothing that loops. */
+@keyframes ks-rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+@keyframes ks-appear {
+  from {
+    opacity: 0;
+  }
+}
+/* A page settles in when you arrive on it. */
+.ks-main {
+  animation: ks-rise 0.35s ease-out backwards;
+}
+/* Rows fade in when they replace the loading placeholders, the first few a beat apart. */
+.ks-list > .ks-row,
+.ks-list > .ks-run {
+  animation: ks-appear 0.4s ease-out backwards;
+}
+.ks-list > :nth-child(2) {
+  animation-delay: 30ms;
+}
+.ks-list > :nth-child(3) {
+  animation-delay: 60ms;
+}
+.ks-list > :nth-child(4) {
+  animation-delay: 90ms;
+}
+.ks-list > :nth-child(5) {
+  animation-delay: 120ms;
+}
+.ks-list > :nth-child(n + 6) {
+  animation-delay: 150ms;
+}
+/* Charts and detail lines fade in, so switching a tab cross-fades instead of jumping. */
+.ks-pie,
+.ks-stack-bar,
+.ks-spikes,
+.ks-price,
+.ks-ribbon,
+.ks-lines {
+  animation: ks-rise 0.4s ease-out backwards;
+}
+/* The gold flash on a row that just arrived keeps priority over the fade. */
+.ks-list > .ks-row.new {
+  animation: ks-enter 0.6s ease;
+}
+.ks-filters button {
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease;
+}
+.ks-share i,
+.ks-stack-bar .bar i {
+  transition: width 0.5s ease, flex-grow 0.5s ease;
+}
+
 /* ------------------------------------------------------------------ motion + mobile */
 @media (prefers-reduced-motion: reduce) {
+  .ks-kbd,
+  .ks-main,
+  .ks-list > .ks-row,
+  .ks-list > .ks-run,
+  .ks-pie,
+  .ks-stack-bar,
+  .ks-spikes,
+  .ks-price,
+  .ks-ribbon,
+  .ks-ribbon .row a,
+  .ks-lines,
   .ks-glow,
   .ks-row.new,
   .ks-livebar .ks-ping::after,

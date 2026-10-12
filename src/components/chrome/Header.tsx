@@ -19,7 +19,7 @@ export function Header() {
         <button type="button" className="ks-search" onClick={openSearch} aria-label="Search">
           <SearchIcon />
           <span>Search</span>
-          <kbd className="ks-kbd">{shortcut}</kbd>
+          {shortcut && <kbd className="ks-kbd">{shortcut}</kbd>}
         </button>
       )}
       <div className="ks-right">

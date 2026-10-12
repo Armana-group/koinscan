@@ -54,3 +54,4 @@ test("an empty or single-block window has no gaps", () => {
   assert.equal(summarise([]).averageBlockTime, 0);
   assert.deepEqual(summarise([block(1, "a")]).blockTimes, []);
 });
+

@@ -266,6 +266,7 @@ strong {
   line-height: 1.4;
   font-weight: 400;
   font-family: inherit;
+  animation: ks-appear 0.3s ease-out backwards;
 }
 .ks-burger {
   width: 44px;
@@ -1905,6 +1906,56 @@ button.ks-row:hover .ks-t {
   font-weight: 500;
   color: var(--ink);
 }
+.ks-ribbon {
+  margin: 4px 0 26px;
+}
+.ks-ribbon .row {
+  display: flex;
+  gap: 2px;
+  height: 14px;
+  margin-top: 8px;
+}
+.ks-ribbon .row a {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 0;
+  border-radius: 2px;
+  /* Softened so a hundred colours read calmly; the hovered block shows its full colour. */
+  opacity: 0.45;
+  transition: opacity 0.15s;
+}
+.ks-ribbon .row a.on {
+  opacity: 1;
+}
+.ks-ribbon .row a.dim {
+  opacity: 0.15;
+}
+.ks-ribbon .row a.tx::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: -7px;
+  width: 4px;
+  height: 4px;
+  margin-left: -2px;
+  border-radius: 50%;
+  background: var(--ink);
+}
+.ks-ribbon .row a:last-child {
+  animation: ks-ribbon-in 0.6s ease both;
+}
+@keyframes ks-ribbon-in {
+  from {
+    transform: scaleY(0.2);
+    opacity: 0;
+  }
+}
+@media (max-width: 520px) {
+  /* Fifty squares fit a phone; the older half is left out. */
+  .ks-ribbon .row a:nth-last-child(n + 51) {
+    display: none;
+  }
+}
 .ks-stack-bar {
   margin: 16px 0 8px;
 }
@@ -2724,8 +2775,79 @@ button.ks-row:hover .ks-t {
   text-underline-offset: 3px;
 }
 
+/* ------------------------------------------------------------------ entrances
+   Quiet by design: short fades with a few pixels of rise, nothing that loops. */
+@keyframes ks-rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+@keyframes ks-appear {
+  from {
+    opacity: 0;
+  }
+}
+/* A page settles in when you arrive on it. */
+.ks-main {
+  animation: ks-rise 0.35s ease-out backwards;
+}
+/* Rows fade in when they replace the loading placeholders, the first few a beat apart. */
+.ks-list > .ks-row,
+.ks-list > .ks-run {
+  animation: ks-appear 0.4s ease-out backwards;
+}
+.ks-list > :nth-child(2) {
+  animation-delay: 30ms;
+}
+.ks-list > :nth-child(3) {
+  animation-delay: 60ms;
+}
+.ks-list > :nth-child(4) {
+  animation-delay: 90ms;
+}
+.ks-list > :nth-child(5) {
+  animation-delay: 120ms;
+}
+.ks-list > :nth-child(n + 6) {
+  animation-delay: 150ms;
+}
+/* Charts and detail lines fade in, so switching a tab cross-fades instead of jumping. */
+.ks-pie,
+.ks-stack-bar,
+.ks-spikes,
+.ks-price,
+.ks-ribbon,
+.ks-lines {
+  animation: ks-rise 0.4s ease-out backwards;
+}
+/* The gold flash on a row that just arrived keeps priority over the fade. */
+.ks-list > .ks-row.new {
+  animation: ks-enter 0.6s ease;
+}
+.ks-filters button {
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease;
+}
+.ks-share i,
+.ks-stack-bar .bar i {
+  transition: width 0.5s ease, flex-grow 0.5s ease;
+}
+
 /* ------------------------------------------------------------------ motion + mobile */
 @media (prefers-reduced-motion: reduce) {
+  .ks-kbd,
+  .ks-main,
+  .ks-list > .ks-row,
+  .ks-list > .ks-run,
+  .ks-pie,
+  .ks-stack-bar,
+  .ks-spikes,
+  .ks-price,
+  .ks-ribbon,
+  .ks-ribbon .row a,
+  .ks-lines,
   .ks-glow,
   .ks-row.new,
   .ks-livebar .ks-ping::after,

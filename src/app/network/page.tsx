@@ -22,7 +22,7 @@ import { Avatar, More, Row } from "@/components/ks/Row";
 import { KV, Lines } from "@/components/ks/Advanced";
 import { useNameOf } from "@/components/ks/Named";
 import { ProducerPie } from "@/components/ks/ProducerPie";
-import { LineChart } from "@/components/ks/LineChart";
+import { BlockRibbon } from "@/components/ks/BlockRibbon";
 import { StackBar } from "@/components/ks/StackBar";
 import { pieColour } from "@/lib/pie";
 
@@ -45,7 +45,7 @@ const STATS_EVERY_MS = 60_000;
 
 async function readBlocks(provider: ProviderInterface, from: number, count: number): Promise<SampledBlock[]> {
   const blocks = await provider.getBlocks(from, count, "", { returnBlock: true, returnReceipt: false });
-  return blocks.map((b) => ({ height: Number(b.block.header!.height), timestamp: Number(b.block.header!.timestamp), signer: b.block.header!.signer! }));
+  return blocks.map((b) => ({ height: Number(b.block.header!.height), timestamp: Number(b.block.header!.timestamp), signer: b.block.header!.signer!, txs: b.block.transactions?.length ?? 0 }));
 }
 
 async function readRecentBlocks(provider: ProviderInterface): Promise<SampledBlock[]> {
@@ -135,7 +135,11 @@ export default function NetworkPage() {
   const data: NetworkData | null = summary && current?.stats ? { ...summary, ...current.stats } : null;
   const producers = useMemo(() => summary?.producers ?? [], [summary]);
   const maxShare = producers[0]?.share ?? 1;
-  const blockLine = useMemo(() => (summary?.blockTimes ?? []).map((b) => ({ x: b.height, y: b.seconds })), [summary]);
+  // The ribbon and the ring share colours: a producer's colour follows its rank by share.
+  const colourOf = useMemo(() => {
+    const rank = new Map(producers.map((p, i) => [p.address, i]));
+    return (signer: string) => pieColour(rank.get(signer) ?? producers.length);
+  }, [producers]);
 
   return (
     <Page list>
@@ -149,21 +153,7 @@ export default function NetworkPage() {
           "A block every 3 seconds."
         )}
       </Lede>
-      {data && blockLine.length > 1 && (
-        <LineChart
-          points={blockLine}
-          height={56}
-          colour="var(--faint)"
-          reference={3}
-          label={`Seconds between each of the last ${SAMPLE} blocks`}
-          idle={<>Seconds between each of the last {SAMPLE} blocks · dashed line is the 3 second target</>}
-          readout={(p) => (
-            <>
-              Block {fmt(p.x)} · <b>{p.y.toFixed(1)} s</b> after the one before
-            </>
-          )}
-        />
-      )}
+      {data && current && current.blocks.length > 1 && <BlockRibbon blocks={current.blocks} colourOf={colourOf} nameOf={(address) => nameOf(address)} />}
       <Filters
         top
         options={[

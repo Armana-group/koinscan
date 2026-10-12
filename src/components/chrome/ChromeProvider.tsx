@@ -136,9 +136,10 @@ export function useChrome(): ChromeState {
 
 const noop = () => () => {};
 const shortcutOnClient = () => (/Mac|iPhone|iPad/.test(navigator.platform) ? "⌘K" : "Ctrl K");
-const shortcutOnServer = () => "⌘K";
+// The server cannot tell the visitor's computer, so it renders no label rather than a wrong one.
+const shortcutOnServer = () => "";
 
-/** ⌘K on Apple platforms, Ctrl K elsewhere; the server renders ⌘K. */
+/** ⌘K on Apple platforms, Ctrl K elsewhere; empty until the browser knows which. */
 export function useShortcutLabel(): string {
   return useSyncExternalStore(noop, shortcutOnClient, shortcutOnServer);
 }

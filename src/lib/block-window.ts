@@ -19,8 +19,8 @@ export interface WindowSummary {
 }
 
 /** Adds blocks to the window, ignoring ones already in it, and keeps the newest `size`. */
-export function slide(window: readonly SampledBlock[], incoming: readonly SampledBlock[], size: number): SampledBlock[] {
-  const byHeight = new Map<number, SampledBlock>();
+export function slide<T extends { height: number }>(window: readonly T[], incoming: readonly T[], size: number): T[] {
+  const byHeight = new Map<number, T>();
   for (const block of window) byHeight.set(block.height, block);
   for (const block of incoming) byHeight.set(block.height, block);
   return [...byHeight.values()].sort((a, b) => a.height - b.height).slice(-size);

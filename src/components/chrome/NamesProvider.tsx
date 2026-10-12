@@ -1,13 +1,13 @@
 "use client";
 
 // Names for addresses, merged from the static list and the Fogata pool
-// registry (fetched once per provider). Pages ask `nameOf(address)`.
-import { Contract, Multicall } from "koilib";
+// registry (fetched once per node, through /api/chain for a trusted node).
+// Pages ask `nameOf(address)`.
 import { createContext, useContext, useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
 import { useWallet } from "@/contexts/WalletContext";
-import { abiFogata2ListPools } from "@/koinos/abis/fogata2ListPools";
-import { abiFogata2Pool } from "@/koinos/abis/fogata2Pool";
-import { FOGATA2_LIST_POOLS_CONTRACT_ID } from "@/koinos/constants";
+import { fetchChain } from "@/koinos/chain-client";
+import { readPoolNames } from "@/koinos/chain-reads";
+import { isKnownRpcNode } from "@/koinos/known-nodes";
 import { staticName } from "@/lib/names";
 import { retry } from "@/lib/retry";
 
@@ -41,7 +41,7 @@ interface Names {
 const NamesContext = createContext<Names>({ nameOf: staticName, pools: new Set() });
 
 export function NamesProvider({ children }: { children: ReactNode }) {
-  const { provider } = useWallet();
+  const { provider, jsonRpcNode } = useWallet();
   const [fetched, setFetched] = useState<Record<string, string> | null>(null);
   const stored = useSyncExternalStore(noop, storedOnClient, storedOnServer);
   const poolNames = fetched ?? stored;
@@ -49,28 +49,12 @@ export function NamesProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!provider) return;
     let active = true;
-    // The public node turns away bursts (its refusals look like network errors
-    // in the browser), and this read starts alongside the page's own, so try a
-    // few times before settling for the stored or static names.
-    const read = async () => {
-      const list = new Contract({ id: FOGATA2_LIST_POOLS_CONTRACT_ID, provider, abi: abiFogata2ListPools });
-      const { result } = await list.functions.get_pools({ start: "", limit: 100, direction: 0 });
-      const listed: { account: string }[] = result?.value ?? [];
-      if (!listed.length) return null;
-      const contracts = listed.map((pool) => new Contract({ id: pool.account, provider, abi: abiFogata2Pool }));
-      const multicall = new Multicall({ provider, contracts });
-      for (const contract of contracts) await multicall.add(contract.functions.get_pool_params, {});
-      const params = await multicall.call();
-      const names: Record<string, string> = {};
-      listed.forEach((pool, index) => {
-        const value = params[index] as { name?: string } | Error;
-        if (!(value instanceof Error) && value?.name) names[pool.account] = value.name;
-      });
-      return names;
-    };
+    // The node can turn away a burst (its refusals look like network errors in
+    // the browser), so try a few times before settling for the stored or static names.
+    const read = isKnownRpcNode(jsonRpcNode) ? () => fetchChain<Record<string, string>>("pool-names", jsonRpcNode) : () => readPoolNames(provider);
     retry(read, 4, 2500)
       .then((names) => {
-        if (!active || !names) return;
+        if (!active || !Object.keys(names).length) return;
         setFetched(names);
         try {
           localStorage.setItem(STORAGE_KEY, JSON.stringify(names));
@@ -82,7 +66,7 @@ export function NamesProvider({ children }: { children: ReactNode }) {
     return () => {
       active = false;
     };
-  }, [provider]);
+  }, [provider, jsonRpcNode]);
 
   const value = useMemo<Names>(
     () => ({

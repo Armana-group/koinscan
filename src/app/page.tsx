@@ -14,6 +14,7 @@ import { RollingNumber } from "@/components/ks/RollingNumber";
 import { useWallet } from "@/contexts/WalletContext";
 import { useEffect } from "react";
 import { useKoinQuote } from "@/hooks/useKoinPrice";
+import { readSigner } from "@/koinos/chain-reads";
 import { KOIN_CONTRACT_ID } from "@/koinos/constants";
 import { formatChange, formatKoinUsd } from "@/lib/price";
 
@@ -32,20 +33,19 @@ export default function Home() {
   const { provider } = useWallet();
   const nameOf = useNameOf();
   const [value, setValue] = useState("");
-  const [producer, setProducer] = useState<string>("");
+  const [askedProducer, setProducer] = useState<string>("");
   // The full hint only fits on wide screens; narrower phones get shorter wording so it isn't cut off.
   const phone = useMediaQuery("(max-width: 760px)");
   const narrow = useMediaQuery("(max-width: 374px)");
   const hint = narrow ? "Search Koinos" : phone ? "Address, @name, tx or block" : "Search an address, @nickname, transaction or block";
 
-  // Who produced the head block, for the live line.
+  // Who produced the head block, for the live line. The shared head already
+  // says; a custom node is asked directly.
   useEffect(() => {
-    if (!provider || !head) return;
+    if (!provider || !head || head.signer) return;
     let active = true;
-    provider
-      .getBlocks(head.height, 1, head.id, { returnBlock: true, returnReceipt: false })
-      .then((items) => {
-        const signer = items[0]?.block?.header?.signer;
+    readSigner(provider, head)
+      .then((signer) => {
         if (active && signer) setProducer(signer);
       })
       .catch(() => undefined);
@@ -53,6 +53,8 @@ export default function Home() {
       active = false;
     };
   }, [provider, head]);
+
+  const producer = head?.signer ?? askedProducer;
 
   const submit = async (text: string) => {
     if (await go(text)) setValue("");

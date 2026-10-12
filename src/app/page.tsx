@@ -101,7 +101,7 @@ export default function Home() {
             disabled={busy}
             {...{ [HOME_SEARCH_ATTRIBUTE]: "" }}
           />
-          <kbd className="ks-kbd">{shortcut}</kbd>
+          {shortcut && <kbd className="ks-kbd">{shortcut}</kbd>}
           <SearchIcon className="ks-ic" />
           <button type="submit" className="ks-go" aria-label="Search" disabled={busy || !value.trim()}>
             <ArrowIcon />

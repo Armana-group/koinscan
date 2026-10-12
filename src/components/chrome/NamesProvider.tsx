@@ -4,10 +4,9 @@
 // registry (fetched once per node, through /api/chain for a trusted node).
 // Pages ask `nameOf(address)`.
 import { createContext, useContext, useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
-import { useWallet } from "@/contexts/WalletContext";
+import { useChainSource } from "@/hooks/useChainSource";
 import { fetchChain } from "@/koinos/chain-client";
 import { readPoolNames } from "@/koinos/chain-reads";
-import { isKnownRpcNode } from "@/koinos/known-nodes";
 import { staticName } from "@/lib/names";
 import { retry } from "@/lib/retry";
 
@@ -41,17 +40,17 @@ interface Names {
 const NamesContext = createContext<Names>({ nameOf: staticName, pools: new Set() });
 
 export function NamesProvider({ children }: { children: ReactNode }) {
-  const { provider, jsonRpcNode } = useWallet();
+  const { node, shared, direct } = useChainSource();
   const [fetched, setFetched] = useState<Record<string, string> | null>(null);
   const stored = useSyncExternalStore(noop, storedOnClient, storedOnServer);
   const poolNames = fetched ?? stored;
 
   useEffect(() => {
-    if (!provider) return;
+    if (!shared && !direct) return;
     let active = true;
     // The node can turn away a burst (its refusals look like network errors in
     // the browser), so try a few times before settling for the stored or static names.
-    const read = isKnownRpcNode(jsonRpcNode) ? () => fetchChain<Record<string, string>>("pool-names", jsonRpcNode) : () => readPoolNames(provider);
+    const read = direct ? () => readPoolNames(direct) : () => fetchChain<Record<string, string>>("pool-names", node);
     retry(read, 4, 2500)
       .then((names) => {
         if (!active || !Object.keys(names).length) return;
@@ -66,7 +65,7 @@ export function NamesProvider({ children }: { children: ReactNode }) {
     return () => {
       active = false;
     };
-  }, [provider, jsonRpcNode]);
+  }, [node, shared, direct]);
 
   const value = useMemo<Names>(
     () => ({

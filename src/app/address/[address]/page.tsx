@@ -2,13 +2,13 @@
 
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Contract, utils } from "koilib";
-import tokenAbi from "@/koinos/abi";
 import { useWallet } from "@/contexts/WalletContext";
 import { useNames } from "@/components/chrome/NamesProvider";
+import { useChainSource } from "@/hooks/useChainSource";
 import { useKoinPrice } from "@/hooks/useKoinPrice";
 import { useWalletBalances } from "@/hooks/useWalletBalances";
-import { NICKNAMES_CONTRACT_ID } from "@/koinos/constants";
+import { fetchChain } from "@/koinos/chain-client";
+import { readNickname, readTokenBalances } from "@/koinos/chain-reads";
 import { formatDetailedTransactions, getDetailedAccountHistory, getTransactionDetails, type DetailedTransaction } from "@/lib/api";
 import { ago, fmt, fmtRaw, plural, short } from "@/lib/format";
 import { buildHistoryItems, flowOf, summarizeActivity, type HistoryItem, type TxRow } from "@/lib/history-rows";
@@ -19,24 +19,12 @@ import { CopyButton } from "@/components/ks/Advanced";
 import { Filters, Toggle } from "@/components/ks/Controls";
 import { Crumb, Empty, H2, Page, RowSkeleton, Section, Title } from "@/components/ks/Page";
 import { Avatar, GlyphMark, ListMark, More, Row, TokenMark } from "@/components/ks/Row";
-import { applyTokenMeta, resolveTokenMeta, unknownTokenAddresses, type TokenMeta } from "@/lib/token-meta";
+import { applyTokenMeta, readTokenMeta, resolveTokenMeta, unknownTokenAddresses, type TokenMeta } from "@/lib/token-meta";
 import { useNameOf } from "@/components/ks/Named";
 import { SpikeChart, type SpikeEntry } from "@/components/ks/SpikeChart";
 
 const PAGE_SIZE = 25;
 type Filter = "all" | "received" | "sent" | "contracts" | "blocks";
-
-async function lookupNickname(provider: NonNullable<ReturnType<typeof useWallet>["provider"]>, address: string): Promise<string | null> {
-  try {
-    const nicknames = new Contract({ id: NICKNAMES_CONTRACT_ID, provider, abi: utils.nicknamesAbi });
-    const { result } = await nicknames.functions.get_main_token({ value: address });
-    if (!result?.token_id) return null;
-    const name = new TextDecoder().decode(utils.toUint8Array(String(result.token_id).slice(2)));
-    return name || null;
-  } catch {
-    return null;
-  }
-}
 
 function BlockRun({ run, advanced }: { run: Extract<HistoryItem, { kind: "run" }>; advanced: boolean }) {
   const [open, setOpen] = useState(false);
@@ -73,7 +61,8 @@ function BlockRun({ run, advanced }: { run: Extract<HistoryItem, { kind: "run" }
 
 export default function AddressPage() {
   const { address } = useParams<{ address: string }>();
-  const { rpcNode, provider } = useWallet();
+  const { rpcNode } = useWallet();
+  const { node, shared, direct } = useChainSource();
   const { nameOf, pools } = useNames();
   const nameFor = useNameOf();
   const price = useKoinPrice();
@@ -87,33 +76,37 @@ export default function AddressPage() {
   const unknownKey = unknownTokens.join(",");
   const [meta, setMeta] = useState<{ key: string; map: Map<string, TokenMeta | null> }>();
   useEffect(() => {
-    if (!provider || !unknownKey) return;
+    if ((!shared && !direct) || !unknownKey) return;
     let active = true;
-    resolveTokenMeta(provider, unknownKey.split(",")).then((map) => active && setMeta({ key: unknownKey, map }));
+    const read = (missing: string[]) => (direct ? readTokenMeta(direct, missing) : fetchChain<Record<string, TokenMeta | null>>("token-meta", node, { tokens: missing.join(",") }));
+    resolveTokenMeta(unknownKey.split(","), read)
+      .then((map) => active && setMeta({ key: unknownKey, map }))
+      .catch(() => undefined);
     return () => {
       active = false;
     };
-  }, [provider, unknownKey]);
+  }, [node, shared, direct, unknownKey]);
   const namedRows = useMemo(() => (meta?.key === unknownKey ? applyTokenMeta(rows as Parameters<typeof applyTokenMeta>[0], meta.map) : rows), [rows, meta, unknownKey]);
   // Balances of those off-list tokens, so Holds shows them too.
   const offList = useMemo(() => (meta?.key === unknownKey ? [...meta.map.values()].filter((m): m is TokenMeta => Boolean(m)) : []), [meta, unknownKey]);
   const offListKey = `${address}|${offList.map((m) => m.address).join(",")}`;
   const [extra, setExtra] = useState<{ key: string; list: { meta: TokenMeta; value: number }[] }>();
   useEffect(() => {
-    if (!provider || !offList.length) return;
+    if ((!shared && !direct) || !offList.length) return;
     let active = true;
-    Promise.all(
-      offList.map(async (m) => {
-        const contract = new Contract({ id: m.address, provider, abi: tokenAbi });
-        const { result } = await contract.functions.balanceOf({ owner: address }).catch(() => ({ result: undefined }));
-        return { meta: m, value: Number((result as { value?: string } | undefined)?.value ?? 0) / 10 ** m.decimals };
-      }),
-    ).then((list) => active && setExtra({ key: offListKey, list: list.filter((item) => item.value > 0) }));
+    const tokens = offList.map((m) => m.address).sort();
+    const read = direct ? readTokenBalances(direct, address, tokens) : fetchChain<Record<string, string>>("token-balances", node, { address, tokens: tokens.join(",") });
+    read
+      .then((raw) => {
+        const list = offList.map((m) => ({ meta: m, value: Number(raw[m.address] ?? 0) / 10 ** m.decimals }));
+        if (active) setExtra({ key: offListKey, list: list.filter((item) => item.value > 0) });
+      })
+      .catch(() => undefined);
     return () => {
       active = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [provider, address, offListKey]);
+  }, [node, shared, direct, address, offListKey]);
   const extraBalances = extra?.key === offListKey ? extra.list : [];
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -123,14 +116,15 @@ export default function AddressPage() {
   const [advanced, setAdvanced] = useState(false);
 
   useEffect(() => {
-    if (!provider || !address) return;
+    if ((!shared && !direct) || !address) return;
     let active = true;
     setNickname(null);
-    lookupNickname(provider, address).then((name) => active && setNickname(name));
+    const read = direct ? readNickname(direct, address) : fetchChain<{ nickname: string | null }>("nickname", node, { address }).then((answer) => answer.nickname);
+    read.then((name) => active && setNickname(name)).catch(() => undefined);
     return () => {
       active = false;
     };
-  }, [provider, address]);
+  }, [node, shared, direct, address]);
 
   // History: the first page, then "Earlier" pages appended below.
   const fetchPage = useCallback(

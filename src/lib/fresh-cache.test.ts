@@ -45,3 +45,14 @@ test("keys are separate", async () => {
   assert.equal(await cache("a", async () => "a"), "a");
   assert.equal(await cache("b", async () => "b"), "b");
 });
+
+test("past the size limit the oldest keys are dropped", async () => {
+  let reads = 0;
+  const cache = freshCache<number>(60_000, 60_000, Date.now, 2);
+  const load = async () => ++reads;
+  await cache("a", load);
+  await cache("b", load);
+  await cache("c", load);
+  assert.equal(await cache("c", load), 3);
+  assert.equal(await cache("a", load), 4);
+});

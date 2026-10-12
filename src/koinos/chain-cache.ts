@@ -4,11 +4,12 @@
 // handful of node requests every few seconds however many people are reading.
 import { Provider } from "koilib";
 import { slide, type SampledBlock } from "@/lib/block-window";
-import { readBlockItems, type BlockItem, type BlockSummary } from "@/lib/busy-blocks";
+import { CHUNK, readBlockItems, type BlockItem, type BlockSummary } from "@/lib/busy-blocks";
 import { freshCache } from "@/lib/fresh-cache";
 import { retry } from "@/lib/retry";
 import { DEFAULT_JSON_RPC_NODE, KNOWN_RPC_ORIGINS, normalizeRpcOrigin } from "@/koinos/known-nodes";
-import { NETWORK_SAMPLE, readHead, readPoolNames, readSigner, readStats, type ChainHead, type ChainStats, type NetworkSnapshot } from "@/koinos/chain-reads";
+import { readTokenMeta, type TokenMeta } from "@/lib/token-meta";
+import { NETWORK_SAMPLE, readBlockHeight, readHead, readNickname, readPoolNames, readSigner, readStats, readTokenBalances, type ChainHead, type ChainStats, type NetworkSnapshot } from "@/koinos/chain-reads";
 
 /** The trusted node a request names, or the default; null for anything else. */
 export function trustedOrigin(request: Request): string | null {
@@ -24,10 +25,23 @@ const stats = freshCache<ChainStats>(60_000, 30 * 60_000);
 const recent = freshCache<BlockSummary[]>(2_000);
 // Pool names change when someone renames a pool, which is rare.
 const poolNames = freshCache<Record<string, string>>(10 * 60_000, 24 * 60 * 60_000);
+// Final blocks never change: a hundred at a time, kept for a day.
+const settled = freshCache<BlockSummary[]>(24 * 60 * 60_000, 24 * 60 * 60_000, Date.now, 500);
+// Blocks that could still be replaced, for the few seconds until the next one.
+const unsettled = freshCache<BlockSummary[]>(2_000);
+// A block's height never changes once its id is known.
+const heights = freshCache<number | null>(24 * 60 * 60_000, 24 * 60 * 60_000, Date.now, 5000);
+// Nicknames change when their owner sets a new main one.
+const nicknames = freshCache<string | null>(10 * 60_000, 24 * 60 * 60_000, Date.now, 5000);
+// What a token calls itself is set when it is deployed. A contract that did not
+// answer reads as "not a token", so that is asked again after an hour.
+const tokenMetas = freshCache<Record<string, TokenMeta | null>>(60 * 60_000, 24 * 60 * 60_000, Date.now, 2000);
+// Balances move with every transfer; this only absorbs a burst of the same question.
+const tokenBalances = freshCache<Record<string, string>>(5_000, 60_000, Date.now, 2000);
 const windows = new Map<string, BlockSummary[]>();
 const providers = new Map<string, Provider>();
 
-function providerFor(origin: string): Provider {
+export function providerFor(origin: string): Provider {
   let provider = providers.get(origin);
   if (!provider) {
     provider = new Provider([origin]);
@@ -83,4 +97,43 @@ export async function latestBlocksFor(origin: string, count: number): Promise<Bl
 
 export function poolNamesFor(origin: string): Promise<Record<string, string>> {
   return poolNames(origin, () => patiently(() => readPoolNames(providerFor(origin))));
+}
+
+/** Blocks `from` to `from + count - 1` (stopping at the head), newest first, and whether all of them are final. */
+export async function rangeFor(origin: string, from: number, count: number): Promise<{ blocks: BlockSummary[]; final: boolean }> {
+  const head = await headFor(origin);
+  const to = Math.min(from + count - 1, head.height);
+  if (to < from) return { blocks: [], final: false };
+  const held = windows.get(origin);
+  let blocks: BlockSummary[] = [];
+  if (held?.length && held[0].height <= from && held[held.length - 1].height >= to) {
+    blocks = held.filter((block) => block.height >= from && block.height <= to);
+  } else {
+    // Whole hundreds, so everyone paging back shares the same reads.
+    const provider = providerFor(origin);
+    for (let start = Math.floor((from - 1) / CHUNK) * CHUNK + 1; start <= to; start += CHUNK) {
+      const end = Math.min(start + CHUNK - 1, head.height);
+      const read = () => patiently(() => provider.getBlocks(start, end - start + 1, "", { returnBlock: true, returnReceipt: false }) as Promise<BlockItem[]>).then(readBlockItems);
+      const chunk = end <= head.lastIrreversible ? await settled(`${origin}|${start}`, read) : await unsettled(`${origin}|${start}|${end}`, read);
+      blocks.push(...chunk.filter((block) => block.height >= from && block.height <= to));
+    }
+  }
+  return { blocks: blocks.sort((a, b) => b.height - a.height), final: to <= head.lastIrreversible };
+}
+
+export function blockHeightFor(origin: string, id: string): Promise<number | null> {
+  return heights(`${origin}|${id}`, () => patiently(() => readBlockHeight(providerFor(origin), id)));
+}
+
+export function nicknameFor(origin: string, address: string): Promise<string | null> {
+  return nicknames(`${origin}|${address}`, () => patiently(() => readNickname(providerFor(origin), address)));
+}
+
+/** Name, symbol and decimals of tokens that are not on the KoinDX list. */
+export function tokenMetaFor(origin: string, tokens: string[]): Promise<Record<string, TokenMeta | null>> {
+  return tokenMetas(`${origin}|${tokens.join(",")}`, () => readTokenMeta(providerFor(origin), tokens));
+}
+
+export function tokenBalancesFor(origin: string, owner: string, tokens: string[]): Promise<Record<string, string>> {
+  return tokenBalances(`${origin}|${owner}|${tokens.join(",")}`, () => readTokenBalances(providerFor(origin), owner, tokens));
 }

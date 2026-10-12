@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { Provider } from "koilib";
+import { headFor, providerFor } from "@/koinos/chain-cache";
 import { DEFAULT_JSON_RPC_NODE, KNOWN_RPC_ORIGINS, normalizeRpcOrigin } from "@/koinos/known-nodes";
 import { BusyBlockIndex, type BlockItem } from "@/lib/busy-blocks";
 import { retry } from "@/lib/retry";
@@ -32,10 +32,9 @@ export async function GET(request: Request) {
   if (before === 0) return NextResponse.json({ error: "Invalid before height" }, { status: 400 });
 
   try {
-    const provider = new Provider([rpcOrigin]);
-    const headInfo = await provider.getHeadInfo();
-    const head = Number(headInfo.head_topology.height);
-    const headId = headInfo.head_topology.id;
+    const provider = providerFor(rpcOrigin);
+    // The same shared head as the rest of the site, so this asks the node only for blocks.
+    const { height: head, id: headId } = await headFor(rpcOrigin);
     // Public nodes throttle a burst of reads; waiting a moment and asking again usually works.
     const getBlocks = (from: number, count: number) => retry(() => provider.getBlocks(from, count, headId, { returnBlock: true, returnReceipt: false }) as Promise<BlockItem[]>, 3, 1500);
 

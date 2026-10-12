@@ -94,17 +94,27 @@ async function readBatch(provider: ProviderInterface, addresses: string[]): Prom
   }
 }
 
-/** Resolve metadata for token contracts, cached in memory and localStorage. */
-export async function resolveTokenMeta(provider: ProviderInterface, addresses: string[]): Promise<Map<string, TokenMeta | null>> {
+/** Metadata for token contracts, read from the node a few at a time. */
+export async function readTokenMeta(provider: ProviderInterface, addresses: string[]): Promise<Record<string, TokenMeta | null>> {
+  const found: Record<string, TokenMeta | null> = {};
+  for (let i = 0; i < addresses.length; i += BATCH) {
+    const batch = addresses.slice(i, i + BATCH);
+    const metas = await readBatch(provider, batch);
+    batch.forEach((address, j) => (found[address] = metas[j]));
+  }
+  return found;
+}
+
+/** Resolve metadata for token contracts with `read`, cached in memory and localStorage. */
+export async function resolveTokenMeta(addresses: string[], read: (missing: string[]) => Promise<Record<string, TokenMeta | null>>): Promise<Map<string, TokenMeta | null>> {
   restore();
   const wanted = [...new Set(addresses)];
   const missing = wanted.filter((address) => !memory.has(address));
-  for (let i = 0; i < missing.length; i += BATCH) {
-    const batch = missing.slice(i, i + BATCH);
-    const metas = await readBatch(provider, batch);
-    batch.forEach((address, j) => memory.set(address, metas[j]));
+  if (missing.length) {
+    const found = await read(missing);
+    for (const address of missing) memory.set(address, found[address] ?? null);
+    persist();
   }
-  if (missing.length) persist();
   return new Map(wanted.map((address) => [address, memory.get(address) ?? null]));
 }
 

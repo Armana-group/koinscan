@@ -5,6 +5,9 @@ import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { useWallet } from "@/contexts/WalletContext";
 import { getTokenInfoSync, getTransactionDetails } from "@/lib/api";
+import { fetchChain } from "@/koinos/chain-client";
+import { readBlockHeight } from "@/koinos/chain-reads";
+import { isKnownRpcNode } from "@/koinos/known-nodes";
 import { ago, fmt, fmtRaw, humanize, short } from "@/lib/format";
 import { buildTxStory, type TxStory } from "@/lib/tx-story";
 import { Advanced, CopyButton, KV, Mono, RawJson } from "@/components/ks/Advanced";
@@ -25,7 +28,7 @@ interface BlockRef {
 
 export default function TransactionPage() {
   const { txid } = useParams<{ txid: string }>();
-  const { rpcNode, provider } = useWallet();
+  const { rpcNode, jsonRpcNode, provider } = useWallet();
   const nameOf = useNameOf();
   const key = `${rpcNode}|${txid}`;
   const [loaded, setLoaded] = useState<{ key: string; status: "ready" | "missing" | "error"; payload: unknown; block: BlockRef | null } | null>(null);
@@ -44,14 +47,14 @@ export default function TransactionPage() {
         setLoaded({ key, status: "ready", payload: data, block: null });
         const blockId = data.containing_blocks?.[0];
         if (blockId) {
-          const info = provider
-            ? await provider
-                .call<{ block_items?: { block_height?: string }[] }>("block_store.get_blocks_by_id", { block_ids: [blockId], return_block: false, return_receipt: false })
-                .catch(() => null)
-            : null;
+          const read = isKnownRpcNode(jsonRpcNode)
+            ? fetchChain<{ height: number | null }>("block-height", jsonRpcNode, { id: blockId }).then((answer) => answer.height)
+            : provider
+              ? readBlockHeight(provider, blockId)
+              : Promise.resolve(null);
+          const height = await read.catch(() => null);
           if (!active) return;
-          const height = Number(info?.block_items?.[0]?.block_height);
-          const block = { id: blockId, height: Number.isFinite(height) && height > 0 ? height : null };
+          const block = { id: blockId, height };
           setLoaded((previous) => (previous?.key === key ? { ...previous, block } : previous));
         }
       } catch (error) {
@@ -62,7 +65,7 @@ export default function TransactionPage() {
     return () => {
       active = false;
     };
-  }, [rpcNode, provider, txid, key]);
+  }, [rpcNode, jsonRpcNode, provider, txid, key]);
 
   const current = loaded?.key === key ? loaded : null;
   const state = current?.status ?? "loading";

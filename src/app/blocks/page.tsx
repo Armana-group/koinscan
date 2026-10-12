@@ -69,12 +69,16 @@ export default function BlocksPage() {
     [provider],
   );
 
+  // Blocks `from` to `from + count - 1`, newest first: from the server for a
+  // trusted node, where final ones are shared by everyone paging back.
   const fetchRange = useCallback(
     async (from: number, count: number): Promise<BlockSummary[]> => {
-      if (!provider || count <= 0) return [];
+      if (count <= 0) return [];
+      if (isKnownRpcNode(jsonRpcNode)) return fetchChain<BlockSummary[]>("blocks", jsonRpcNode, { from: String(from), count: String(count) });
+      if (!provider) return [];
       return readBlockItems(await getBlocks(from, count));
     },
-    [provider, getBlocks],
+    [provider, jsonRpcNode, getBlocks],
   );
 
   // The newest blocks at or above `from`, newest first: from the server's shared

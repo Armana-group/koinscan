@@ -9,22 +9,21 @@
 // to get a visitor rate-limited by the public nodes. After an error the
 // interval backs off, up to ten times the usual, until a poll succeeds.
 import { useEffect, useState } from "react";
-import { useWallet } from "@/contexts/WalletContext";
+import { useChainSource } from "@/hooks/useChainSource";
 import { fetchChain } from "@/koinos/chain-client";
 import { readHead, type ChainHead } from "@/koinos/chain-reads";
-import { isKnownRpcNode } from "@/koinos/known-nodes";
 
 export interface HeadInfo extends ChainHead {
   receivedAt: number;
 }
 
 export function useHead(pollMs = 3000): HeadInfo | null {
-  const { provider, jsonRpcNode } = useWallet();
+  const { node, shared, direct } = useChainSource();
   const [head, setHead] = useState<HeadInfo | null>(null);
 
   useEffect(() => {
-    if (!provider) return;
-    const read = isKnownRpcNode(jsonRpcNode) ? () => fetchChain<ChainHead>("head", jsonRpcNode) : () => readHead(provider);
+    if (!shared && !direct) return;
+    const read = direct ? () => readHead(direct) : () => fetchChain<ChainHead>("head", node);
     let active = true;
     let timer: ReturnType<typeof setTimeout> | undefined;
     let polling = false;
@@ -71,7 +70,7 @@ export function useHead(pollMs = 3000): HeadInfo | null {
       document.removeEventListener("visibilitychange", onVisibility);
       if (timer) clearTimeout(timer);
     };
-  }, [provider, jsonRpcNode, pollMs]);
+  }, [node, shared, direct, pollMs]);
 
   return head;
 }

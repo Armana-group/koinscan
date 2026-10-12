@@ -10,7 +10,7 @@ import tokenAbi from "@/koinos/abi";
 import { abiPob } from "@/koinos/abis";
 import { abiFogata2ListPools } from "@/koinos/abis/fogata2ListPools";
 import { abiFogata2Pool } from "@/koinos/abis/fogata2Pool";
-import { FOGATA2_LIST_POOLS_CONTRACT_ID, KOIN_CONTRACT_ID, POB_CONTRACT_ID, VHP_CONTRACT_ID } from "@/koinos/constants";
+import { FOGATA2_LIST_POOLS_CONTRACT_ID, KOIN_CONTRACT_ID, NICKNAMES_CONTRACT_ID, POB_CONTRACT_ID, VHP_CONTRACT_ID } from "@/koinos/constants";
 import type { SampledBlock } from "@/lib/block-window";
 
 export interface ChainHead {
@@ -94,4 +94,33 @@ export async function readPoolNames(provider: ProviderInterface): Promise<Record
     if (!(value instanceof Error) && value?.name) names[pool.account] = value.name;
   });
   return names;
+}
+
+/** The height of the block with this id, or null if the node does not know it. */
+export async function readBlockHeight(provider: ProviderInterface, id: string): Promise<number | null> {
+  const info = await provider.call<{ block_items?: { block_height?: string }[] }>("block_store.get_blocks_by_id", { block_ids: [id], return_block: false, return_receipt: false });
+  const height = Number(info?.block_items?.[0]?.block_height);
+  return Number.isFinite(height) && height > 0 ? height : null;
+}
+
+/** The address's main @nickname, or null if it has none. */
+export async function readNickname(provider: ProviderInterface, address: string): Promise<string | null> {
+  const nicknames = new Contract({ id: NICKNAMES_CONTRACT_ID, provider, abi: utils.nicknamesAbi });
+  const { result } = await nicknames.functions.get_main_token({ value: address });
+  if (!result?.token_id) return null;
+  return new TextDecoder().decode(utils.toUint8Array(String(result.token_id).slice(2))) || null;
+}
+
+/** Raw balances of `owner` in each token contract, by contract; a token that does not answer counts as zero. */
+export async function readTokenBalances(provider: ProviderInterface, owner: string, tokens: string[]): Promise<Record<string, string>> {
+  const balances: Record<string, string> = {};
+  await Promise.all(
+    tokens.map(async (token) => {
+      const contract = new Contract({ id: token, provider, abi: tokenAbi });
+      const { result } = await contract.functions.balanceOf({ owner }).catch(() => ({ result: undefined }));
+      const value = (result as { value?: string } | undefined)?.value;
+      balances[token] = value ?? "0";
+    }),
+  );
+  return balances;
 }

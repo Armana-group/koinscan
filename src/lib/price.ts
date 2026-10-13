@@ -23,6 +23,8 @@ export interface KoinQuote {
 }
 
 let cachedPrice: CachedPrice | null = null;
+// Several parts of a page ask for the price as it loads; they share one request.
+let pending: Promise<KoinQuote | null> | null = null;
 const CACHE_TTL = 60000; // 60 seconds
 
 const PRICE_API_URL = '/api/koin-price';
@@ -45,6 +47,13 @@ export async function getKoinQuote(): Promise<KoinQuote | null> {
     return quoteOf(cachedPrice);
   }
 
+  pending ??= fetchQuote().finally(() => {
+    pending = null;
+  });
+  return pending;
+}
+
+async function fetchQuote(): Promise<KoinQuote | null> {
   try {
     const response = await fetch(PRICE_API_URL, {
       method: 'GET',

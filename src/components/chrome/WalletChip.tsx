@@ -57,7 +57,8 @@ export function WalletChip() {
   const walletName = signer?.name ?? savedWalletType;
   const connected = Boolean(signer);
 
-  const { balances, loading } = useWalletBalances(walletCardOpen ? address : null);
+  // Your own balances, always read fresh so a transfer you just sent shows.
+  const { balances, loading } = useWalletBalances(walletCardOpen ? address : null, { fresh: true });
   const price = useKoinPrice();
   const rc = useMana(walletCardOpen ? address : null);
 
